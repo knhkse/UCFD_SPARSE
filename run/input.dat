@@ -1,0 +1,8 @@
+nx      ny      nz
+100     80     60
+
+npx     npy     npz
+2      2       2
+
+nstep
+100
