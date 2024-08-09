@@ -138,7 +138,7 @@ void ns_parallel_lower_sweep(int n0, int ne, int neles, int nfvars, int nface, i
 }
 
 /**
- * @details     By processing lower sweep, intermediate solution \f$\Delta Q^*$\f is computed.
+ * @details     By processing lower sweep, intermediate solution \f$\Delta Q^*\f$ is computed.
  *              This function is used for RANS equations.  
  *              solution array is stored in `dub` array.
  */
@@ -210,7 +210,7 @@ void rans_parallel_lower_sweep(int n0, int ne, int neles, int nvars, int nfvars,
 
 
 /**
- * @details     By processing upper sweep, next time step solution \f$\Delta Q$\f is computed.
+ * @details     By processing upper sweep, next time step solution \f$\Delta Q\f$ is computed.
  *              This function is used for Euler or Navier-Stokes equations,
  *              which has the same flux shape.  
  *              Solution array is stored in `rhsb` array,
@@ -278,7 +278,7 @@ void ns_parallel_upper_sweep(int n0, int ne, int neles, int nfvars, int nface, i
 
 
 /**
- * @details     By processing upper sweep, next time step solution \f$\Delta Q$\f is computed.
+ * @details     By processing upper sweep, next time step solution \f$\Delta Q\f$ is computed.
  *              This function is used for RANS equations.  
  *              Solution array is stored in `rhsb` array,
  *              since right-hand-side array is no longer needed.
@@ -351,7 +351,7 @@ void rans_parallel_upper_sweep(int n0, int ne, int neles, int nvars, int nfvars,
 
 
 /**
- * @details     solution array updated by adding \f$\Delta Q$\f.
+ * @details     solution array updated by adding \f$\Delta Q\f$.
  *              Be aware that `rhsb` array in function parameter
  *              is the difference array after upper sweep,
  *              not the right-hand-side array.
