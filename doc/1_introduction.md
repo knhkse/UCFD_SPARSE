@@ -37,8 +37,8 @@ Generally, iterative time-stepping schemes like Block Jacobi, Gauss-Seidel metho
 	- {serial/parallel} : LU-SGS / Colored LU-SGS
 		- If OpenMP is enabled, both serial and parallel options are available.
 
-- {ns/rans}\_\_{serial/parallel}\_lower\_sweep : A function to execute lower sweep
-- {ns/rans}\_\_{serial/parallel}\_upper\_sweep : A function to execute upper sweep
+- {ns/rans}\_{serial/parallel}\_lower\_sweep : A function to execute lower sweep
+- {ns/rans}\_{serial/parallel}\_upper\_sweep : A function to execute upper sweep
 
 ## RANS equations
 RANS (Reynolds-Averaged Navier-Stokes) equations are supported by using integral formulation.
@@ -58,7 +58,7 @@ $$
 \end{align}
 $$
 
-- Subscription \f(T\f) means `Turbulent`.  
+- Subscription \f$T\f$ means `Turbulent`.  
 - Equation above is almost identical with the Euler or Navier-Stokes equations.
 - flux.c : Only uses `convective flux` term based on `Rusanov flux scheme` *[Rusanov, V.V. (1962)](https://www.sciencedirect.com/science/article/abs/pii/0041555362900629)*.
 - Convective flux of the RANS equations is calculated by multiplying contravariant velocity and turbulent conservative variables.
