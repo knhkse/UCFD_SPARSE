@@ -8,7 +8,7 @@ pages:
   script:
     - doxygen Doxyfile
     - mkdir public
-    - mv doc_build/* public
+    - mv doc_build/html/* public
     - ls -la public
   artifacts:
     paths:
