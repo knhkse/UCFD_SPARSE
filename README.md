@@ -28,9 +28,8 @@ Currently, functions in LU-SGS source file is fit for [pyBaram](https://gitlab.c
 - 5) `vec_fnorm` : face normal vector [nface, ndims, neles]  
     Normalized vector of each cell face. The vector is always outward-directed with reference to the current cell.
 
-More informations about function parameters are available in the \[documents\].
+More informations about function parameters are available in the [documents](https://xccels.github.io/UCFD_SPARSE/).
 
-> Currently, document link is not available. (Will be updated soon)
 
 
 ## Computation process
