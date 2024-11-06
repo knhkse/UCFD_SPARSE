@@ -4,7 +4,6 @@
  * @details     This file is an executable example file for LU-SGS method with MPI parallelism.
  *              Basic hexahedral gird is used, and 
  * 
- * 
  * @author
  *              - Namhyoung Kim (knhkse@inha.edu), Department of Aerospace Engineering, Inha University
  *              - Jin Seok Park (jinseok.park@inha.ac.kr), Department of Aerospace Engineering, Inha University
@@ -15,6 +14,7 @@
  *              Copyright (c) 2024, Namhyoung Kim and Jin Seok Park, Inha University, All rights reserved.
  * @par         License
  *              This project is release under the terms of the MIT License (see LICENSE file).
+ * 
  * =======================================================================================================================
  */
 
@@ -224,7 +224,6 @@ double run(int rank, int *params)
 
 /**
  * @brief       Write output file as txt format
- * @details     
  */
 void write_output(int nprocs, int *params, double *times)
 {

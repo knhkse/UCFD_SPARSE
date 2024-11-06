@@ -5,13 +5,13 @@
  *              To compute solution of the next time step, refer to the following steps.  
  *                
  *              (1) Preparing LU-SGS :  
- *                  Computes diagonal matrix of the Implicit operator.
+ *                  Computes diagonal matrix of the Implicit operator.  
  *              (2) Lower sweep :  
- *                  First step of LU-SGS method, which computes intermediate solution difference array.
+ *                  First step of LU-SGS method, which computes intermediate solution difference array.  
  *              (3) Upper sweep :  
- *                  Second step of LU-SGS method, which computes next solution difference array.
+ *                  Second step of LU-SGS method, which computes next solution difference array.  
  *              (4) Update :  
- *                  Time integration by adding current solution with next time step solution difference
+ *                  Time integration by adding current solution with next time step solution difference  
  * 
  * @note        In case of RANS equations, add rans_serial_{}_sweep function right after the ns_serial_{}_sweep function.  
  *              Be aware that ns and rans sweep function must be paired with each sweep step.
@@ -26,6 +26,7 @@
  *              Copyright (c) 2024, Namhyoung Kim and Jin Seok Park, Inha University, All rights reserved.
  * @par         License
  *              This project is release under the terms of the MIT License (see LICENSE file).
+ * 
  * =======================================================================================================================
  */
 

@@ -1,3 +1,23 @@
+/** ======================================================================================================================
+ * @file        omp3d.c
+ * @brief       Example for LU-SGS method using MPI & SMP.
+ * @details     This file is an executable example file for `Colored LU-SGS` method with MPI parallelism.
+ *              Basic hexahedral gird is used, and 
+ * 
+ * @author
+ *              - Namhyoung Kim (knhkse@inha.edu), Department of Aerospace Engineering, Inha University
+ *              - Jin Seok Park (jinseok.park@inha.ac.kr), Department of Aerospace Engineering, Inha University
+ * 
+ * @date        July 2024
+ * @version     1.0
+ * @par         Copyright
+ *              Copyright (c) 2024, Namhyoung Kim and Jin Seok Park, Inha University, All rights reserved.
+ * @par         License
+ *              This project is release under the terms of the MIT License (see LICENSE file).
+ * 
+ * =======================================================================================================================
+ */
+
 #include <math.h>
 #include <time.h>
 #include <stdio.h>

@@ -12,15 +12,17 @@
  *              Copyright (c) 2024, Namhyoung Kim and Jin Seok Park, Inha University, All rights reserved.
  * @par         License
  *              This project is release under the terms of the MIT License (see LICENSE file).
+ * 
  * =======================================================================================================================
  */
 
 #include "flux.h"
 
-/** Default value */
 #ifndef CONST_H
-    #define gamma   1.4     /* Specific heat ratio */
-    #define pmin    1e-15   /* Minimum pressure value */
+    /** Specific heat ratio */
+    #define gamma   1.4
+    /** Minimum pressure value */
+    #define pmin    1e-15
 #endif
 
 

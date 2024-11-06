@@ -1,3 +1,23 @@
+/** ======================================================================================================================
+ * @file        queue.c
+ * @brief       
+ * @details     Queue data structure for computing Reverse Cuthill-McKee algorithm.
+ *              Queue is a FIFO (First-In First-Out) data structure to access data in serial input order.  
+ * 
+ * @author
+ *              - Namhyoung Kim (knhkse@inha.edu), Department of Aerospace Engineering, Inha University
+ *              - Jin Seok Park (jinseok.park@inha.ac.kr), Department of Aerospace Engineering, Inha University
+ * 
+ * @date        July 2024
+ * @version     1.0
+ * @par         Copyright
+ *              Copyright (c) 2024, Namhyoung Kim and Jin Seok Park, Inha University, All rights reserved.
+ * @par         License
+ *              This project is release under the terms of the MIT License (see LICENSE file).
+ * 
+ * =======================================================================================================================
+ */
+
 #include <regex.h>
 #include <stdio.h>
 #include <string.h>
