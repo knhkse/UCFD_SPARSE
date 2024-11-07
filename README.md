@@ -117,7 +117,7 @@ mpirun -np 8 python omp3d.x $(UCFD_PATH)/run/input.dat $(UCFD_PATH)/lib/liblusgs
 
 
 # References
-[XCCELS](https://xccels.github.io/main/)
-[Aerodynamic Analysis & Design Laboratory](http://aadl.inha.ac.kr)
+[XCCELS](https://xccels.github.io/main/)  
+[Aerodynamic Analysis & Design Laboratory](http://aadl.inha.ac.kr)  
 [pyBaram](https://gitlab.com/aadl_inha/pyBaram)
 
