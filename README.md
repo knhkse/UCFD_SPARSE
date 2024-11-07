@@ -1,4 +1,6 @@
 # UCFD_SPARSE: Unstructured Grid Based CFD Applicable Asymmetric Sparse Matrix Numerical Library
+[![](https://img.shields.io/badge/documentation-32CD32)](https://xccels.github.io/UCFD_SPARSE/)
+![](https://img.shields.io/badge/license-MIT_License-yellow.svg)
 
 UCFD_SPARSE provides LU-SGS (Lower Upper Symmetric Gauss-Seidel) type numerical methods for unstructured grid based Computational Fluid Dynamics (CFD) simulation. Since time accuracy is less important in steady flows problem, many researchers has intorduced robust and fast-converging time marching schemes. LU-SGS method is one of the widely-used method which was proposed by *[Jameson & Yoon (1987)](https://arc.aiaa.org/doi/abs/10.2514/3.9724)* to obtain steady solution, and has been successfully applied to the unstructured grid problem (*[Sharov & Nakahashi (1997)](https://arc.aiaa.org/doi/10.2514/6.1997-2102)*).  
 2-dimensional or 3-dimensional problem with Euler/Navier-Stokes/RANS equations is applicable. For RANS equations, only 1-equation and 2-equations model are supported and are computed separately with Navier-Stokes equations.
@@ -57,7 +59,7 @@ LU-SGS method consists of two main sweeps (lower and upper sweep), and each iter
 
 ## Download
 ```
-git clone https://gitlab.com/aadl_inha/ucfd_sparse.git
+git clone https://github.com/xccels/UCFD_SPARSE.git
 ```
 
 ## Compile
@@ -84,8 +86,24 @@ git clone https://gitlab.com/aadl_inha/ucfd_sparse.git
 `Makefile.inc` file in the root directory defines compiler and optimization options. This can be modified depending on each user's computer setting.
 
 ### Running the example
-After building the example, two executable files will be located in the `run` directory. The `.x` file can be executed as follows: `mpirun -np 8 ./mpi3d.x ./input.dat` or `mpirun -np 8 ./omp3d.x ./input.dat`. Note that the total number of processors to use for MPI communication must match the total number of elements defined in the `input.dat` file. The total number of elements is computed by multiplying `npx`, `npy`, and `npz`.  
-Python examples are also available. In this case, a dynamic library (.so) is used. Because the Python file should be executed in the `example` directory, absolute paths for the dynamic library and input file are recommended. For more stability, it is recommended to pass the number of threads to the command arguments in the multi-threading case. For example, `mpirun -np 8 python omp3d.x $(UCFD_PATH)/run/input.dat $(UCFD_PATH)/lib/liblusgs.so nthreads=8`.
+After building the example, two executable files will be located in the `run` directory. The `.x` file can be executed as follows:
+
+```
+mpirun -np 8 ./mpi3d.x ./input.dat
+```
+
+or
+
+```
+mpirun -np 8 ./omp3d.x ./input.dat
+```
+
+Note that the total number of processors to use for MPI communication must match the total number of elements defined in the `input.dat` file. The total number of elements is computed by multiplying `npx`, `npy`, and `npz`.  
+Python examples are also available. In this case, a dynamic library (.so) is used. Since the Python file should be executed in the `example` directory, absolute paths for the dynamic library and input file are required. Also, for more stability, it is recommended to pass the number of threads to the command arguments for multi-threading case. Python example can be executed as follows:
+
+```
+mpirun -np 8 python omp3d.x $(UCFD_PATH)/run/input.dat $(UCFD_PATH)/lib/liblusgs.so nthreads=8
+```
 
 
 # Folder structure
@@ -99,5 +117,7 @@ Python examples are also available. In this case, a dynamic library (.so) is use
 
 
 # References
+[XCCELS](https://xccels.github.io/main/)
 [Aerodynamic Analysis & Design Laboratory](http://aadl.inha.ac.kr)
+[pyBaram](https://gitlab.com/aadl_inha/pyBaram)
 

@@ -1,7 +1,7 @@
 /** ======================================================================================================================
  * @file        lusgs.c
- * @brief       UCFD_SPARSE : Unstructured Grid Based CFD Applicable Asymmetric Sparse Matrix Numerical Library
- * @details     LU-SGS time integration method for unstructured grid.
+ * @brief       LU-SGS time integration method for unstructured grid.
+ * @details     LU-SGS time integration method (Single thread only).  
  *              To compute solution of the next time step, refer to the following steps.  
  *                
  *              (1) Preparing LU-SGS :  

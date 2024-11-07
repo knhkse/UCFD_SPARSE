@@ -4,7 +4,7 @@ Theory                          {#theory_page}
 [TOC]
 
 
-# LU-SGS Method
+# LU-SGS
 TBU
 
 
@@ -12,5 +12,3 @@ TBU
 TBU
 
 
-# Reverse Cuthill-McKee Algorithm
-TBU

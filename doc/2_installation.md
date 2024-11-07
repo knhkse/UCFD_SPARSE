@@ -7,7 +7,7 @@ Installation                        {#install_page}
 ## 1. Git clone
 
 ```
-git clone https://gitlab.com/aadl_inha/ucfd_sparse.git
+git clone https://github.com/xccels/UCFD_SPARSE.git
 ```
 
 ## 2. Download ZIP

@@ -1,16 +1,16 @@
 /** ======================================================================================================================
  * @file        coloredlusgs.c
- * @brief       UCFD_SPARSE : Unstructured Grid Based CFD Applicable Asymmetric Sparse Matrix Numerical Library
- * @details     Colored LU-SGS time integration method for unstructured grid.  
- *              Multi-thread computation is enabled using <omp.h> header file.
+ * @brief       Colored LU-SGS time integration method for unstructured grid.
+ * @details     LU-SGS time integration method applying Multi-coloring algorithm.  
+ *              Multi-thread computation is enabled using <omp.h> header file.  
  *              To compute solution of the next time step, refer to the following steps.  
  *                
  *              (1) Preparing LU-SGS :  
- *                  Computes diagonal matrix of the Implicit operator.
+ *                  Computes diagonal matrix of the Implicit operator.  
  *              (2) Lower sweep :  
- *                  First step of LU-SGS method, which computes intermediate solution difference array.
+ *                  First step of LU-SGS method, which computes intermediate solution difference array.  
  *              (3) Upper sweep :  
- *                  Second step of LU-SGS method, which computes next solution difference array.
+ *                  Second step of LU-SGS method, which computes next solution difference array.  
  *              (4) Update :  
  *                  Time integration by adding current solution with next time step solution difference
  * 
