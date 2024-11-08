@@ -11,7 +11,6 @@
  */
 void ns_flux_container(int nfvars, int ndims, double *u, double *nf, double *f);
 
-
 /**
  * @brief       Computes flux for RANS equations.
  * @param       nfvars      Number of flux variables
