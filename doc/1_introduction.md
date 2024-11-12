@@ -30,7 +30,7 @@ Generally, iterative time-stepping schemes like Block Jacobi, Gauss-Seidel metho
 # Features
 
 ## LU-SGS method
-\image html lusgs.png width=50%
+\image html lusgs.png width=60%
 
 - There are two options in UCFD_SPARSE module.
 	- {ns/rans} : Navier-Stokes equations / RANS equations

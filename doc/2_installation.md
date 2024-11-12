@@ -12,7 +12,7 @@ git clone https://github.com/xccels/UCFD_SPARSE.git
 
 ## 2. Download ZIP
 Code - Download source code - zip
-\image html install.png width=50%
+\image html install.png width=80%
 
 # Compile
 ## Prerequisites
