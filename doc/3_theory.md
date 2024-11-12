@@ -1,14 +1,8 @@
 Theory                          {#theory_page}
 ======
 
-[TOC]
+For more information, refer to the link pages.
 
+@subpage lusgs
 
-# LU-SGS
-TBU
-
-
-# Multi-coloring Algorithm
-TBU
-
-
+@subpage coloring
