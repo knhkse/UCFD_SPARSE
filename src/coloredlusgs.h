@@ -2,6 +2,13 @@
 #define COLOREDLUSGS_H
 
 /**
+ * @file        coloredlusgs.h
+ * @brief       Header file for Colored LU-SGS method
+ * @details     Declaration of each function used in Colored LU-SGS method.
+ *              Parameters are explained here.
+ */
+
+/**
  * @brief       Computes Diagonal matrix for Colored LU-SGS method.
  * @param       neles       Number of element cells
  * @param       nface       Number of faces depends on element type

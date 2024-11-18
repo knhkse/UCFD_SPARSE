@@ -1,7 +1,8 @@
 /** ======================================================================================================================
  * @file        flux.c
- * @brief       Computes numerical flux from conservative variables.  
- *              Non-physical value correction included.
+ * @brief       Computes numerical flux from conservative variables.
+ * @details     Non-physical value correction included.
+ * 
  * @author
  *              - Namhyoung Kim (knhkse@inha.edu), Department of Aerospace Engineering, Inha University
  *              - Jin Seok Park (jinseok.park@inha.ac.kr), Department of Aerospace Engineering, Inha University
@@ -25,6 +26,7 @@
     #define pmin    1e-15
 #endif
 
+#define max(a,b) (((a) > (b)) ? (a) : (b))
 
 /**
  * @details     Computes Euler/Navier-Stokes flux vector.  
@@ -33,11 +35,18 @@
  *              Therefore, only convective flux is used.
  */
 void ns_flux_container(int nfvars, int ndims, double *u, double *nf, double *f)
-{
-    double rho = u[0];          /** density */
-    double et = u[nfvars-1];    /** Total Energy */
-    double temp = 0.0;          /** \f$\rho^2 \times (u^2 + v^2)\f$ */
-    double contrav = 0.0;       /** Contravariant velocity */
+{   
+    /**
+     * Variable description :  
+     * `rho` : Density  
+     * `et` : Total Energy  
+     * `temp` : \f$\rho^2 \times (u^2 + v^2)\f$  
+     * `contrav` : Contravariant velocity
+     */
+    double rho = u[0];
+    double et = u[nfvars-1];
+    double temp = 0.0;
+    double contrav = 0.0;
     int i;
 
     for (i=0; i<ndims; i++) {
@@ -86,4 +95,28 @@ void rans_flux_container(int nfvars, int ndims, int nturbvars, double *u, double
     for (int i=0; i<nturbvars; i++) {
         f[i] = u[nfvars+i]*contrav;
     }
+}
+
+
+int rans_source_jacobian(int nvars, int ntvars, double betast, \
+                         double *uf, double *tmat, double *dsrc)
+{
+    /* 1-equation RANS model (Spalart-Allmaras) */
+    if (ntvars == 1) {
+        tmat[0] += dsrc[nvars-1];
+    }
+
+    /* 2-equations RANS model (kw-SST) */
+    else if (ntvars == 2) {
+        double k = uf[nvars-2] / uf[0];
+        tmat[0] += dsrc[nvars-2];
+        tmat[1] += max(betast*k, 0.0);
+        tmat[3] += dsrc[nvars-1];
+    }
+
+    else {
+        return -1;
+    }
+
+    return 0;
 }
