@@ -12,7 +12,7 @@
  *              Input vector `b` is overwritten with the solution vector `x`.  
  * 
  * @note        Input matrix must be the n-by-n square matrix, and `Row-major` format.  
- *              Each function treats target matrix as one-dimensional array.
+ *              Each function treats target matrix as a one-dimensional array.
  * 
  * @author
  *              - Namhyoung Kim (knhkse@inha.edu), Department of Aerospace Engineering, Inha University
@@ -69,7 +69,6 @@ void ludcmp(int n, double *A)
 
 /**
  * @details     This function performs Forward/Backward substitution of LU decomposed matrix.
- *              
  */
 void lusubst(int n, double *LU, double *b)
 {

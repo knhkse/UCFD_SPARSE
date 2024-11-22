@@ -26,8 +26,8 @@
 
 #include <stdio.h>
 #include "blusgs.h"
-#include "inverse.h"
 #include "flux.h"
+#include "inverse.h"
 
 /**
  * @details     This function computes diagonal matrices of the implicit operator.
@@ -39,25 +39,24 @@
 void ns_serial_pre_blusgs(int neles, int nfvars, int nface, double factor, \
                       double *fnorm_vol, double *dt, double *diag, double *fjmat)
 {
-    int idx;        // Element index
-    int jdx;        // Face index
-    int kdx;
-    int row, col;
+    int idx, jdx, kdx, row, col;        // Element index
     int matsize = nfvars*nfvars;
-    double dmat[matsize];     // Diagonal matrix at each cell
     double fv, dti;
+    double dmat[matsize];     // Diagonal matrix at each cell
 
     for (idx=0; idx<neles; idx++) {
         // Initialize diagonal matrix
-        for (kdx=0; kdx<matsize; kdx++)
+        for (kdx=0; kdx<matsize; kdx++) {
             dmat[kdx] = 0.0;
+        }
         
         // Computes diagonal matrix based on neighbor cells
         for (jdx=0; jdx<nface; jdx++) {
             fv = fnorm_vol[neles*jdx + idx];
             for (row=0; row<nfvars; row++) {
                 for (col=0; col<nfvars; col++) {
-                    dmat[nfvars*row+col] += fjmat[idx+neles*jdx+nface*neles*col+nfvars*nface*neles*row]*fv;
+                    dmat[nfvars*row+col] \
+                        += fjmat[idx+neles*jdx+nface*neles*col+nfvars*nface*neles*row]*fv;
                 }
             }
         }
@@ -91,16 +90,12 @@ void ns_serial_pre_blusgs(int neles, int nfvars, int nface, double factor, \
 void rans_serial_pre_blusgs(int neles, int nvars, int nfvars, int nface, double factor, double betast, \
                             double *fnorm_vol, double *uptsb, double *dt, double *tdiag, double *tjmat, double *dsrc)
 {
-    int idx;        // Element index
-    int jdx;        // Face index
-    int kdx;
-    int row, col;
+    int idx, jdx, kdx, row, col, err;        // Element index
     int ntvars = nvars - nfvars;
     int matsize = ntvars*ntvars;
+    double fv;
     double tmat[matsize];     // Diagonal matrix at each cell
     double uf[nvars], dsrcf[nvars];
-    double fv;
-    int err;
 
     for (idx=0; idx<neles; idx++) {
         // Initialize diagonal matrix
@@ -117,7 +112,8 @@ void rans_serial_pre_blusgs(int neles, int nvars, int nfvars, int nface, double 
             fv = fnorm_vol[neles*jdx + idx];
             for (row=0; row<ntvars; row++) {
                 for (col=0; col<ntvars; col++) {
-                    tmat[ntvars*row+col] += tjmat[idx+neles*jdx+nface*neles*col+ntvars*nface*neles*row]*fv;
+                    tmat[ntvars*row+col] \
+                        += tjmat[idx+neles*jdx+nface*neles*col+ntvars*nface*neles*row]*fv;
                 }
             }
         }
@@ -146,9 +142,8 @@ void rans_serial_pre_blusgs(int neles, int nvars, int nfvars, int nface, double 
 }
 
 
-
 /**
- * @details     By processing lower sweep, intermediate solution \f$\Delta Q^(k+1)\f$ is computed.
+ * @details     By processing lower sweep, intermediate solution \f$\Delta Q^*\f$ is computed.
  *              This function is used for Euler or Navier-Stokes equations,
  *              which has the same flux shape.  
  *              solution array is stored in `dub` array.
@@ -190,7 +185,8 @@ void ns_serial_block_lower_sweep(int neles, int nfvars, int nface, \
                 for (row=0; row<nfvars; row++) {
                     val = 0.0;
                     for (col=0; col<nfvars; col++) {
-                        val += fjmat[idx+neles*jdx+nface*neles*col+nfvars*nface*neles*row]*dub[neib+neles*col];
+                        val += fjmat[idx+neles*jdx+nface*neles*col+nfvars*nface*neles*row] \
+                                * dub[neib+neles*col];
                     }
                     rhs[row] -= val*fv;
                 }
@@ -208,6 +204,14 @@ void ns_serial_block_lower_sweep(int neles, int nfvars, int nface, \
 }
 
 
+/**
+ * @details     Lower sweep of Block LU-SGS.  
+ *              This function is used for RANS equations.
+ *              solution array is stored in `dub` array.
+ * 
+ * @note        The last argument array, `tjmat` is NOT identical with ns_serial_pre_blusgs function.  
+ *              For more details, refer to the Block LU-SGS in the document.
+ */
 void rans_serial_block_lower_sweep(int neles, int nvars, int nfvars, int nface, \
                                    int *nei_ele, int *mapping, int *unmapping, double *fnorm_vol, \
                                    double *rhsb, double *dub, double *tdiag, double *tjmat)
@@ -215,8 +219,8 @@ void rans_serial_block_lower_sweep(int neles, int nvars, int nfvars, int nface, 
     int _idx, idx, jdx, kdx, neib;                              // Index variables
     int row, col;
     int ntvars = nvars - nfvars;
-    double rhs[ntvars], dmat[ntvars*ntvars];
     double val, fv;
+    double rhs[ntvars], dmat[ntvars*ntvars];
 
     // Lower sweep via mapping
     for (_idx=0; _idx<neles; _idx++) {
@@ -238,12 +242,13 @@ void rans_serial_block_lower_sweep(int neles, int nvars, int nfvars, int nface, 
             neib = nei_ele[idx+neles*jdx];
 
             if (unmapping[neib] != _idx) {
-                fv = fnorm_vol[neles*jdx + idx];
+                fv = fnorm_vol[idx+neles*jdx];
                 // Matrix-Vector multiplication
                 for (row=0; row<ntvars; row++) {
                     val = 0.0;
                     for (col=0; col<ntvars; col++) {
-                        val += tjmat[idx+neles*jdx+nface*neles*col+ntvars*nface*neles*row]*dub[neib+neles*(col+nfvars)];
+                        val += tjmat[idx+neles*jdx+nface*neles*col+ntvars*nface*neles*row] \
+                                * dub[neib+neles*(col+nfvars)];
                     }
                     rhs[row] -= val*fv;
                 }
@@ -261,14 +266,23 @@ void rans_serial_block_lower_sweep(int neles, int nvars, int nfvars, int nface, 
 }
 
 
+/**
+ * @details     By processing upper sweep, next sub-iteration solution \f$\Delta Q^(k+1)\f$ is computed.
+ *              This function is used for Euler or Navier-Stokes equations,
+ *              which has the same flux shape.  
+ *              solution array is stored in `dub` array.
+ * 
+ * @note        The last argument array, `fjmat` is NOT identical with ns_serial_pre_blusgs function.  
+ *              For more details, refer to the Block LU-SGS in the document.
+ */
 void ns_serial_block_upper_sweep(int neles, int nfvars, int nface, \
                                  int *nei_ele, int *mapping, int *unmapping, double *fnorm_vol, \
                                  double *rhsb, double *dub, double *diag, double *fjmat)
 {
     int _idx, idx, jdx, kdx, neib;                              // Index variables
     int row, col;
-    double rhs[nfvars], dmat[nfvars*nfvars];
     double val, fv;
+    double rhs[nfvars], dmat[nfvars*nfvars];
 
     // Upper sweep via mapping
     for (_idx=neles-1; _idx>-1; _idx--) {
@@ -295,7 +309,8 @@ void ns_serial_block_upper_sweep(int neles, int nfvars, int nface, \
                 for (row=0; row<nfvars; row++) {
                     val = 0.0;
                     for (col=0; col<nfvars; col++) {
-                        val += fjmat[idx+neles*jdx+nface*neles*col+nfvars*nface*neles*row]*dub[neib+neles*col];
+                        val += fjmat[idx+neles*jdx+nface*neles*col+nfvars*nface*neles*row] \
+                                * dub[neib+neles*col];
                     }
                     rhs[row] -= val*fv;
                 }
@@ -313,6 +328,14 @@ void ns_serial_block_upper_sweep(int neles, int nfvars, int nface, \
 }
 
 
+/**
+ * @details     Upper sweep of Block LU-SGS.  
+ *              This function is used for RANS equations.
+ *              solution array is stored in `dub` array.
+ * 
+ * @note        The last argument array, `tjmat` is NOT identical with ns_serial_pre_blusgs function.  
+ *              For more details, refer to the Block LU-SGS in the document.
+ */
 void rans_serial_block_upper_sweep(int neles, int nvars, int nfvars, int nface, \
                                    int *nei_ele, int *mapping, int *unmapping, double *fnorm_vol, \
                                    double *rhsb, double *dub, double *tdiag, double *tjmat)
@@ -320,8 +343,8 @@ void rans_serial_block_upper_sweep(int neles, int nvars, int nfvars, int nface, 
     int _idx, idx, jdx, kdx, neib;                              // Index variables
     int row, col;
     int ntvars = nvars - nfvars;
-    double rhs[ntvars], dmat[ntvars*ntvars];
     double val, fv;
+    double rhs[ntvars], dmat[ntvars*ntvars];
 
     // Lower sweep via mapping
     for (_idx=neles-1; _idx>-1; _idx--) {
@@ -348,7 +371,8 @@ void rans_serial_block_upper_sweep(int neles, int nvars, int nfvars, int nface, 
                 for (row=0; row<ntvars; row++) {
                     val = 0.0;
                     for (col=0; col<ntvars; col++) {
-                        val += tjmat[idx+neles*jdx+nface*neles*col+ntvars*nface*neles*row]*dub[neib+neles*(col+nfvars)];
+                        val += tjmat[idx+neles*jdx+nface*neles*col+ntvars*nface*neles*row] \
+                                * dub[neib+neles*(col+nfvars)];
                     }
                     rhs[row] -= val*fv;
                 }
@@ -365,6 +389,10 @@ void rans_serial_block_upper_sweep(int neles, int nvars, int nfvars, int nface, 
     }
 }
 
+
+/**
+ * @details     solution array is updated by adding \f$\Delta Q\f$.
+ */
 void serial_update(int neles, int nvars, double *uptsb, double *dub, double *subres)
 {
     int idx, kdx;

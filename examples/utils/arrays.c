@@ -66,6 +66,26 @@ void ***malloc_3d(const size_t rows, const size_t cols, const size_t depth, cons
 }
 
 
+void ****malloc_4d(const size_t rows, const size_t cols, const size_t depth, const size_t dims, const size_t T) {
+    void *data = (void *) malloc(rows*cols*depth*dims*T);
+    void **ar3 = (void **)malloc(rows*cols*depth*sizeof(void*));
+    void ***ar2 = (void ***)malloc(rows*cols*sizeof(void**));
+    void ****ar = (void ****)malloc(rows*sizeof(void ***));
+    int i, j, k, idx;
+    char *p = (char*)data;
+    for (i=0; i<rows; i++){
+        for (j=0; j<cols; j++){
+            for (k=0; k<depth; k++){
+                ar3[(i*cols+j)*depth+k] = &p[((i*cols+j)*depth+k)*dims*T];
+            }
+            ar2[i*cols+j] = &ar3[(i*cols+j)*depth];
+        }
+        ar[i] = &ar2[i*cols];
+    }
+    return ar;
+}
+
+
 /**
  * @brief       Deallocate 2D array
  * @param       mat         2D array
@@ -83,6 +103,13 @@ void dealloc_2d(void **mat)
  */
 void dealloc_3d(void ***mat)
 {
+    free(**mat);
+    free(*mat);
+    free(mat);
+}
+
+void dealloc_4d(void ****mat) {
+    free(***mat);
     free(**mat);
     free(*mat);
     free(mat);
