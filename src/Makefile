@@ -12,6 +12,7 @@ LUSGS = $(OBJDIR)/lusgs.o
 BLUSGS = $(OBJDIR)/blusgs.o
 FLUX = $(OBJDIR)/flux.o
 CLUSGS = $(OBJDIR)/coloredlusgs.o
+CBLUSGS = $(OBJDIR)/coloredblusgs.o
 INVERSE = $(OBJDIR)/inverse.o
 CONST = const.h
 
@@ -30,11 +31,14 @@ $(CLUSGS) : coloredlusgs.c coloredlusgs.h
 $(BLUSGS) : blusgs.c blusgs.h
 	$(CC) $(CFLAGS) -fPIC -c $< -o $@
 
+$(CBLUSGS) : coloredblusgs.c coloredblusgs.h
+	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+
 $(SLIB) : $(FLUX) $(LUSGS) $(CLUSGS)
 	ar qc $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
-$(SBLIB) : $(FLUX) $(BLUSGS) $(INVERSE) # Add CBLUSGS later
+$(SBLIB) : $(FLUX) $(INVERSE) $(BLUSGS) $(CBLUSGS)
 	ar qc $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
@@ -42,7 +46,7 @@ $(DLIB) : $(FLUX) $(LUSGS) $(CLUSGS)
 	$(CC) -fPIC -shared -o $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
-$(DBLIB) : $(FLUX) $(BLUSGS) # Add CBLUSGS later
+$(DBLIB) : $(FLUX) $(INVERSE) $(BLUSGS) $(CBLUSGS)
 	$(CC) -fPIC -shared -o $@ $^
 	cp $@ $(UCFD_PATH)/lib
 

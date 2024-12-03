@@ -352,7 +352,7 @@ void rans_parallel_upper_sweep(int n0, int ne, int neles, int nvars, int nfvars,
 
 
 /**
- * @details     solution array updated by adding \f$\Delta Q\f$.
+ * @details     solution array is updated by adding \f$\Delta Q\f$.
  *              Be aware that `rhsb` array in function parameter
  *              is the difference array after upper sweep,
  *              not the right-hand-side array.
