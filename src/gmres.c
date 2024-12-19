@@ -30,7 +30,7 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, c
                            const int *row_ptr, const int *col_ind, const int *diag_ind, double *pre_nnz_data, \
                            const double tol, const double itmax, double *dub, double *rhsb, double *H, double *V, double *g, double *y, double *w, double *r)
 {   
-    int it, i, j, err;
+    int it, i, j;
     const int n = neles * nvars;
     double beta, tmp, c, s, h1, h2, rr;
     sparse_status_t status;
@@ -48,7 +48,7 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, c
 
     for (it=0; it<itmax; it++) {
         beta = cblas_dnrm2(n, r, 1);
-        // printf("%d iteration, %.10f residual\n", it, beta);
+        // printf("%d: %.10f\n", it, beta);
         if (beta < tol) return UCFD_STATUS_CONVERGED;
 
         if (precon_type == ILU0) {
@@ -126,10 +126,10 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, c
         if (status != SPARSE_STATUS_SUCCESS) printf("Residual computation error\n");
     }
 
-    if (it == itmax){
-        printf("Not converged in %d iteration, residual=%.5f", it, beta);
-        return it;
-    }
+    // if (it == itmax){
+    //     printf("Not converged in %d iteration, residual=%.5f", it, beta);
+    //     return it;
+    // }
 
     return UCFD_STATUS_ERROR;
 }
@@ -140,7 +140,7 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, c
 ucfd_status_t serial_gmres2(const int neles, const int nvars, const int m, sparse_matrix_t op, const int *row_ptr, const int *col_ind, const int *diag_ind, \
                             ucfd_precon_type_t precon_type, double *pre_nnz_data, const double tol, const double itmax, double *dub, double *rhsb)
 {
-    int it, i, j, err;
+    int it, i, j;
     const int n = neles * nvars;
     double beta, tmp, c, s, h1, h2, rr;
     sparse_status_t status;

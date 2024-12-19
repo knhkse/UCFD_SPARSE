@@ -5,11 +5,15 @@
 #include "precon.h"
 
 
+/**
+ * Incomplete LU Preconditioner
+ * ipar = [ijarr, kjarr] = []
+ */
 // !! Diagonal matrices are inverted !!
 ucfd_precon_status_t ilu0_prepare_bsr(const int neles, const int nvars, \
                                       const int *row_ptr, const int *col_ind, const int *diag_ind, double *nnz_data)
 {
-    int idx, jdx, kdx, ldx, mdx, row, col;
+    int idx, jdx, kdx, ldx, mdx;
     int st, ed, ijdx, kjdx, ijed, kjed;
     double mat[nvars*nvars];
     int ijarr[nvars+3], kjarr[nvars+3];
@@ -200,4 +204,32 @@ ucfd_precon_status_t ilu0_sweep_bsr(const int neles, const int nvars, const int 
 
     return UCFD_PRECON_SUCCESS;
 }
+
+
+/**
+ * LU-SGS Preconditioner
+ */
+
+// ? Speed Test
+// * 1) No prepare & dgetrf -> dgetrs
+// * 2) dgetrf -> dgetri & Matrix-Matrix multiplication
+
+// ucfd_precon_status_t lusgs_sweep_bsr(const int neles, const int nvars, const int *row_ptr, const int *col_ind, const int *diag_ind, \
+//                                      double *nnz_data, double *b)
+// {
+
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
