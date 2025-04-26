@@ -1,5 +1,6 @@
 #ifndef FLUX_H
 #define FLUX_H
+#include "const.h"
 
 /**
  * @file        flux.h

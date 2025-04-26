@@ -34,6 +34,7 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, c
                            const int *row_ptr, const int *col_ind, const int *diag_ind, double *pre_nnz_data,
                            const double tol, const double itmax, double *x, double *b, double *H, double *V, double *g, double *y, double *w, double *r);
 
+
 /**
 * @brief       Single GMRES iteration routine
 * @param       op              `Intel MKL` sparse matrix handler (System matrix)
@@ -57,6 +58,7 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, c
 ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, const int neles, const int nvars, const int m,
                          const int *row_ptr, const int *col_ind, const int *diag_ind, double *pre_nnz_data,
                          double *x, double *b, double *H, double *V, double *g, double *y, double *w, double *r);
+
 
 /**
  * @brief       Serial BiCGstab routine

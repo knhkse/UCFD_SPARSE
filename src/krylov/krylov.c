@@ -167,7 +167,7 @@ ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, con
                          const int *row_ptr, const int *col_ind, const int *diag_ind, double *pre_nnz_data,
                          double *x, double *b, double *H, double *V, double *g, double *y, double *w, double *r)
 {
-    int it, i, j;
+    int i, j;
     const int n = neles * nvars;
     double beta, tmp, c, s, h1, h2, rr;
     sparse_status_t status;
@@ -265,7 +265,7 @@ ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type
                               const int *row_ptr, const int *col_ind, const int *diag_ind, double *pre_nnz_data,
                               const double tol, const double itmax, double *x, double *b, double *r, double *p, double *v, double *s, double *t)
 {
-    int it, i, j, err;
+    int it;
     const int n = neles * nvars;
     double rho, rhoprev, alpha, beta, omega, resid;
     double rv, ts, tt;

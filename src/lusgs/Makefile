@@ -10,36 +10,39 @@ INCDIR = ./include
 
 LUSGS = $(OBJDIR)/lusgs.o
 BLUSGS = $(OBJDIR)/blusgs.o
-FLUX = $(OBJDIR)/flux.o
 CLUSGS = $(OBJDIR)/coloredlusgs.o
 CBLUSGS = $(OBJDIR)/coloredblusgs.o
+FLUX = $(OBJDIR)/flux.o
 INVERSE = $(OBJDIR)/inverse.o
 CONST = const.h
 
+# Object files
 $(FLUX) : flux.c flux.h $(INCDIR)/$(CONST)
-	$(CC) $(CFLAGS) -fPIC -imacros $(INCDIR)/$(CONST) -c $< -o $@
+	$(CC) $(CFLAGS) -fPIC -I$(INCDIR) -c $< -o $@
 
 $(INVERSE) : inverse.c inverse.h
 	$(CC) $(CFLAGS) -fPIC -c $< -o $@
 
-$(LUSGS) : lusgs.c lusgs.h
-	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+$(LUSGS) : lusgs.c lusgs.h flux.h
+	$(CC) $(CFLAGS) -fPIC -I$(INCDIR) -c $< -o $@
 
-$(CLUSGS) : coloredlusgs.c coloredlusgs.h
-	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+$(CLUSGS) : coloredlusgs.c coloredlusgs.h flux.h inverse.h
+	$(CC) $(CFLAGS) -fPIC -I$(INCDIR) -c $< -o $@
 
 $(BLUSGS) : blusgs.c blusgs.h
-	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+	$(CC) $(CFLAGS) -fPIC -I$(INCDIR) -c $< -o $@
 
-$(CBLUSGS) : coloredblusgs.c coloredblusgs.h
-	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+$(CBLUSGS) : coloredblusgs.c coloredblusgs.h flux.h inverse.h
+	$(CC) $(CFLAGS) -fPIC -I$(INCDIR) -c $< -o $@
 
+
+# Library files
 $(SLIB) : $(FLUX) $(LUSGS) $(CLUSGS)
-	ar qc $@ $^
+	ar rcs $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
 $(SBLIB) : $(FLUX) $(INVERSE) $(BLUSGS) $(CBLUSGS)
-	ar qc $@ $^
+	ar rcs $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
 $(DLIB) : $(FLUX) $(LUSGS) $(CLUSGS)
@@ -50,13 +53,17 @@ $(DBLIB) : $(FLUX) $(INVERSE) $(BLUSGS) $(CBLUSGS)
 	$(CC) -fPIC -shared -o $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
+
 all : $(SLIB) $(SBLIB) $(DLIB) $(DBLIB)
+	@echo All libraries are created
 
 static : $(SLIB) $(SBLIB)
+	@echo Static libraries are created
 
 dynamic : $(DLIB) $(DBLIB)
+	@echo Dynamic libraries are created
 
 .PHONY : clean
 clean :
-	rm -rf $(UCFD_PATH)/lib $(OBJDIR)
+	rm -rf $(OBJDIR)
 	rm -f $(SLIB) $(SBLIB) $(DLIB) $(DBLIB)
