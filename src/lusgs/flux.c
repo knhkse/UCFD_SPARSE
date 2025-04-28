@@ -19,12 +19,12 @@
 
 #include "flux.h"
 
-#ifndef CONST_H
-    /** Specific heat ratio */
-    #define gamma   1.4
-    /** Minimum pressure value */
-    #define pmin    1e-15
-#endif
+// #ifndef CONST_H
+//     /** Specific heat ratio */
+//     #define gamma   1.4
+//     /** Minimum pressure value */
+//     #define pmin    1e-15
+// #endif
 
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 

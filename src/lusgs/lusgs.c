@@ -11,7 +11,7 @@
  *              (3) Upper sweep :  
  *                  Second step of LU-SGS method, which computes next solution difference array.  
  *              (4) Update :  
- *                  Time integration by adding current solution with next time step solution difference  
+ *                  Time integration by adding current solution with next time step solution difference.  
  * 
  * @note        In case of RANS equations, add rans_serial_{}_sweep function right after the ns_serial_{}_sweep function.  
  *              Be aware that ns and rans sweep function must be paired with each sweep step.

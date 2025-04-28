@@ -2,26 +2,24 @@ include Makefile.inc
 
 lib :
 	mkdir -p lib
-	cd src; mkdir -p obj; make all
+	cd src/krylov; mkdir -p obj; make all
+	cd src/lusgs; mkdir -p obj; make all
+
+lusgs :
+	mkdir -p lib
+	cd src/lusgs; mkdir -p obj; make all
 
 example :
 	cd examples; mkdir -p obj; make all
 
 all :
 	mkdir -p lib
-	cd src; mkdir -p obj; make all
+	cd src; make all
 	cd examples; mkdir -p obj; make all
-
-static :
-	mkdir -p lib
-	cd src; mkdir -p obj; make static
-
-dynamic :
-	mkdir -p lib
-	cd src; mkdir -p obj; make dynamic
-	
 
 .PHONY : clean
 clean :
-	cd src; make clean
-	cd examples; make clean
+	cd src/krylov; make clean
+	cd src/lusgs; make clean
+	rm -rf $(UCFD_PATH)/lib
+#	cd examples; make clean
