@@ -86,8 +86,10 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, c
         y[0] = beta;
 
         // V = r/beta
-        cblas_dcopy(n, r, 1, V, 1);
-        cblas_dscal(n, 1 / beta, V, 1);
+        #pragma omp parallel for
+        for (i=0; i<n; i++) {
+            V[i] = r[i]/beta;
+        }
 
         for (j = 0; j < m; j++)
         {
@@ -114,8 +116,11 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, c
 
             tmp = cblas_dnrm2(n, w, 1);
             H[j + (j + 1) * m] = tmp;
-            cblas_dcopy(n, w, 1, &V[(j + 1) * n], 1);
-            cblas_dscal(n, 1 / tmp, &V[(j + 1) * n], 1);
+            
+            #pragma omp parallel for
+            for (i=0; i<n; i++) {
+                V[(j+1)*n+i] = w[i]/tmp;
+            }
 
             // Givens Rotation
             for (i = 0; i < j; i++)
@@ -161,7 +166,7 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, c
 
 /**
  * @details     Single iteration of GMRES.
- *              Residual array `r` must have non-empty values when using this function.
+ * @note        Residual array `r` must be initialized, `r := b - A @ x`.
  */
 ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, const int neles, const int nvars, const int m,
                          const int *row_ptr, const int *col_ind, const int *diag_ind, double *pre_nnz_data,
@@ -187,8 +192,10 @@ ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, con
     y[0] = beta;
 
     // V = r/beta
-    cblas_dcopy(n, r, 1, V, 1);
-    cblas_dscal(n, 1 / beta, V, 1);
+    #pragma omp parallel for
+    for (i=0; i<n; i++) {
+        V[i] = r[i]/beta;
+    }
 
     for (j = 0; j < m; j++)
     {
@@ -211,8 +218,11 @@ ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, con
 
         tmp = cblas_dnrm2(n, w, 1);
         H[j + (j + 1) * m] = tmp;
-        cblas_dcopy(n, w, 1, &V[(j + 1) * n], 1);
-        cblas_dscal(n, 1 / tmp, &V[(j + 1) * n], 1);
+
+        #pragma omp parallel for
+        for (i=0; i<n; i++) {
+            V[(j+1)*n+i] = w[i]/tmp;
+        }
 
         // Givens Rotation
         for (i = 0; i < j; i++)

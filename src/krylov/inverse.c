@@ -101,3 +101,35 @@ void lusubst(int n, double *LU, double *b)
     }
 }
 
+void lumatsubtrans(int n, double *LU, double *B)
+{
+    int row, col, ncol, scol;
+    double val;
+
+    if (n == 1) {                       // 1-equation RANS model
+        B[0] *= LU[0];
+    }
+
+    else {
+        // Forward substitution
+        for (scol=0; scol<n; scol++) B[scol*n] /= LU[0];
+        for (row=1; row<n; row++) {
+            for (scol=0; scol<n; scol++) {
+                val = 0.0;
+                for (col=0; col<row; col++)
+                    val += B[scol*n+col] * LU[col*n+row];
+                B[scol*n+row] = (B[scol*n+row] - val)/LU[row*n+row];
+            }
+        }
+
+        // Backward substitution
+        for (row=n-2; row>-1; row--) {
+            for (scol=0; scol<n; scol++) {
+                val = 0.0;
+                for (col=row+1; col<n; col++)
+                    val += B[scol*n+col] * LU[col*n+row];
+                B[scol*n+row] -= val;
+            }
+        }
+    }
+}

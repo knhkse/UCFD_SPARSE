@@ -101,3 +101,73 @@ void lusubst(int n, double *LU, double *b)
     }
 }
 
+/**
+ * @details     LU substitution method for block matrix
+ */
+void lusubstmat(int n, double *LU, double *B)
+{
+    int row, col, nrow, scol;
+    double val;
+
+    if (n == 1) {                       // 1-equation RANS model
+        B[0] *= LU[0];
+    }
+
+    else {
+        // Forward substitution
+        for (row=1; row<n; row++) {
+            nrow = n*row;
+            for (scol=0; scol<n; scol++) {
+                val = 0.0;
+                for (col=0; col<row; col++)
+                    val += LU[nrow+col]*B[scol+col*n];
+                B[nrow+scol] -= val;
+            }
+        }
+
+        // Backward substitution
+        for (scol=1; scol<n+1; scol++) B[n*n-scol] /= LU[n*n-1];
+        for (row=n-2; row>-1; row--) {
+            nrow = n*row;
+            for (scol=0; scol<n; scol++) {
+                val = 0.0;
+                for (col=row+1; col<n; col++)
+                    val += LU[nrow+col] * B[n*col+scol];
+                B[nrow+scol] = (B[nrow+scol]-val)/LU[nrow+row];
+            }
+        }
+    }
+}
+
+void lusubstmattrans(int n, double *LU, double *B)
+{
+    int row, col, ncol, scol;
+    double val;
+
+    if (n == 1) {                       // 1-equation RANS model
+        B[0] *= LU[0];
+    }
+
+    else {
+        // Forward substitution
+        for (scol=0; scol<n; scol++) B[scol*n] /= LU[0];
+        for (row=1; row<n; row++) {
+            for (scol=0; scol<n; scol++) {
+                val = 0.0;
+                for (col=0; col<row; col++)
+                    val += B[scol*n+col] * LU[col*n+row];
+                B[scol*n+row] = (B[scol*n+row] - val)/LU[row*n+row];
+            }
+        }
+
+        // Backward substitution
+        for (row=n-2; row>-1; row--) {
+            for (scol=0; scol<n; scol++) {
+                val = 0.0;
+                for (col=row+1; col<n; col++)
+                    val += B[scol*n+col] * LU[col*n+row];
+                B[scol*n+row] -= val;
+            }
+        }
+    }
+}
