@@ -1,41 +1,69 @@
-#ifndef FLUX_H
-#define FLUX_H
-#include "const.h"
-
 /**
  * @file        flux.h
  * @brief       Header file for numerical flux funtions
  * @details     Declaration of convective flux for Navier-Stokes and RANS equations.
  */
+#ifndef FLUX_H
+#define FLUX_H
+#include "config.h"
+
+// Single precision
+#if defined(UCFD_FLOAT32)
+    #ifndef BETAST
+        #define BETAST 0.09f
+    #endif
+    #ifndef GAMMA
+        #define GAMMA 1.4f
+    #endif
+    #ifndef PMIN
+        #define PMIN 1e-13f
+    #endif
+// Double precision
+#else
+    #ifndef BETAST
+        #define BETAST 0.09
+    #endif
+    #ifndef GAMMA
+        #define GAMMA 1.4
+    #endif
+    #ifndef PMIN
+        #define PMIN 1e-13
+    #endif
+#endif
+
+typedef enum
+{
+    LUSGS_STATUS_SUCCESS = 0,
+    LUSGS_STATUS_FAILED = 1
+
+} ucfd_status_t;
 
 /**
  * @brief       Computes flux for Navier-Stokes equations.
- * @param       nfvars      Number of flux variables
- * @param       ndims       Dimensions
  * @param       u           Conservative vector
  * @param       nf          Surface vector
  * @param       f           Flux vector
  */
-void ns_flux_container(int nfvars, int ndims, double *u, double *nf, double *f);
+void ns_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f);
 
 /**
  * @brief       Computes flux for RANS equations.
- * @param       nfvars      Number of flux variables
- * @param       ndims       Dimensions
- * @param       nturbvars   Number of turbulence variables
  * @param       u           Conservative vector
  * @param       nf          Surface vector
  * @param       f           Flux vector
  */
-void rans_flux_container(int nfvars, int ndims, int nturbvars, double *u, double *nf, double *f);
+void rans_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f);
 
 
 /**
  * @brief       Computes source term Jacobian matrix for RANS equations.
- * @param       nvars       Number of conservative variables
- * @param       ntvars      
+ * @param       betast      beta* value for kw-SST RANS model
+ * @param       uf          Conservative vector
+ * @param       tmat        Turbulence Jacobian matrix
+ * @param       dsrc        Source term derivatives vector
  */
-int rans_source_jacobian(int nvars, int ntvars, double betast, \
-                         double *uf, double *tmat, double *dsrc);
+ucfd_status_t rans_source_jacobian(UCFD_FLOAT *uf, UCFD_FLOAT *tmat, UCFD_FLOAT *dsrc);
+
+void print_configure(); // Remove later
 
 #endif //FLUX_H

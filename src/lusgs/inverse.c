@@ -27,15 +27,18 @@
  * 
  * =======================================================================================================================
  */
+#include "inverse.h"
+
+// TODO : Bespoke code generation
 
 /**
  * @details     Decompose matrix A into lower and upper triangular matrix
  */
-void ludcmp(int n, double *A)
+void ludcmp(int n, UCFD_FLOAT *A)
 {
     int row, col, kdx;
     int nrow;
-    double val;
+    UCFD_FLOAT val;
 
     if (n == 1) {               // 1-equation RANS model
         A[0] = 1.0/A[0];
@@ -70,10 +73,10 @@ void ludcmp(int n, double *A)
 /**
  * @details     This function performs Forward/Backward substitution of LU decomposed matrix.
  */
-void lusubst(int n, double *LU, double *b)
+void lusubst(int n, UCFD_FLOAT *LU, UCFD_FLOAT *b)
 {
     int row, col, nrow;
-    double val;
+    UCFD_FLOAT val;
 
     if (n == 1) {                       // 1-equation RANS model
         b[0] *= LU[0];
@@ -104,10 +107,10 @@ void lusubst(int n, double *LU, double *b)
 /**
  * @details     LU substitution method for block matrix
  */
-void lusubstmat(int n, double *LU, double *B)
+void lusubstmat(int n, UCFD_FLOAT *LU, UCFD_FLOAT *B)
 {
     int row, col, nrow, scol;
-    double val;
+    UCFD_FLOAT val;
 
     if (n == 1) {                       // 1-equation RANS model
         B[0] *= LU[0];
@@ -141,7 +144,7 @@ void lusubstmat(int n, double *LU, double *B)
 
 void lusubstmattrans(int n, double *LU, double *B)
 {
-    int row, col, ncol, scol;
+    int row, col, scol;
     double val;
 
     if (n == 1) {                       // 1-equation RANS model

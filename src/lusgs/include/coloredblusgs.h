@@ -1,26 +1,37 @@
+/**
+ * @file        coloredblusgs.h
+ * @brief       Header file for colored Block LU-SGS method
+ */
 #ifndef COLOREDBLUSGS_H
 #define COLOREDBLUSGS_H
 
-void ns_parallel_pre_blusgs(int neles, int nfvars, int nface, double factor, \
-                            double *fnorm_vol, double *dt, double *diag, double *fjmat);
+#define nsmatdim NFVARS*NFVARS
+#define ransmatdim NTURBVARS*NTURBVARS
+
+#include "flux.h"
+#include "inverse.h"
 
 
-void rans_parallel_pre_blusgs(int neles, int nvars, int nfvars, int nface, double factor, double betast, \
-                              double *fnorm_vol, double *uptsb, double *dt, double *tdiag, double *tjmat, double *dsrc);
+void ns_parallel_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
+                          UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat);
 
 
-void ns_parallel_block_sweep(int n0, int ne, int neles, int nfvars, int nface, \
-                             int *nei_ele, int *icolor, int *lcolor, double *fnorm_vol, \
-                             double *rhsb, double *dub, double *diag, double *fjmat);
+void rans_parallel_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
+                            UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *uptsb, UCFD_FLOAT *dt,
+                            UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat, UCFD_FLOAT *dsrc);
 
 
-void rans_parallel_block_sweep(int n0, int ne, int neles, int nvars, int nfvars, int nface, \
-                             int *nei_ele, int *icolor, int *lcolor, double *fnorm_vol, \
-                             double *rhsb, double *dub, double *tdiag, double *tjmat);
+void ns_parallel_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+                             UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol,
+                             UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat);
 
 
-void parallel_update(int neles, int nvars, double *uptsb, double *dub, double *subres);
+void rans_parallel_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+                               UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol,
+                               UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat);
 
+
+void blusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres);
 
 
 #endif

@@ -1,12 +1,12 @@
-#ifndef COLOREDLUSGS_H
-#define COLOREDLUSGS_H
-
 /**
  * @file        coloredlusgs.h
  * @brief       Header file for Colored LU-SGS method
  * @details     Declaration of each function used in Colored LU-SGS method.
  *              Parameters are explained here.
  */
+#ifndef COLOREDLUSGS_H
+#define COLOREDLUSGS_H
+#include "flux.h"
 
 /**
  * @brief       Computes Diagonal matrix for Colored LU-SGS method.
@@ -18,8 +18,8 @@
  * @param       diag        Diagonal matrix for LU-SGS method
  * @param       fspr        Wave speed for each cell face
  */
-void parallel_pre_lusgs(int neles, int nface, double factor, \
-                        double *fnorm_vol, double *dt, double *diag, double *fspr);
+void parallel_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
+                        UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
 
 
 /**
@@ -27,9 +27,7 @@ void parallel_pre_lusgs(int neles, int nface, double factor, \
  * @param       n0          First index for coloring set
  * @param       ne          Last index for coloring set
  * @param       neles       Number of element cells
- * @param       nfvars      Number of flux variables
  * @param       nface       Number of faces depends on element type
- * @param       ndims       Dimensions
  * @param       nei_ele     Indices for neighbor cells
  * @param       icolor      Color Index of each cell
  * @param       lcolor      Color level of each cell
@@ -41,9 +39,9 @@ void parallel_pre_lusgs(int neles, int nface, double factor, \
  * @param       diag        Diagonal matrix array
  * @param       fspr        Wave speed for each cell face
  */
-void ns_parallel_lower_sweep(int n0, int ne, int neles, int nfvars, int nface, int ndims, \
-                             int *nei_ele, int *icolor, int *lcolor, double *fnorm_vol, double *vec_fnorm, \
-                             double *uptsb, double *rhsb, double *dub, double *diag, double *fspr);
+void ns_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+                             UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
 
 
 /**
@@ -51,10 +49,7 @@ void ns_parallel_lower_sweep(int n0, int ne, int neles, int nfvars, int nface, i
  * @param       n0          First index for coloring set
  * @param       ne          Last index for coloring set
  * @param       neles       Number of element cells
- * @param       nvars       Number of conservative variables
- * @param       nfvars      Number of flux variables
  * @param       nface       Number of faces depends on element type
- * @param       ndims       Dimensions
  * @param       nei_ele     Indices for neighbor cells
  * @param       icolor      Color Index of each cell
  * @param       lcolor      Color level of each cell
@@ -66,9 +61,9 @@ void ns_parallel_lower_sweep(int n0, int ne, int neles, int nfvars, int nface, i
  * @param       diag        Diagonal matrix array
  * @param       fspr        Wave speed for each cell face
  */
-void rans_parallel_lower_sweep(int n0, int ne, int neles, int nvars, int nfvars, int nface, int ndims, \
-                               int *nei_ele, int *icolor, int *lcolor, double *fnorm_vol, double *vec_fnorm, \
-                               double *uptsb, double *rhsb, double *dub, double *diag, double *fspr, double *dsrc);
+void rans_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+                               UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                               UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
 
 
 /**
@@ -76,9 +71,7 @@ void rans_parallel_lower_sweep(int n0, int ne, int neles, int nvars, int nfvars,
  * @param       n0          First index for coloring set
  * @param       ne          Last index for coloring set
  * @param       neles       Number of element cells
- * @param       nfvars      Number of flux variables
  * @param       nface       Number of faces depends on element type
- * @param       ndims       Dimensions
  * @param       nei_ele     Indices for neighbor cells
  * @param       icolor      Color Index of each cell
  * @param       lcolor      Color level of each cell
@@ -90,9 +83,9 @@ void rans_parallel_lower_sweep(int n0, int ne, int neles, int nvars, int nfvars,
  * @param       diag        Diagonal matrix array
  * @param       fspr        Wave speed for each cell face
  */
-void ns_parallel_upper_sweep(int n0, int ne, int neles, int nfvars, int nface, int ndims, \
-                             int *nei_ele, int *icolor, int *lcolor, double *fnorm_vol, double *vec_fnorm, \
-                             double *uptsb, double *rhsb, double *dub, double *diag, double *fspr);
+void ns_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+                             UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
 
 
 /**
@@ -100,10 +93,7 @@ void ns_parallel_upper_sweep(int n0, int ne, int neles, int nfvars, int nface, i
  * @param       n0          First index for coloring set
  * @param       ne          Last index for coloring set
  * @param       neles       Number of element cells
- * @param       nvars       Number of conservative variables
- * @param       nfvars      Number of flux variables
  * @param       nface       Number of faces depends on element type
- * @param       ndims       Dimensions
  * @param       nei_ele     Indices for neighbor cells
  * @param       icolor      Color Index of each cell
  * @param       lcolor      Color level of each cell
@@ -115,19 +105,17 @@ void ns_parallel_upper_sweep(int n0, int ne, int neles, int nfvars, int nface, i
  * @param       diag        Diagonal matrix array
  * @param       fspr        Wave speed for each cell face
  */
-void rans_parallel_upper_sweep(int n0, int ne, int neles, int nvars, int nfvars, int nface, int ndims, \
-                               int *nei_ele, int *icolor, int *lcolor, double *fnorm_vol, double *vec_fnorm, \
-                               double *uptsb, double *rhsb, double *dub, double *diag, double *fspr, double *dsrc);
+void rans_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+                               UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                               UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
 
 
 /**
  * @brief       Updates solution array.
  * @param       neles       Number of element cells
- * @param       nvars       Number of conservative variables
  * @param       uptsb       Solution array
  * @param       rhsb        Result of LU-SGS sweeps
  */
-void parallel_update(int neles, int nvars, double *uptsb, double *rhsb);
-
+void clusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
 
 #endif

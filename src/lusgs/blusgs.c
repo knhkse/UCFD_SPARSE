@@ -24,10 +24,9 @@
  * =======================================================================================================================
  */
 
-#include <stdio.h>
+#include <assert.h>
 #include "blusgs.h"
-#include "flux.h"
-#include "inverse.h"
+
 
 /**
  * @details     This function computes diagonal matrices of the implicit operator.
@@ -36,44 +35,43 @@
  *              `n` is the number of conservative variables in Navier-Stokes equations,
  *              or the number of turbulent variables in RANS equations.
  */
-void ns_serial_pre_blusgs(int neles, int nfvars, int nface, double factor, \
-                      double *fnorm_vol, double *dt, double *diag, double *fjmat)
+void ns_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
+                          UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat)
 {
-    int idx, jdx, kdx, row, col;        // Element index
-    int matsize = nfvars*nfvars;
-    double fv, dti;
-    double dmat[matsize];     // Diagonal matrix at each cell
+    UCFD_INT idx, jdx, kdx, row, col;
+    UCFD_FLOAT fv, dti;
+    UCFD_FLOAT dmat[nsmatdim];
 
     for (idx=0; idx<neles; idx++) {
         // Initialize diagonal matrix
-        for (kdx=0; kdx<matsize; kdx++) {
+        for (kdx=0; kdx<nsmatdim; kdx++) {
             dmat[kdx] = 0.0;
         }
         
         // Computes diagonal matrix based on neighbor cells
         for (jdx=0; jdx<nface; jdx++) {
             fv = fnorm_vol[neles*jdx + idx];
-            for (row=0; row<nfvars; row++) {
-                for (col=0; col<nfvars; col++) {
-                    dmat[nfvars*row+col] \
-                        += fjmat[idx+neles*jdx+nface*neles*col+nfvars*nface*neles*row]*fv;
+            for (row=0; row<NFVARS; row++) {
+                for (col=0; col<NFVARS; col++) {
+                    dmat[NFVARS*row+col] \
+                        += fjmat[idx+neles*jdx+nface*neles*col+NFVARS*nface*neles*row]*fv;
                 }
             }
         }
 
         // Complete implicit operator
         dti = 1.0/(dt[idx]*factor);
-        for (kdx=0; kdx<nfvars; kdx++) {
-            dmat[(nfvars+1)*kdx] += dti;
+        for (kdx=0; kdx<NFVARS; kdx++) {
+            dmat[(NFVARS+1)*kdx] += dti;
         }
         
         // LU decomposition for inverse process
-        ludcmp(nfvars, dmat);
+        ludcmp(NFVARS, dmat);
 
         // Allocate temporal matrix to diag array
-        for (row=0; row<nfvars; row++) {
-            for (col=0; col<nfvars; col++) {
-                diag[idx+neles*col+neles*nfvars*row] = dmat[nfvars*row+col];
+        for (row=0; row<NFVARS; row++) {
+            for (col=0; col<NFVARS; col++) {
+                diag[idx+neles*col+neles*NFVARS*row] = dmat[NFVARS*row+col];
             }
         }
     }
@@ -87,22 +85,21 @@ void ns_serial_pre_blusgs(int neles, int nfvars, int nface, double factor, \
  *              `n` is the number of conservative variables in Navier-Stokes equations,
  *              or the number of turbulent variables in RANS equations.
  */
-void rans_serial_pre_blusgs(int neles, int nvars, int nfvars, int nface, double factor, double betast, \
-                            double *fnorm_vol, double *uptsb, double *dt, double *tdiag, double *tjmat, double *dsrc)
+void rans_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
+                            UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *uptsb, UCFD_FLOAT *dt,
+                            UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat, UCFD_FLOAT *dsrc)
 {
-    int idx, jdx, kdx, row, col, err;        // Element index
-    int ntvars = nvars - nfvars;
-    int matsize = ntvars*ntvars;
-    double fv;
-    double tmat[matsize];     // Diagonal matrix at each cell
-    double uf[nvars], dsrcf[nvars];
+    UCFD_INT idx, jdx, kdx, row, col;
+    UCFD_FLOAT fv;
+    UCFD_FLOAT tmat[ransmatdim];
+    UCFD_FLOAT uf[NVARS], dsrcf[NVARS];
 
     for (idx=0; idx<neles; idx++) {
         // Initialize diagonal matrix
-        for (kdx=0; kdx<matsize; kdx++)
+        for (kdx=0; kdx<ransmatdim; kdx++)
             tmat[kdx] = 0.0;
         
-        for (kdx=0; kdx<nvars; kdx++) {
+        for (kdx=0; kdx<NVARS; kdx++) {
             uf[kdx] = uptsb[idx+neles*kdx];
             dsrcf[kdx] = dsrc[idx+neles*kdx];
         }
@@ -110,32 +107,29 @@ void rans_serial_pre_blusgs(int neles, int nvars, int nfvars, int nface, double 
         // Computes diagonal matrix based on neighbor cells
         for (jdx=0; jdx<nface; jdx++) {
             fv = fnorm_vol[neles*jdx + idx];
-            for (row=0; row<ntvars; row++) {
-                for (col=0; col<ntvars; col++) {
-                    tmat[ntvars*row+col] \
-                        += tjmat[idx+neles*jdx+nface*neles*col+ntvars*nface*neles*row]*fv;
+            for (row=0; row<NTURBVARS; row++) {
+                for (col=0; col<NTURBVARS; col++) {
+                    tmat[NTURBVARS*row+col] \
+                        += tjmat[idx+neles*jdx+nface*neles*col+NTURBVARS*nface*neles*row]*fv;
                 }
             }
         }
 
         // Computes Source term Jacobian
-        err = rans_source_jacobian(nvars, ntvars, betast, uf, tmat, dsrcf);
-        if (err == -1) {
-            printf("Warning:::Source term Jacobian of RANS equations does not match\n");
-        }
+        assert(rans_source_jacobian(uf, tmat, dsrcf) == LUSGS_STATUS_SUCCESS);
 
         // Complete implicit operator
-        for (kdx=0; kdx<ntvars; kdx++) {
-            tmat[(ntvars+1)*kdx] += 1.0/(dt[idx]*factor);
+        for (kdx=0; kdx<NTURBVARS; kdx++) {
+            tmat[(NTURBVARS+1)*kdx] += 1.0/(dt[idx]*factor);
         }
         
         // LU decomposition for inverse process
-        ludcmp(ntvars, tmat);
+        ludcmp(NTURBVARS, tmat);
 
         // Allocate temporal matrix to diag array
-        for (row=0; row<ntvars; row++) {
-            for (col=0; col<ntvars; col++) {
-                tdiag[idx+neles*col+neles*ntvars*row] = tmat[ntvars*row+col];
+        for (row=0; row<NTURBVARS; row++) {
+            for (col=0; col<NTURBVARS; col++) {
+                tdiag[idx+neles*col+neles*NTURBVARS*row] = tmat[NTURBVARS*row+col];
             }
         }
     }
@@ -151,27 +145,25 @@ void rans_serial_pre_blusgs(int neles, int nvars, int nfvars, int nface, double 
  * @note        The last argument array, `fjmat` is NOT identical with ns_serial_pre_blusgs function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void ns_serial_block_lower_sweep(int neles, int nfvars, int nface, \
-                                 int *nei_ele, int *mapping, int *unmapping, double *fnorm_vol, \
-                                 double *rhsb, double *dub, double *diag, double *fjmat)
+void ns_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
+                                 UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
+                                 UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat)
 {
-    int _idx, idx, jdx, kdx, neib;                              // Index variables
-    int row, col;
-    double rhs[nfvars], dmat[nfvars*nfvars];
-    double val, fv;
+    UCFD_INT idx, jdx, kdx, neib;
+    UCFD_INT row, col;
+    UCFD_FLOAT rhs[NFVARS], dmat[nsmatdim];
+    UCFD_FLOAT val, fv;
 
     // Lower sweep via mapping
-    for (_idx=0; _idx<neles; _idx++) {
-        idx = mapping[_idx];
-
+    for (idx=0; idx<neles; idx++) {
         // Initialize
-        for (kdx=0; kdx<nfvars; kdx++) {
+        for (kdx=0; kdx<NFVARS; kdx++) {
             rhs[kdx] = rhsb[idx+kdx*neles];
         }
 
-        for (row=0; row<nfvars; row++) {
-            for (col=0; col<nfvars; col++) {
-                dmat[col+nfvars*row] = diag[idx+neles*col+neles*nfvars*row];
+        for (row=0; row<NFVARS; row++) {
+            for (col=0; col<NFVARS; col++) {
+                dmat[col+NFVARS*row] = diag[idx+neles*col+neles*NFVARS*row];
             }
         }
 
@@ -179,13 +171,13 @@ void ns_serial_block_lower_sweep(int neles, int nfvars, int nface, \
         for (jdx=0; jdx<nface; jdx++) {
             neib = nei_ele[idx+neles*jdx];
 
-            if (unmapping[neib] != _idx) {
+            if (neib != idx) {
                 fv = fnorm_vol[neles*jdx + idx];
                 // Matrix-Vector multiplication
-                for (row=0; row<nfvars; row++) {
+                for (row=0; row<NFVARS; row++) {
                     val = 0.0;
-                    for (col=0; col<nfvars; col++) {
-                        val += fjmat[idx+neles*jdx+nface*neles*col+nfvars*nface*neles*row] \
+                    for (col=0; col<NFVARS; col++) {
+                        val += fjmat[idx+neles*jdx+nface*neles*col+NFVARS*nface*neles*row] \
                                 * dub[neib+neles*col];
                     }
                     rhs[row] -= val*fv;
@@ -194,10 +186,10 @@ void ns_serial_block_lower_sweep(int neles, int nfvars, int nface, \
         }
 
         // Compute inverse of diagonal matrix multiplication
-        lusubst(nfvars, dmat, rhs);
+        lusubst(NFVARS, dmat, rhs);
 
         // Update dub array
-        for (kdx=0; kdx<nfvars; kdx++) {
+        for (kdx=0; kdx<NFVARS; kdx++) {
             dub[idx+neles*kdx] = rhs[kdx];
         }
     }
@@ -212,28 +204,25 @@ void ns_serial_block_lower_sweep(int neles, int nfvars, int nface, \
  * @note        The last argument array, `tjmat` is NOT identical with ns_serial_pre_blusgs function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void rans_serial_block_lower_sweep(int neles, int nvars, int nfvars, int nface, \
-                                   int *nei_ele, int *mapping, int *unmapping, double *fnorm_vol, \
-                                   double *rhsb, double *dub, double *tdiag, double *tjmat)
+void rans_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
+                                   UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
+                                   UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat)
 {
-    int _idx, idx, jdx, kdx, neib;                              // Index variables
-    int row, col;
-    int ntvars = nvars - nfvars;
-    double val, fv;
-    double rhs[ntvars], dmat[ntvars*ntvars];
+    UCFD_INT idx, jdx, kdx, neib;
+    UCFD_INT row, col;
+    UCFD_FLOAT val, fv;
+    UCFD_FLOAT rhs[NTURBVARS], dmat[NTURBVARS*NTURBVARS];
 
     // Lower sweep via mapping
-    for (_idx=0; _idx<neles; _idx++) {
-        idx = mapping[_idx];
-
+    for (idx=0; idx<neles; idx++) {
         // Initialize
-        for (kdx=0; kdx<ntvars; kdx++) {
-            rhs[kdx] = rhsb[idx+(kdx+nfvars)*neles];
+        for (kdx=0; kdx<NTURBVARS; kdx++) {
+            rhs[kdx] = rhsb[idx+(kdx+NFVARS)*neles];
         }
 
-        for (row=0; row<ntvars; row++) {
-            for (col=0; col<ntvars; col++) {
-                dmat[col+ntvars*row] = tdiag[idx+neles*col+neles*ntvars*row];
+        for (row=0; row<NTURBVARS; row++) {
+            for (col=0; col<NTURBVARS; col++) {
+                dmat[col+NTURBVARS*row] = tdiag[idx+neles*col+neles*NTURBVARS*row];
             }
         }
 
@@ -241,14 +230,14 @@ void rans_serial_block_lower_sweep(int neles, int nvars, int nfvars, int nface, 
         for (jdx=0; jdx<nface; jdx++) {
             neib = nei_ele[idx+neles*jdx];
 
-            if (unmapping[neib] != _idx) {
+            if (neib != idx) {
                 fv = fnorm_vol[idx+neles*jdx];
                 // Matrix-Vector multiplication
-                for (row=0; row<ntvars; row++) {
+                for (row=0; row<NTURBVARS; row++) {
                     val = 0.0;
-                    for (col=0; col<ntvars; col++) {
-                        val += tjmat[idx+neles*jdx+nface*neles*col+ntvars*nface*neles*row] \
-                                * dub[neib+neles*(col+nfvars)];
+                    for (col=0; col<NTURBVARS; col++) {
+                        val += tjmat[idx+neles*jdx+nface*neles*col+NTURBVARS*nface*neles*row] \
+                                * dub[neib+neles*(col+NFVARS)];
                     }
                     rhs[row] -= val*fv;
                 }
@@ -256,11 +245,11 @@ void rans_serial_block_lower_sweep(int neles, int nvars, int nfvars, int nface, 
         }
 
         // Compute inverse of diagonal matrix multiplication
-        lusubst(ntvars, dmat, rhs);
+        lusubst(NTURBVARS, dmat, rhs);
 
         // Update dub array
-        for (kdx=0; kdx<ntvars; kdx++) {
-            dub[idx+neles*(kdx+nfvars)] = rhs[kdx];
+        for (kdx=0; kdx<NTURBVARS; kdx++) {
+            dub[idx+neles*(kdx+NFVARS)] = rhs[kdx];
         }
     }
 }
@@ -275,27 +264,25 @@ void rans_serial_block_lower_sweep(int neles, int nvars, int nfvars, int nface, 
  * @note        The last argument array, `fjmat` is NOT identical with ns_serial_pre_blusgs function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void ns_serial_block_upper_sweep(int neles, int nfvars, int nface, \
-                                 int *nei_ele, int *mapping, int *unmapping, double *fnorm_vol, \
-                                 double *rhsb, double *dub, double *diag, double *fjmat)
+void ns_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
+                                 UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
+                                 UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat)
 {
-    int _idx, idx, jdx, kdx, neib;                              // Index variables
-    int row, col;
-    double val, fv;
-    double rhs[nfvars], dmat[nfvars*nfvars];
+    UCFD_INT idx, jdx, kdx, neib;
+    UCFD_INT row, col;
+    UCFD_FLOAT val, fv;
+    UCFD_FLOAT rhs[NFVARS], dmat[NFVARS*NFVARS];
 
     // Upper sweep via mapping
-    for (_idx=neles-1; _idx>-1; _idx--) {
-        idx = mapping[_idx];
-
+    for (idx=neles-1; idx>-1; idx--) {
         // Initialize
-        for (kdx=0; kdx<nfvars; kdx++) {
+        for (kdx=0; kdx<NFVARS; kdx++) {
             rhs[kdx] = rhsb[idx+kdx*neles];
         }
 
-        for (row=0; row<nfvars; row++) {
-            for (col=0; col<nfvars; col++) {
-                dmat[col+nfvars*row] = diag[idx+neles*col+neles*nfvars*row];
+        for (row=0; row<NFVARS; row++) {
+            for (col=0; col<NFVARS; col++) {
+                dmat[col+NFVARS*row] = diag[idx+neles*col+neles*NFVARS*row];
             }
         }
 
@@ -303,13 +290,13 @@ void ns_serial_block_upper_sweep(int neles, int nfvars, int nface, \
         for (jdx=0; jdx<nface; jdx++) {
             neib = nei_ele[idx+neles*jdx];
 
-            if (unmapping[neib] != _idx) {
+            if (neib != idx) {
                 fv = fnorm_vol[neles*jdx + idx];
                 // Matrix-Vector multiplication
-                for (row=0; row<nfvars; row++) {
+                for (row=0; row<NFVARS; row++) {
                     val = 0.0;
-                    for (col=0; col<nfvars; col++) {
-                        val += fjmat[idx+neles*jdx+nface*neles*col+nfvars*nface*neles*row] \
+                    for (col=0; col<NFVARS; col++) {
+                        val += fjmat[idx+neles*jdx+nface*neles*col+NFVARS*nface*neles*row] \
                                 * dub[neib+neles*col];
                     }
                     rhs[row] -= val*fv;
@@ -318,10 +305,10 @@ void ns_serial_block_upper_sweep(int neles, int nfvars, int nface, \
         }
 
         // Compute inverse of diagonal matrix multiplication
-        lusubst(nfvars, dmat, rhs);
+        lusubst(NFVARS, dmat, rhs);
 
         // Update dub array
-        for (kdx=0; kdx<nfvars; kdx++) {
+        for (kdx=0; kdx<NFVARS; kdx++) {
             dub[idx+neles*kdx] = rhs[kdx];
         }
     }
@@ -336,28 +323,26 @@ void ns_serial_block_upper_sweep(int neles, int nfvars, int nface, \
  * @note        The last argument array, `tjmat` is NOT identical with ns_serial_pre_blusgs function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void rans_serial_block_upper_sweep(int neles, int nvars, int nfvars, int nface, \
-                                   int *nei_ele, int *mapping, int *unmapping, double *fnorm_vol, \
-                                   double *rhsb, double *dub, double *tdiag, double *tjmat)
+void rans_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
+                                   UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
+                                   UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat)
 {
-    int _idx, idx, jdx, kdx, neib;                              // Index variables
-    int row, col;
-    int ntvars = nvars - nfvars;
-    double val, fv;
-    double rhs[ntvars], dmat[ntvars*ntvars];
+    UCFD_INT idx, jdx, kdx, neib;
+    UCFD_INT row, col;
+    UCFD_FLOAT val, fv;
+    UCFD_FLOAT rhs[NTURBVARS], dmat[NTURBVARS*NTURBVARS];
 
     // Lower sweep via mapping
-    for (_idx=neles-1; _idx>-1; _idx--) {
-        idx = mapping[_idx];
+    for (idx=neles-1; idx>-1; idx--) {
 
         // Initialize
-        for (kdx=0; kdx<ntvars; kdx++) {
-            rhs[kdx] = rhsb[idx+(kdx+nfvars)*neles];
+        for (kdx=0; kdx<NTURBVARS; kdx++) {
+            rhs[kdx] = rhsb[idx+(kdx+NFVARS)*neles];
         }
 
-        for (row=0; row<ntvars; row++) {
-            for (col=0; col<ntvars; col++) {
-                dmat[col+ntvars*row] = tdiag[idx+neles*col+neles*ntvars*row];
+        for (row=0; row<NTURBVARS; row++) {
+            for (col=0; col<NTURBVARS; col++) {
+                dmat[col+NTURBVARS*row] = tdiag[idx+neles*col+neles*NTURBVARS*row];
             }
         }
 
@@ -365,14 +350,14 @@ void rans_serial_block_upper_sweep(int neles, int nvars, int nfvars, int nface, 
         for (jdx=0; jdx<nface; jdx++) {
             neib = nei_ele[idx+neles*jdx];
 
-            if (unmapping[neib] != _idx) {
+            if (neib != idx) {
                 fv = fnorm_vol[neles*jdx + idx];
                 // Matrix-Vector multiplication
-                for (row=0; row<ntvars; row++) {
+                for (row=0; row<NTURBVARS; row++) {
                     val = 0.0;
-                    for (col=0; col<ntvars; col++) {
-                        val += tjmat[idx+neles*jdx+nface*neles*col+ntvars*nface*neles*row] \
-                                * dub[neib+neles*(col+nfvars)];
+                    for (col=0; col<NTURBVARS; col++) {
+                        val += tjmat[idx+neles*jdx+nface*neles*col+NTURBVARS*nface*neles*row] \
+                                * dub[neib+neles*(col+NFVARS)];
                     }
                     rhs[row] -= val*fv;
                 }
@@ -380,11 +365,11 @@ void rans_serial_block_upper_sweep(int neles, int nvars, int nfvars, int nface, 
         }
 
         // Compute inverse of diagonal matrix multiplication
-        lusubst(ntvars, dmat, rhs);
+        lusubst(NTURBVARS, dmat, rhs);
 
         // Update dub array
-        for (kdx=0; kdx<ntvars; kdx++) {
-            dub[idx+neles*(kdx+nfvars)] = rhs[kdx];
+        for (kdx=0; kdx<NTURBVARS; kdx++) {
+            dub[idx+neles*(kdx+NFVARS)] = rhs[kdx];
         }
     }
 }
@@ -393,12 +378,12 @@ void rans_serial_block_upper_sweep(int neles, int nvars, int nfvars, int nface, 
 /**
  * @details     solution array is updated by adding \f$\Delta Q\f$.
  */
-void serial_update(int neles, int nvars, double *uptsb, double *dub, double *subres)
+void blusgs_serial_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres)
 {
-    int idx, kdx;
+    UCFD_INT idx, kdx;
 
     for (idx=0; idx<neles; idx++) {
-        for (kdx=0; kdx<nvars; kdx++) {
+        for (kdx=0; kdx<NVARS; kdx++) {
             uptsb[idx+neles*kdx] += dub[idx+neles*kdx];
 
             // Initialize dub array
