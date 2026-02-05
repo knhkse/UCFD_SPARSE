@@ -78,50 +78,53 @@ DLIB = liblusgs.so
 DCLIB = libclusgs.so
 
 OBJDIR = ./obj
+COMMDIR = $(UCFD_PATH)/src/common
 INCDIR = ./include
+IFLAGS += -I$(INCDIR)
+IFLAGS += -I$(COMMDIR)/include
 
 LUSGS = $(OBJDIR)/lusgs.o
 BLUSGS = $(OBJDIR)/blusgs.o
 CLUSGS = $(OBJDIR)/coloredlusgs.o
 CBLUSGS = $(OBJDIR)/coloredblusgs.o
 FLUX = $(OBJDIR)/flux.o
-INVERSE = $(OBJDIR)/inverse.o
-CONFIG = config.h
+
+INVERSE = $(COMMDIR)/obj/inverse.o
+INVERSEH = $(COMMDIR)/include/inverse.h
+CONFIG = $(COMMDIR)/include/config.h
+TYPES = $(COMMDIR)/include/ucfd_types.h
 
 # Build object(.o) files
-$(FLUX) : flux.c $(INCDIR)/flux.h $(INCDIR)/$(CONFIG)
-	$(CC) $(CFLAGS) -fPIC -I$(INCDIR) -c $< -o $@
+$(FLUX) : flux.c $(INCDIR)/flux.h $(CONFIG) $(TYPES)
+	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
 
-$(INVERSE) : inverse.c $(INCDIR)/inverse.h $(INCDIR)/$(CONFIG)
-	$(CC) $(CFLAGS) -fPIC -I$(INCDIR) -c $< -o $@
+$(LUSGS) : lusgs.c $(INCDIR)/lusgs.h $(INCDIR)/flux.h $(CONFIG) $(TYPES)
+	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
 
-$(LUSGS) : lusgs.c $(INCDIR)/lusgs.h $(INCDIR)/flux.h $(INCDIR)/$(CONFIG)
-	$(CC) $(CFLAGS) -fPIC -I$(INCDIR) -c $< -o $@
+$(CLUSGS) : coloredlusgs.c $(INCDIR)/coloredlusgs.h $(INCDIR)/flux.h $(CONFIG) $(TYPES)
+	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
 
-$(CLUSGS) : coloredlusgs.c $(INCDIR)/coloredlusgs.h $(INCDIR)/flux.h $(INCDIR)/$(CONFIG)
-	$(CC) $(CFLAGS) -fPIC -I$(INCDIR) -c $< -o $@
+$(BLUSGS) : blusgs.c $(INCDIR)/blusgs.h $(INCDIR)/flux.h $(INVERSEH) $(CONFIG) $(TYPES)
+	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
 
-$(BLUSGS) : blusgs.c $(INCDIR)/blusgs.h $(INCDIR)/flux.h $(INCDIR)/inverse.h $(INCDIR)/$(CONFIG)
-	$(CC) $(CFLAGS) -fPIC -I$(INCDIR) -c $< -o $@
-
-$(CBLUSGS) : coloredblusgs.c $(INCDIR)/coloredblusgs.h $(INCDIR)/flux.h $(INCDIR)/inverse.h $(INCDIR)/$(CONFIG)
-	$(CC) $(CFLAGS) -fPIC -I$(INCDIR) -c $< -o $@
+$(CBLUSGS) : coloredblusgs.c $(INCDIR)/coloredblusgs.h $(INCDIR)/flux.h $(INVERSEH) $(CONFIG) $(TYPES)
+	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
 
 
 # Build library files
-$(SLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE) # $(INCDIR)/$(CONFIG)
+$(SLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE) # $(CONFIG)
 	ar rcs $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
-$(SCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE) # $(INCDIR)/$(CONFIG)
+$(SCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE) # $(CONFIG)
 	ar rcs $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
-$(DLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE) # $(INCDIR)/$(CONFIG)
+$(DLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE) # $(CONFIG)
 	$(CC) -fPIC -shared -o $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
-$(DCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE) # $(INCDIR)/$(CONFIG)
+$(DCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE) # $(CONFIG)
 	$(CC) -fPIC -shared -o $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
@@ -139,5 +142,3 @@ dynamic : $(DLIB) $(DCLIB)
 clean :
 	rm -rf $(OBJDIR)
 	rm -f $(SLIB) $(SCLIB) $(DLIB) $(DCLIB)
-
-# TODO : config.h auto-generator

@@ -22,24 +22,22 @@
  *
  * =======================================================================================================================
  */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include "omp.h"
-#include "mkl.h"
 #include "precon.h"
 #include "inverse.h"
+#include <stdlib.h>
+#include <omp.h>
+
+#define blkdim BLOCK*BLOCK
 
 /**
  * @details     This function refactors non-zero values of BSR matrix applying block fill-in process.
  */
-ucfd_status_t bilu_prepare(const int bn, const int blk, int *iw,
-                           const int *row_ptr, const int *col_ind, const int *diag_ind, double *nnz_data)
+ucfd_status_t bilu_prepare(int bn, int *iw,
+                           int *row_ptr, int *col_ind, int *diag_ind, double *nnz_data)
 {
-    int idx, jdx, kdx, ck, mdx, row, col, ele;
+    int idx, kdx, ck, row, col, ele;
     int st, ed, jed, kk, kst, ked, jj, iwj;
-    double v, Aik[blk * blk];
-    int blk2 = blk * blk;
+    double v, Aik[blkdim];
 
     for (idx = 0; idx < bn; idx++)
     {
@@ -57,11 +55,11 @@ ucfd_status_t bilu_prepare(const int bn, const int blk, int *iw,
             ked = row_ptr[ck+1];
             
             // A[i,k] := A[i,k] @ inv(A[k,k])
-            lumatsubtrans(blk, &nnz_data[kk*blk2], &nnz_data[kdx*blk2]);
-            // memcpy(Aik, &nnz_data[kdx*blk2], sizeof(double)*blk);
-            for (row=0; row<blk; row++) {
-                for (col=0; col<blk; col++)
-                    Aik[row*blk+col] = nnz_data[kdx*blk2+row*blk+col];
+            lusubmattrans(BLOCK, &nnz_data[kk*blkdim], &nnz_data[kdx*blkdim]);
+            // memcpy(Aik, &nnz_data[kdx*blkdim], sizeof(double)*BLOCK);
+            for (row=0; row<BLOCK; row++) {
+                for (col=0; col<BLOCK; col++)
+                    Aik[row*BLOCK+col] = nnz_data[kdx*blkdim+row*BLOCK+col];
             }
 
             // Prepare iw
@@ -73,12 +71,12 @@ ucfd_status_t bilu_prepare(const int bn, const int blk, int *iw,
 
                 if (iwj != 0) {
                     // nnz_data[jj] -= Aik * nnz_data[iwj]
-                    for (row=0; row<blk; row++) {
-                        for (col=0; col<blk; col++) {
+                    for (row=0; row<BLOCK; row++) {
+                        for (col=0; col<BLOCK; col++) {
                             v = 0.0;
-                            for (ele=0; ele<blk; ele++)
-                                v += Aik[row*blk+ele] * nnz_data[iwj*blk2+ele*blk+col];
-                            nnz_data[jj*blk2+row*blk+col] -= v;
+                            for (ele=0; ele<BLOCK; ele++)
+                                v += Aik[row*BLOCK+ele] * nnz_data[iwj*blkdim+ele*BLOCK+col];
+                            nnz_data[jj*blkdim+row*BLOCK+col] -= v;
                         }
                     }
                 }
@@ -88,7 +86,7 @@ ucfd_status_t bilu_prepare(const int bn, const int blk, int *iw,
             for (jj=kst; jj<ked; jj++) iw[col_ind[jj]] = 0;
         }
         // Inverse current row diagonal matrix
-        ludcmp(blk, &nnz_data[ed*blk2]);
+        ludcmp(BLOCK, &nnz_data[ed*blkdim]);
     }
 
     return UCFD_STATUS_SUCCESS;
@@ -99,13 +97,12 @@ ucfd_status_t bilu_prepare(const int bn, const int blk, int *iw,
  * @details     This function applies preconditioner matrix into arbitrary input vector `b`.
  *              In other words, solve `Px = b`.
  */
-ucfd_status_t bilu_psolve(const int bn, const int blk, const int *row_ptr,
-                          const int *col_ind, const int *diag_ind, double *nnz_data, double *b)
+void bilu_psolve(int bn, int *row_ptr,
+                 int *col_ind, int *diag_ind, double *nnz_data, double *b)
 {
     int idx, jdx, kdx, row, col;
     int dd, st, ed, cind;
-    double v, arr[blk];
-    const int blk2 = blk*blk;
+    double v, arr[BLOCK];
 
     // Forward substitution
     for (idx = 0; idx < bn; idx++)
@@ -114,24 +111,24 @@ ucfd_status_t bilu_psolve(const int bn, const int blk, const int *row_ptr,
         st = row_ptr[idx];
 
         // Initialize arr
-        for (kdx = 0; kdx < blk; kdx++)
-            arr[kdx] = b[kdx + idx * blk];
+        for (kdx = 0; kdx < BLOCK; kdx++)
+            arr[kdx] = b[kdx + idx * BLOCK];
 
         for (jdx = st; jdx < dd; jdx++)
         {
             cind = col_ind[jdx];
 
-            for (row = 0; row < blk; row++)
+            for (row = 0; row < BLOCK; row++)
             {
                 v = 0.0;
-                for (col = 0; col < blk; col++)
-                    v += nnz_data[col + row * blk + jdx * blk2] * b[col + cind * blk];
+                for (col = 0; col < BLOCK; col++)
+                    v += nnz_data[col + row * BLOCK + jdx * blkdim] * b[col + cind * BLOCK];
                 arr[row] -= v;
             }
         }
 
-        for (kdx = 0; kdx < blk; kdx++)
-            b[kdx + idx * blk] = arr[kdx];
+        for (kdx = 0; kdx < BLOCK; kdx++)
+            b[kdx + idx * BLOCK] = arr[kdx];
     }
 
     // Backward substitution
@@ -141,46 +138,43 @@ ucfd_status_t bilu_psolve(const int bn, const int blk, const int *row_ptr,
         ed = row_ptr[idx + 1];
 
         // Initialize
-        for (kdx = 0; kdx < blk; kdx++)
-            arr[kdx] = b[kdx + idx * blk];
+        for (kdx = 0; kdx < BLOCK; kdx++)
+            arr[kdx] = b[kdx + idx * BLOCK];
 
         for (jdx = dd + 1; jdx < ed; jdx++)
         {
             cind = col_ind[jdx];
 
-            for (row = 0; row < blk; row++)
+            for (row = 0; row < BLOCK; row++)
             {
                 v = 0.0;
-                for (col = 0; col < blk; col++)
-                    v += nnz_data[col + row * blk + jdx * blk2] * b[col + cind * blk];
+                for (col = 0; col < BLOCK; col++)
+                    v += nnz_data[col + row * BLOCK + jdx * blkdim] * b[col + cind * BLOCK];
                 arr[row] -= v;
             }
         }
 
         // LU substitution for vector
-        luvecsub(blk, &nnz_data[dd*blk2], arr);
-        for (row=0; row<blk; row++) b[idx*blk+row] = arr[row];
+        lusub(BLOCK, &nnz_data[dd*blkdim], arr);
+        for (row=0; row<BLOCK; row++) b[idx*BLOCK+row] = arr[row];
     }
-
-    return UCFD_STATUS_SUCCESS;
 }
 
 
 /**
  * @details     LU decomposition is applied in every diagonal matrix.
  */
-ucfd_status_t lusgs_prepare(const int bn, const int blk, const int *diag_ind, double *nnz_data)
+ucfd_status_t lusgs_prepare(int bn, int *diag_ind, double *nnz_data)
 {
-    const int blk2 = blk * blk;
     int idx, didx;
 
     // Get diagonal block and store reverse
     // Parallel computation available (Only diagonal matrices are used)
-    #pragma omp parall for private(didx)
+    #pragma omp parallel for private(didx)
     for (idx = 0; idx < bn; idx++)
     {
         didx = diag_ind[idx];
-        ludcmp(blk, &nnz_data[didx * blk2]);
+        ludcmp(BLOCK, &nnz_data[didx * blkdim]);
     }
 
     return UCFD_STATUS_SUCCESS;
@@ -190,13 +184,12 @@ ucfd_status_t lusgs_prepare(const int bn, const int blk, const int *diag_ind, do
  * @details     This function applies preconditioner matrix into arbitrary input vector `b`.
  *              In other words, solve `Px = b`.
  */
-ucfd_status_t lusgs_psolve(const int bn, const int blk, const int *row_ptr,
-                           const int *col_ind, const int *diag_ind, double *nnz_data, double *b)
+void lusgs_psolve(int bn, int *row_ptr,
+                  int *col_ind, int *diag_ind, double *nnz_data, double *b)
 {
-    const int blk2 = blk * blk;
     int idx, jdx, kdx, row, col;
     int dd, st, ed, cind;
-    double v, arr[blk];
+    double v, arr[BLOCK];
 
     // Forward sweep : (D+L)x' = b -> x' = inv(D) * (b-Lx')
     for (idx = 0; idx < bn; idx++)
@@ -205,26 +198,26 @@ ucfd_status_t lusgs_psolve(const int bn, const int blk, const int *row_ptr,
         st = row_ptr[idx];
 
         // arr := b
-        for (kdx = 0; kdx < blk; kdx++)
-            arr[kdx] = b[kdx + idx * blk];
+        for (kdx = 0; kdx < BLOCK; kdx++)
+            arr[kdx] = b[kdx + idx * BLOCK];
 
         // arr := b - Lx'
         for (jdx = st; jdx < dd; jdx++)
         {
             cind = col_ind[jdx];
-            for (row = 0; row < blk; row++)
+            for (row = 0; row < BLOCK; row++)
             {
                 v = 0.0;
-                for (col = 0; col < blk; col++)
-                    v += nnz_data[col + row * blk + jdx * blk2] * b[col + cind * blk];
+                for (col = 0; col < BLOCK; col++)
+                    v += nnz_data[col + row * BLOCK + jdx * blkdim] * b[col + cind * BLOCK];
                 arr[row] -= v;
             }
         }
 
         // x' := inv(D) * (b-Lx') = inv(D) * arr
-        lusubst(blk, &nnz_data[dd * blk2], arr);
-        for (kdx = 0; kdx < blk; kdx++)
-            b[kdx + idx * blk] = arr[kdx];
+        lusub(BLOCK, &nnz_data[dd * blkdim], arr);
+        for (kdx = 0; kdx < BLOCK; kdx++)
+            b[kdx + idx * BLOCK] = arr[kdx];
     }
 
     // Backward sweep : (D+U)x = Dx' -> x = x' - inv(D) * Ux
@@ -234,29 +227,30 @@ ucfd_status_t lusgs_psolve(const int bn, const int blk, const int *row_ptr,
         ed = row_ptr[idx + 1];
 
         // Initialize
-        for (kdx = 0; kdx < blk; kdx++)
+        for (kdx = 0; kdx < BLOCK; kdx++)
             arr[kdx] = 0.0;
 
         // arr := Ux
         for (jdx = dd + 1; jdx < ed; jdx++)
         {
             cind = col_ind[jdx];
-            for (row = 0; row < blk; row++)
+            for (row = 0; row < BLOCK; row++)
             {
                 v = 0.0;
-                for (col = 0; col < blk; col++)
-                    v += nnz_data[col + row * blk + jdx * blk2] * b[col + cind * blk];
+                for (col = 0; col < BLOCK; col++)
+                    v += nnz_data[col + row * BLOCK + jdx * blkdim] * b[col + cind * BLOCK];
                 arr[row] += v;
             }
         }
 
         // arr := inv(D) Ux
-        lusubst(blk, &nnz_data[dd * blk2], arr);
+        lusub(BLOCK, &nnz_data[dd * blkdim], arr);
 
         // b := b - inv(D) Ux
-        for (kdx = 0; kdx < blk; kdx++)
-            b[kdx + idx * blk] -= arr[kdx];
+        for (kdx = 0; kdx < BLOCK; kdx++)
+            b[kdx + idx * BLOCK] -= arr[kdx];
     }
-
-    return UCFD_STATUS_SUCCESS;
 }
+
+void none_psolve(int bn, int *row_ptr,
+                 int *col_ind, int *diag_ind, double *nnz_data, double *b) {};

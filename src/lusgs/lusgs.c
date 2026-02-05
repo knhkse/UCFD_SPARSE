@@ -29,8 +29,8 @@
  * 
  * =======================================================================================================================
  */
-
 #include "lusgs.h"
+#include "flux.h"
 
 /**
  * @details     This function computes diagonal matrix of the implicit operator.

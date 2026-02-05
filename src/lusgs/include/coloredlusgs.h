@@ -6,7 +6,7 @@
  */
 #ifndef COLOREDLUSGS_H
 #define COLOREDLUSGS_H
-#include "flux.h"
+#include "config.h"
 
 /**
  * @brief       Computes Diagonal matrix for Colored LU-SGS method.

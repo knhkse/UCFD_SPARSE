@@ -31,9 +31,9 @@
  * 
  * =======================================================================================================================
  */
-
-#include <omp.h>
 #include "coloredlusgs.h"
+#include "flux.h"
+#include <omp.h>
 
 /**
  * @details     This function computes diagonal matrix of the implicit operator.

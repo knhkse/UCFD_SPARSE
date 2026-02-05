@@ -4,13 +4,7 @@
  */
 #ifndef COLOREDBLUSGS_H
 #define COLOREDBLUSGS_H
-
-#define nsmatdim NFVARS*NFVARS
-#define ransmatdim NTURBVARS*NTURBVARS
-
-#include "flux.h"
-#include "inverse.h"
-
+#include "config.h"
 
 void ns_parallel_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
                           UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat);

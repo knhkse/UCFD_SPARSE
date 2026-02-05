@@ -5,12 +5,7 @@
  */
 #ifndef BLUSGS_H
 #define BLUSGS_H
-
-#define nsmatdim NFVARS*NFVARS
-#define ransmatdim NTURBVARS*NTURBVARS
-
-#include "flux.h"
-#include "inverse.h"
+#include "config.h"
 
 /**
  * @brief       Computes Diagonal matrix for LU-SGS method.

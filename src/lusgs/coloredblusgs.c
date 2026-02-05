@@ -22,11 +22,14 @@
  * 
  * =======================================================================================================================
  */
-
-#include <assert.h>
-#include <omp.h>
 #include "coloredblusgs.h"
+#include "flux.h"
+#include "inverse.h"
+#include <stdio.h>
+#include <omp.h>
 
+#define nsmatdim NFVARS*NFVARS
+#define ransmatdim NTURBVARS*NTURBVARS
 
 /**
  * @details     This function computes diagonal matrices of the implicit operator using multi-thread computing.  
@@ -115,7 +118,8 @@ void rans_parallel_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
         }
 
         // Computes Source term Jacobian
-        assert(rans_source_jacobian(uf, tmat, dsrcf) == LUSGS_STATUS_SUCCESS);
+        if (rans_source_jacobian(uf, tmat, dsrcf) == UCFD_STATUS_NOT_SUPPORTED)
+            printf("Error::Invalid `NTURBVARS` value\n");
 
         // Complete implicit operator
         for (kdx=0; kdx<NTURBVARS; kdx++) {
@@ -187,7 +191,7 @@ void ns_parallel_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
             }
         }
 
-        lusubst(NFVARS, dmat, rhs);
+        lusub(NFVARS, dmat, rhs);
 
         for (kdx=0; kdx<NFVARS; kdx++) {
             dub[idx+neles*kdx] = rhs[kdx];
@@ -248,7 +252,7 @@ void rans_parallel_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
         }
 
         // Compute inverse of diagonal matrix multiplication
-        lusubst(NTURBVARS, dmat, rhs);
+        lusub(NTURBVARS, dmat, rhs);
 
         // Update dub array
         for (kdx=0; kdx<NTURBVARS; kdx++) {

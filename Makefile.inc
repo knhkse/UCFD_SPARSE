@@ -6,7 +6,7 @@ CFLAGS = -Wall -O3 -ffast-math -qopenmp
 # CC = mpicc
 # CFLAGS = -Wall -O3 -ffast-math -fopenmp
 
-## LU-SGS Library Variables
+## LU-SGS Library Variables (Sample)
 NVARS = 7
 NFVARS = 5
 NTURBVARS = 2
@@ -22,7 +22,9 @@ NDIMS = 3
 # INT64 = 0
 
 
-## Krylov Library Variables
-BLOCKSIZE = $(NVARS)
+## Krylov Library Variables (Sample)
+BLOCK = 4
 
+# SDL command line
+MKLFLAGS = -L${MKLROOT}/lib -lmkl_rt -lpthread -lm -ldl
 

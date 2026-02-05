@@ -5,6 +5,7 @@
  */
 #ifndef FLUX_H
 #define FLUX_H
+#include "ucfd_types.h"
 #include "config.h"
 
 // Single precision
@@ -30,13 +31,6 @@
         #define PMIN 1e-13
     #endif
 #endif
-
-typedef enum
-{
-    LUSGS_STATUS_SUCCESS = 0,
-    LUSGS_STATUS_FAILED = 1
-
-} ucfd_status_t;
 
 /**
  * @brief       Computes flux for Navier-Stokes equations.

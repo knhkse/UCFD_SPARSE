@@ -16,8 +16,6 @@
  * 
  * =======================================================================================================================
  */
-
-#include <stdio.h>
 #include "flux.h"
 
 #define max(a,b) (((a) > (b)) ? (a) : (b))
@@ -95,9 +93,7 @@ void rans_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f)
 ucfd_status_t rans_source_jacobian(UCFD_FLOAT *uf, UCFD_FLOAT *tmat, UCFD_FLOAT *dsrc)
 {
     /* 1-equation RANS model (Spalart-Allmaras) */
-    if (NTURBVARS == 1) {
-        tmat[0] += dsrc[NVARS-1];
-    }
+    if (NTURBVARS == 1) tmat[0] += dsrc[NVARS-1];
 
     /* 2-equations RANS model (kw-SST) */
     else if (NTURBVARS == 2) {
@@ -106,29 +102,7 @@ ucfd_status_t rans_source_jacobian(UCFD_FLOAT *uf, UCFD_FLOAT *tmat, UCFD_FLOAT 
         tmat[1] += max(BETAST*k, 0.0);
         tmat[3] += dsrc[NVARS-1];
     }
+    else return UCFD_STATUS_NOT_SUPPORTED;
 
-    else {
-        printf("Invalid turbulent variable size\n");
-        return LUSGS_STATUS_FAILED;
-    }
-
-    return LUSGS_STATUS_SUCCESS;
-}
-
-/**
- * ! -----------------------------
- * ! Test function (Remove later)
- * ! -----------------------------
- */
-void print_configure()
-{
-    printf("Configuration info\n");
-    printf("------------------\n");
-    printf("NVARS = %d\n", NVARS);
-    printf("NFVARS = %d\n", NFVARS);
-    printf("NTURBVARS = %d\n", NTURBVARS);
-    printf("NDIMS = %d\n", NDIMS);
-    printf("GAMMA = %.5f\n", GAMMA);
-    printf("PMIN = %.5f\n", PMIN);
-    printf("BETAST = %.5f\n", BETAST);
+    return UCFD_STATUS_SUCCESS;
 }

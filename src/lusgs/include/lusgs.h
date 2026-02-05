@@ -5,8 +5,7 @@
  */
 #ifndef LUSGS_H
 #define LUSGS_H
-#include "flux.h"
-
+#include "config.h"
 
 /**
  * @brief       Computes Diagonal matrix for LU-SGS method.

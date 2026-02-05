@@ -3,14 +3,13 @@
  * @brief       Header file for solver configuration
  * 
  */
-
 #ifndef CONFIG
 #define CONFIG
 #include <stdint.h>
 #include <float.h>
 #include <inttypes.h>
 
-// TODO : Bespoke file generation
+// TODO : Auto-generation by Makefile
 
 /**
  * Integer type designation
@@ -38,5 +37,6 @@
 // #define NFVARS 5
 // #define NTURBVARS 2
 // #define NDIMS 3
+// #define BLOCK 5
 
 #endif

@@ -23,10 +23,13 @@
  * 
  * =======================================================================================================================
  */
-
-#include <assert.h>
 #include "blusgs.h"
+#include "flux.h"
+#include "inverse.h"
+#include <stdio.h>
 
+#define nsmatdim NFVARS*NFVARS
+#define ransmatdim NTURBVARS*NTURBVARS
 
 /**
  * @details     This function computes diagonal matrices of the implicit operator.
@@ -116,7 +119,8 @@ void rans_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
         }
 
         // Computes Source term Jacobian
-        assert(rans_source_jacobian(uf, tmat, dsrcf) == LUSGS_STATUS_SUCCESS);
+        if (rans_source_jacobian(uf, tmat, dsrcf) == UCFD_STATUS_NOT_SUPPORTED)
+            printf("Error::Invalid `NTURBVARS` value\n");
 
         // Complete implicit operator
         for (kdx=0; kdx<NTURBVARS; kdx++) {
@@ -186,7 +190,7 @@ void ns_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
         }
 
         // Compute inverse of diagonal matrix multiplication
-        lusubst(NFVARS, dmat, rhs);
+        lusub(NFVARS, dmat, rhs);
 
         // Update dub array
         for (kdx=0; kdx<NFVARS; kdx++) {
@@ -245,7 +249,7 @@ void rans_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
         }
 
         // Compute inverse of diagonal matrix multiplication
-        lusubst(NTURBVARS, dmat, rhs);
+        lusub(NTURBVARS, dmat, rhs);
 
         // Update dub array
         for (kdx=0; kdx<NTURBVARS; kdx++) {
@@ -305,7 +309,7 @@ void ns_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
         }
 
         // Compute inverse of diagonal matrix multiplication
-        lusubst(NFVARS, dmat, rhs);
+        lusub(NFVARS, dmat, rhs);
 
         // Update dub array
         for (kdx=0; kdx<NFVARS; kdx++) {
@@ -365,7 +369,7 @@ void rans_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
         }
 
         // Compute inverse of diagonal matrix multiplication
-        lusubst(NTURBVARS, dmat, rhs);
+        lusub(NTURBVARS, dmat, rhs);
 
         // Update dub array
         for (kdx=0; kdx<NTURBVARS; kdx++) {

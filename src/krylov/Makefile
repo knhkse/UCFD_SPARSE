@@ -1,41 +1,69 @@
+# Krylov subspace methods library Makefile
+
+# =================================
+# Configuration Variables
+# =================================
+CC ?= icx
 include $(UCFD_PATH)/Makefile.inc
 
-MKL_REQD := all dynamic
-define ERR_MSG
-MKLFlagsUndefinedError ***
-`MKLFLAGS` must be defined in `Makefile.inc` when you want to make shared library.
-Run `Prep.sh` bash script with appropriate flags.
-For more information, refer to the document
-endef
-ifneq (,$(filter $(MKL_REQD),$(MAKECMDGOALS)))
-  ifeq ($(origin MKLFLAGS),undefined)
-    $(error $(ERR_MSG))
-  endif
+# =================================
+# Derived Settings
+# =================================
+ifeq ($(MKLROOT),)
+  $(error Intel MKL root directory must be defined)
+else
+  IFLAGS += -I$(MKLROOT)/include
 endif
 
+ifeq ($(MKLFLAGS),)
+  $(error MKL flags must be defined)
+endif
+
+# Block size : Required
+ifeq ($(BLOCK),)
+  $(error `BLOCK` must be defined)
+else
+  CFLAGS += -DBLOCK=$(BLOCK)
+endif
+
+ifeq ($(EPS),)
+  $(info Machine epsilon undefined::Default value is 2.22e-16)
+else
+  CFLAGS += -DEPS=$(EPS)
+endif
+
+# =================================
+# Build Targets
+# =================================
 SLIB = libkrylov.a
 DLIB = libkrylov.so
 
 OBJDIR = ./obj
 INCDIR = ./include
+IFLAGS += -I$(INCDIR)
+COMMDIR = $(UCFD_PATH)/src/common
+IFLAGS += -I$(COMMDIR)/include
 
 KRYLOV = $(OBJDIR)/krylov.o
 PRECON = $(OBJDIR)/precon.o
-TYPES = types.h
+INVERSE = $(COMMDIR)/obj/inverse.o
+CONFIG = $(COMMDIR)/include/config.h
+TYPES = $(COMMDIR)/include/ucfd_types.h
 
-$(KRYLOV) : krylov.c krylov.h precon.h $(INCDIR)/$(TYPES)
-	$(CC) $(CFLAGS) -fPIC -I${MKLROOT}/include -I$(INCDIR) -c $< -o $@
+$(KRYLOV) : krylov.c $(INCDIR)/krylov.h $(INCDIR)/precon.h $(CONFIG) $(TYPES)
+	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
 
-$(PRECON) : precon.c precon.h $(INCDIR)/$(TYPES)
-	$(CC) $(CFLAGS) -fPIC -I${MKLROOT}/include -I$(INCDIR) -c $< -o $@
+$(PRECON) : precon.c $(INCDIR)/precon.h $(CONFIG) $(TYPES)
+	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
 
-$(SLIB) : $(KRYLOV) $(PRECON)
+$(SLIB) : $(KRYLOV) $(PRECON) $(INVERSE)
 	ar rcs $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
-$(DLIB) : $(KRYLOV) $(PRECON)
+$(DLIB) : $(KRYLOV) $(PRECON) $(INVERSE)
 	$(CC) $(CFLAGS) -fPIC -shared $(MKLFLAGS) -o $@ $^
 	cp $@ $(UCFD_PATH)/lib
+
 
 all : $(SLIB) $(DLIB)
 	@echo All libraries are created
