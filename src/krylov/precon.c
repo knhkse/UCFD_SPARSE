@@ -37,7 +37,7 @@ ucfd_status_t bilu_prepare(int bn, int *iw,
 {
     int idx, kdx, ck, row, col, ele;
     int st, ed, jed, kk, kst, ked, jj, iwj;
-    double v, Aik[blkdim];
+    double v, Aik[BLOCK][BLOCK];
 
     for (idx = 0; idx < bn; idx++)
     {
@@ -59,7 +59,7 @@ ucfd_status_t bilu_prepare(int bn, int *iw,
             // memcpy(Aik, &nnz_data[kdx*blkdim], sizeof(double)*BLOCK);
             for (row=0; row<BLOCK; row++) {
                 for (col=0; col<BLOCK; col++)
-                    Aik[row*BLOCK+col] = nnz_data[kdx*blkdim+row*BLOCK+col];
+                    Aik[row][col] = nnz_data[kdx*blkdim+row*BLOCK+col];
             }
 
             // Prepare iw
@@ -75,7 +75,7 @@ ucfd_status_t bilu_prepare(int bn, int *iw,
                         for (col=0; col<BLOCK; col++) {
                             v = 0.0;
                             for (ele=0; ele<BLOCK; ele++)
-                                v += Aik[row*BLOCK+ele] * nnz_data[iwj*blkdim+ele*BLOCK+col];
+                                v += Aik[row][ele] * nnz_data[iwj*blkdim+ele*BLOCK+col];
                             nnz_data[jj*blkdim+row*BLOCK+col] -= v;
                         }
                     }

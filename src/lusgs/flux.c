@@ -90,17 +90,17 @@ void rans_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f)
 }
 
 
-ucfd_status_t rans_source_jacobian(UCFD_FLOAT *uf, UCFD_FLOAT *tmat, UCFD_FLOAT *dsrc)
+ucfd_status_t rans_source_jacobian(UCFD_FLOAT *uf, UCFD_FLOAT *tmat[], UCFD_FLOAT *dsrc)
 {
     /* 1-equation RANS model (Spalart-Allmaras) */
-    if (NTURBVARS == 1) tmat[0] += dsrc[NVARS-1];
+    if (NTURBVARS == 1) tmat[0][0] += dsrc[NVARS-1];
 
     /* 2-equations RANS model (kw-SST) */
     else if (NTURBVARS == 2) {
         UCFD_FLOAT k = uf[NVARS-2] / uf[0];
-        tmat[0] += dsrc[NVARS-2];
-        tmat[1] += max(BETAST*k, 0.0);
-        tmat[3] += dsrc[NVARS-1];
+        tmat[0][0] += dsrc[NVARS-2];
+        tmat[0][1] += max(BETAST*k, 0.0);
+        tmat[1][1] += dsrc[NVARS-1];
     }
     else return UCFD_STATUS_NOT_SUPPORTED;
 

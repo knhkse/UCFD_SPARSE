@@ -28,8 +28,6 @@
 #include "inverse.h"
 #include <stdio.h>
 
-#define nsmatdim NFVARS*NFVARS
-#define ransmatdim NTURBVARS*NTURBVARS
 
 /**
  * @details     This function computes diagonal matrices of the implicit operator.
@@ -43,12 +41,13 @@ void ns_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
 {
     UCFD_INT idx, jdx, kdx, row, col;
     UCFD_FLOAT fv, dti;
-    UCFD_FLOAT dmat[nsmatdim];
+    UCFD_FLOAT dmat[NFVARS][NFVARS];
 
     for (idx=0; idx<neles; idx++) {
         // Initialize diagonal matrix
-        for (kdx=0; kdx<nsmatdim; kdx++) {
-            dmat[kdx] = 0.0;
+        for (row=0; row<NFVARS; row++) {
+            for (col=0; col<NFVARS; col++)
+                dmat[row][col] = 0.0;
         }
         
         // Computes diagonal matrix based on neighbor cells
@@ -56,7 +55,7 @@ void ns_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
             fv = fnorm_vol[neles*jdx + idx];
             for (row=0; row<NFVARS; row++) {
                 for (col=0; col<NFVARS; col++) {
-                    dmat[NFVARS*row+col] \
+                    dmat[row][col] \
                         += fjmat[idx+neles*jdx+nface*neles*col+NFVARS*nface*neles*row]*fv;
                 }
             }
@@ -65,7 +64,7 @@ void ns_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
         // Complete implicit operator
         dti = 1.0/(dt[idx]*factor);
         for (kdx=0; kdx<NFVARS; kdx++) {
-            dmat[(NFVARS+1)*kdx] += dti;
+            dmat[kdx][kdx] += dti;
         }
         
         // LU decomposition for inverse process
@@ -74,7 +73,7 @@ void ns_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
         // Allocate temporal matrix to diag array
         for (row=0; row<NFVARS; row++) {
             for (col=0; col<NFVARS; col++) {
-                diag[idx+neles*col+neles*NFVARS*row] = dmat[NFVARS*row+col];
+                diag[idx+neles*col+neles*NFVARS*row] = dmat[row][col];
             }
         }
     }
@@ -94,13 +93,15 @@ void rans_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
 {
     UCFD_INT idx, jdx, kdx, row, col;
     UCFD_FLOAT fv;
-    UCFD_FLOAT tmat[ransmatdim];
+    UCFD_FLOAT tmat[NTURBVARS][NTURBVARS];
     UCFD_FLOAT uf[NVARS], dsrcf[NVARS];
 
     for (idx=0; idx<neles; idx++) {
         // Initialize diagonal matrix
-        for (kdx=0; kdx<ransmatdim; kdx++)
-            tmat[kdx] = 0.0;
+        for (row=0; row<NTURBVARS; row++) {
+            for (col=0; col<NTURBVARS; col++)
+                tmat[row][col] = 0.0;
+        }
         
         for (kdx=0; kdx<NVARS; kdx++) {
             uf[kdx] = uptsb[idx+neles*kdx];
@@ -112,7 +113,7 @@ void rans_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
             fv = fnorm_vol[neles*jdx + idx];
             for (row=0; row<NTURBVARS; row++) {
                 for (col=0; col<NTURBVARS; col++) {
-                    tmat[NTURBVARS*row+col] \
+                    tmat[row][col] \
                         += tjmat[idx+neles*jdx+nface*neles*col+NTURBVARS*nface*neles*row]*fv;
                 }
             }
@@ -124,7 +125,7 @@ void rans_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
 
         // Complete implicit operator
         for (kdx=0; kdx<NTURBVARS; kdx++) {
-            tmat[(NTURBVARS+1)*kdx] += 1.0/(dt[idx]*factor);
+            tmat[kdx][kdx] += 1.0/(dt[idx]*factor);
         }
         
         // LU decomposition for inverse process
@@ -133,7 +134,7 @@ void rans_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
         // Allocate temporal matrix to diag array
         for (row=0; row<NTURBVARS; row++) {
             for (col=0; col<NTURBVARS; col++) {
-                tdiag[idx+neles*col+neles*NTURBVARS*row] = tmat[NTURBVARS*row+col];
+                tdiag[idx+neles*col+neles*NTURBVARS*row] = tmat[row][col];
             }
         }
     }
@@ -155,7 +156,7 @@ void ns_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
 {
     UCFD_INT idx, jdx, kdx, neib;
     UCFD_INT row, col;
-    UCFD_FLOAT rhs[NFVARS], dmat[nsmatdim];
+    UCFD_FLOAT rhs[NFVARS], dmat[NFVARS][NFVARS];
     UCFD_FLOAT val, fv;
 
     // Lower sweep via mapping
@@ -167,7 +168,7 @@ void ns_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
 
         for (row=0; row<NFVARS; row++) {
             for (col=0; col<NFVARS; col++) {
-                dmat[col+NFVARS*row] = diag[idx+neles*col+neles*NFVARS*row];
+                dmat[row][col] = diag[idx+neles*col+neles*NFVARS*row];
             }
         }
 
@@ -215,7 +216,7 @@ void rans_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
     UCFD_INT idx, jdx, kdx, neib;
     UCFD_INT row, col;
     UCFD_FLOAT val, fv;
-    UCFD_FLOAT rhs[NTURBVARS], dmat[NTURBVARS*NTURBVARS];
+    UCFD_FLOAT rhs[NTURBVARS], tmat[NTURBVARS][NTURBVARS];
 
     // Lower sweep via mapping
     for (idx=0; idx<neles; idx++) {
@@ -226,7 +227,7 @@ void rans_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
 
         for (row=0; row<NTURBVARS; row++) {
             for (col=0; col<NTURBVARS; col++) {
-                dmat[col+NTURBVARS*row] = tdiag[idx+neles*col+neles*NTURBVARS*row];
+                tmat[row][col] = tdiag[idx+neles*col+neles*NTURBVARS*row];
             }
         }
 
@@ -249,7 +250,7 @@ void rans_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
         }
 
         // Compute inverse of diagonal matrix multiplication
-        lusub(NTURBVARS, dmat, rhs);
+        lusub(NTURBVARS, tmat, rhs);
 
         // Update dub array
         for (kdx=0; kdx<NTURBVARS; kdx++) {
@@ -275,7 +276,7 @@ void ns_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
     UCFD_INT idx, jdx, kdx, neib;
     UCFD_INT row, col;
     UCFD_FLOAT val, fv;
-    UCFD_FLOAT rhs[NFVARS], dmat[NFVARS*NFVARS];
+    UCFD_FLOAT rhs[NFVARS], dmat[NFVARS][NFVARS];
 
     // Upper sweep via mapping
     for (idx=neles-1; idx>-1; idx--) {
@@ -286,7 +287,7 @@ void ns_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
 
         for (row=0; row<NFVARS; row++) {
             for (col=0; col<NFVARS; col++) {
-                dmat[col+NFVARS*row] = diag[idx+neles*col+neles*NFVARS*row];
+                dmat[row][col] = diag[idx+neles*col+neles*NFVARS*row];
             }
         }
 
@@ -334,7 +335,7 @@ void rans_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
     UCFD_INT idx, jdx, kdx, neib;
     UCFD_INT row, col;
     UCFD_FLOAT val, fv;
-    UCFD_FLOAT rhs[NTURBVARS], dmat[NTURBVARS*NTURBVARS];
+    UCFD_FLOAT rhs[NTURBVARS], tmat[NTURBVARS][NTURBVARS];
 
     // Lower sweep via mapping
     for (idx=neles-1; idx>-1; idx--) {
@@ -346,7 +347,7 @@ void rans_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
 
         for (row=0; row<NTURBVARS; row++) {
             for (col=0; col<NTURBVARS; col++) {
-                dmat[col+NTURBVARS*row] = tdiag[idx+neles*col+neles*NTURBVARS*row];
+                tmat[row][col] = tdiag[idx+neles*col+neles*NTURBVARS*row];
             }
         }
 
@@ -369,7 +370,7 @@ void rans_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
         }
 
         // Compute inverse of diagonal matrix multiplication
-        lusub(NTURBVARS, dmat, rhs);
+        lusub(NTURBVARS, tmat, rhs);
 
         // Update dub array
         for (kdx=0; kdx<NTURBVARS; kdx++) {

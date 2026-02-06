@@ -56,7 +56,7 @@ void rans_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f);
  * @param       tmat        Turbulence Jacobian matrix
  * @param       dsrc        Source term derivatives vector
  */
-ucfd_status_t rans_source_jacobian(UCFD_FLOAT *uf, UCFD_FLOAT *tmat, UCFD_FLOAT *dsrc);
+ucfd_status_t rans_source_jacobian(UCFD_FLOAT *uf, UCFD_FLOAT *tmat[], UCFD_FLOAT *dsrc);
 
 void print_configure(); // Remove later
 
