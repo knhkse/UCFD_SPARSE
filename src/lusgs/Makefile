@@ -78,24 +78,21 @@ DLIB = liblusgs.so
 DCLIB = libclusgs.so
 
 OBJDIR = ./obj
-COMMDIR = $(UCFD_PATH)/src/common
 INCDIR = ./include
 IFLAGS += -I$(INCDIR)
-IFLAGS += -I$(COMMDIR)/include
 
 LUSGS = $(OBJDIR)/lusgs.o
 BLUSGS = $(OBJDIR)/blusgs.o
 CLUSGS = $(OBJDIR)/coloredlusgs.o
 CBLUSGS = $(OBJDIR)/coloredblusgs.o
 FLUX = $(OBJDIR)/flux.o
-
-INVERSE = $(COMMDIR)/obj/inverse.o
-INVERSEH = $(COMMDIR)/include/inverse.h
-CONFIG = $(COMMDIR)/include/config.h
-TYPES = $(COMMDIR)/include/ucfd_types.h
+INVERSE = $(OBJDIR)/inverse.o
 
 # Build object(.o) files
 $(FLUX) : flux.c $(INCDIR)/flux.h $(CONFIG) $(TYPES)
+	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
+
+$(INVERSE) : inverse.c $(INCDIR)/inverse.h $(CONFIG) $(TYPES)
 	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
 
 $(LUSGS) : lusgs.c $(INCDIR)/lusgs.h $(INCDIR)/flux.h $(CONFIG) $(TYPES)
@@ -112,19 +109,19 @@ $(CBLUSGS) : coloredblusgs.c $(INCDIR)/coloredblusgs.h $(INCDIR)/flux.h $(INVERS
 
 
 # Build library files
-$(SLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE) # $(CONFIG)
+$(SLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE)
 	ar rcs $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
-$(SCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE) # $(CONFIG)
+$(SCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE)
 	ar rcs $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
-$(DLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE) # $(CONFIG)
+$(DLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE)
 	$(CC) -fPIC -shared -o $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
-$(DCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE) # $(CONFIG)
+$(DCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE)
 	$(CC) -fPIC -shared -o $@ $^
 	cp $@ $(UCFD_PATH)/lib
 

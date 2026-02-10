@@ -41,14 +41,14 @@ DLIB = libkrylov.so
 OBJDIR = ./obj
 INCDIR = ./include
 IFLAGS += -I$(INCDIR)
-COMMDIR = $(UCFD_PATH)/src/common
-IFLAGS += -I$(COMMDIR)/include
 
 KRYLOV = $(OBJDIR)/krylov.o
 PRECON = $(OBJDIR)/precon.o
-INVERSE = $(COMMDIR)/obj/inverse.o
-CONFIG = $(COMMDIR)/include/config.h
-TYPES = $(COMMDIR)/include/ucfd_types.h
+INVERSE = $(OBJDIR)/inverse.o
+
+# Build object(.o) files
+$(INVERSE) : inverse.c $(INCDIR)/inverse.h $(CONFIG) $(TYPES)
+	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
 
 $(KRYLOV) : krylov.c $(INCDIR)/krylov.h $(INCDIR)/precon.h $(CONFIG) $(TYPES)
 	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
@@ -56,6 +56,7 @@ $(KRYLOV) : krylov.c $(INCDIR)/krylov.h $(INCDIR)/precon.h $(CONFIG) $(TYPES)
 $(PRECON) : precon.c $(INCDIR)/precon.h $(CONFIG) $(TYPES)
 	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
 
+# Build library files
 $(SLIB) : $(KRYLOV) $(PRECON) $(INVERSE)
 	ar rcs $@ $^
 	cp $@ $(UCFD_PATH)/lib

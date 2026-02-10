@@ -2,21 +2,22 @@ include Makefile.inc
 
 lib :
 	mkdir -p lib
-	cd src/common; mkdir -p obj; make common
 	cd src/krylov; mkdir -p obj; make all
 	cd src/lusgs; mkdir -p obj; make all
 
 lusgs :
 	mkdir -p lib
-	cd src/common; mkdir -p obj; make common
 	cd src/lusgs; mkdir -p obj; make all
+
+krylov :
+	mkdir -p lib
+	cd src/krylov; mkdir -p obj; make all
 
 example :
 	cd examples; mkdir -p obj; make all
 
 all :
 	mkdir -p lib
-	cd src/common; mkdir -p obj; make common
 	cd src/krylov; mkdir -p obj; make all
 	cd src/lusgs; mkdir -p obj; make all
 # 	cd examples; mkdir -p obj; make all

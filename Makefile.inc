@@ -1,3 +1,11 @@
+# Common files
+SRCDIR = $(UCFD_PATH)/src
+CONFIG = $(SRCDIR)/config.h
+TYPES = $(SRCDIR)/ucfd_types.h
+IFLAGS = -I$(SRCDIR)
+
+
+# Compiler setting
 ## Intel oneAPI (Recommended)
 CC = icx
 CFLAGS = -Wall -O3 -ffast-math -qopenmp
@@ -6,7 +14,9 @@ CFLAGS = -Wall -O3 -ffast-math -qopenmp
 # CC = mpicc
 # CFLAGS = -Wall -O3 -ffast-math -fopenmp
 
-## LU-SGS Library Variables (Sample)
+
+# LU-SGS macros
+## Equation parameters
 NVARS = 7
 NFVARS = 5
 NTURBVARS = 2
@@ -22,9 +32,10 @@ NDIMS = 3
 # INT64 = 0
 
 
-## Krylov Library Variables (Sample)
+# Krylov macros
+## Block size
 BLOCK = 4
 
-# SDL command line
+## SDL command line
 MKLFLAGS = -L${MKLROOT}/lib -lmkl_rt -lpthread -lm -ldl
 

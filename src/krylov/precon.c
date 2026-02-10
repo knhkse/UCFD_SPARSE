@@ -55,7 +55,7 @@ ucfd_status_t bilu_prepare(int bn, int *iw,
             ked = row_ptr[ck+1];
             
             // A[i,k] := A[i,k] @ inv(A[k,k])
-            lusubmattrans(BLOCK, &nnz_data[kk*blkdim], &nnz_data[kdx*blkdim]);
+            lusubmattrans(&nnz_data[kk*blkdim], &nnz_data[kdx*blkdim]);
             // memcpy(Aik, &nnz_data[kdx*blkdim], sizeof(double)*BLOCK);
             for (row=0; row<BLOCK; row++) {
                 for (col=0; col<BLOCK; col++)
@@ -86,7 +86,7 @@ ucfd_status_t bilu_prepare(int bn, int *iw,
             for (jj=kst; jj<ked; jj++) iw[col_ind[jj]] = 0;
         }
         // Inverse current row diagonal matrix
-        ludcmp(BLOCK, &nnz_data[ed*blkdim]);
+        ludcmp(&nnz_data[ed*blkdim]);
     }
 
     return UCFD_STATUS_SUCCESS;
@@ -155,7 +155,7 @@ void bilu_psolve(int bn, int *row_ptr,
         }
 
         // LU substitution for vector
-        lusub(BLOCK, &nnz_data[dd*blkdim], arr);
+        lusub(&nnz_data[dd*blkdim], arr);
         for (row=0; row<BLOCK; row++) b[idx*BLOCK+row] = arr[row];
     }
 }
@@ -174,7 +174,7 @@ ucfd_status_t lusgs_prepare(int bn, int *diag_ind, double *nnz_data)
     for (idx = 0; idx < bn; idx++)
     {
         didx = diag_ind[idx];
-        ludcmp(BLOCK, &nnz_data[didx * blkdim]);
+        ludcmp(&nnz_data[didx * blkdim]);
     }
 
     return UCFD_STATUS_SUCCESS;
@@ -215,7 +215,7 @@ void lusgs_psolve(int bn, int *row_ptr,
         }
 
         // x' := inv(D) * (b-Lx') = inv(D) * arr
-        lusub(BLOCK, &nnz_data[dd * blkdim], arr);
+        lusub(&nnz_data[dd * blkdim], arr);
         for (kdx = 0; kdx < BLOCK; kdx++)
             b[kdx + idx * BLOCK] = arr[kdx];
     }
@@ -244,7 +244,7 @@ void lusgs_psolve(int bn, int *row_ptr,
         }
 
         // arr := inv(D) Ux
-        lusub(BLOCK, &nnz_data[dd * blkdim], arr);
+        lusub(&nnz_data[dd * blkdim], arr);
 
         // b := b - inv(D) Ux
         for (kdx = 0; kdx < BLOCK; kdx++)
