@@ -383,6 +383,26 @@ void rans_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
 /**
  * @details     solution array is updated by adding \f$\Delta Q\f$.
  */
+void blusgs_serial_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres)
+{
+    UCFD_INT idx, kdx;
+
+    for (idx=0; idx<neles; idx++) {
+        for (kdx=0; kdx<NFVARS; kdx++) {
+            uptsb[idx+neles*kdx] += dub[idx+neles*kdx];
+
+            // Initialize dub array
+            dub[idx+neles*kdx] = 0.0;
+        }
+        // Initialize sub-residual array
+        subres[idx] = 0.0;
+    }
+}
+
+
+/**
+ * @details     solution array is updated by adding \f$\Delta Q\f$.
+ */
 void blusgs_serial_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres)
 {
     UCFD_INT idx, kdx;

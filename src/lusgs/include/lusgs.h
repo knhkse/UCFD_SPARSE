@@ -96,6 +96,15 @@ void rans_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, 
  * @param       neles       Number of element cells
  * @param       uptsb       Solution array
  * @param       rhsb        Result of LU-SGS sweeps
+ */                           
+void lusgs_serial_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
+
+
+/**
+ * @brief       Updates solution array.
+ * @param       neles       Number of element cells
+ * @param       uptsb       Solution array
+ * @param       rhsb        Result of LU-SGS sweeps
  */
 void lusgs_serial_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
 

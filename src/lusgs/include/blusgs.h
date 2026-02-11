@@ -109,7 +109,16 @@ void rans_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
  * @param       dub         Result of Block LU-SGS sweeps
  * @param       subres      Residual of each sub-iteration
  */
-void blusgs_serial_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres);
+void blusgs_serial_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres);
 
+
+/**
+ * @brief       Updates solution array.
+ * @param       neles       Number of element cells
+ * @param       uptsb       Solution array
+ * @param       dub         Result of Block LU-SGS sweeps
+ * @param       subres      Residual of each sub-iteration
+ */
+void blusgs_serial_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres);
 
 #endif // BLUSGS_H

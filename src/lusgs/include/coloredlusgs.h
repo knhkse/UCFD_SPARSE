@@ -116,6 +116,15 @@ void rans_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
  * @param       uptsb       Solution array
  * @param       rhsb        Result of LU-SGS sweeps
  */
-void clusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
+void lusgs_parallel_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
+
+
+/**
+ * @brief       Updates solution array.
+ * @param       neles       Number of element cells
+ * @param       uptsb       Solution array
+ * @param       rhsb        Result of LU-SGS sweeps
+ */
+void lusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
 
 #endif

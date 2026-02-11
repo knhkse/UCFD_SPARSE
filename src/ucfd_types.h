@@ -27,14 +27,4 @@ typedef enum
 
 typedef void (*ucfd_precon_solve)(int, int*, int*, int*, double*, double*);
 
-
-
-// TODO
-typedef struct ucfd_bsrmat {
-    UCFD_INT    *row_ptr;
-    UCFD_INT    *col_ind;
-    UCFD_INT    *diag_ind;
-    UCFD_FLOAT  *nnz_data;
-} ucfd_bsrmat_t;
-
 #endif  // _UCFD_TYPES_H

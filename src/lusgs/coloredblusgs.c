@@ -269,6 +269,27 @@ void rans_parallel_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
 /**
  * @details     solution array is updated by adding \f$\Delta Q\f$.
  */
+void blusgs_parallel_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres)
+{
+    UCFD_INT idx, kdx;
+
+    #pragma omp parallel for private(kdx)
+    for (idx=0; idx<neles; idx++) {
+        for (kdx=0; kdx<NFVARS; kdx++) {
+            uptsb[idx+neles*kdx] += dub[idx+neles*kdx];
+
+            // Initialize dub array
+            dub[idx+neles*kdx] = 0.0;
+        }
+        // Initialize sub-residual array
+        subres[idx] = 0.0;
+    }
+}
+
+
+/**
+ * @details     solution array is updated by adding \f$\Delta Q\f$.
+ */
 void blusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres)
 {
     UCFD_INT idx, kdx;
@@ -285,5 +306,3 @@ void blusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, 
         subres[idx] = 0.0;
     }
 }
-
-

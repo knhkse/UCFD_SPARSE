@@ -335,7 +335,29 @@ void rans_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
  *              is the difference array after upper sweep,
  *              not the right-hand-side array.
  */
-void clusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb)
+void lusgs_parallel_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb)
+{
+    UCFD_INT idx, kdx;
+
+    #pragma omp parallel for private(kdx)
+    // Iterate for all cell
+    for (idx=0; idx<neles; idx++) {
+        // Update conservative variables
+        for (kdx=0; kdx<NFVARS; kdx++) {
+            // Indexing 2D array as 1D
+            uptsb[neles*kdx + idx] += rhsb[neles*kdx + idx];
+        }
+    }
+}
+
+
+/**
+ * @details     solution array is updated by adding \f$\Delta Q\f$.
+ *              Be aware that `rhsb` array in function parameter
+ *              is the difference array after upper sweep,
+ *              not the right-hand-side array.
+ */
+void lusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb)
 {
     UCFD_INT idx, kdx;
 

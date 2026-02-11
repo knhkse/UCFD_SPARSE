@@ -25,7 +25,8 @@ void rans_parallel_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
                                UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat);
 
 
-void blusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres);
+void blusgs_parallel_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres);
 
+void blusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres);
 
 #endif
