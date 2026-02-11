@@ -1,11 +1,11 @@
-#ifndef LUSGS_H
-#define LUSGS_H
-
 /**
  * @file        lusgs.h
  * @brief       Header file for serial LU-SGS method
  * @details     Declaration of each function used in LU-SGS method.
  */
+#ifndef LUSGS_H
+#define LUSGS_H
+#include "config.h"
 
 /**
  * @brief       Computes Diagonal matrix for LU-SGS method.
@@ -17,19 +17,15 @@
  * @param       diag        Diagonal matrix for LU-SGS method [neles]
  * @param       fspr        Wave speed for each cell face [nface, neles]
  */
-void serial_pre_lusgs(int neles, int nface, double factor, \
-                      double *fnorm_vol, double *dt, double *diag, double *fspr);
+void serial_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
+                      UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
 
 
 /**
  * @brief       Lower sweep of LU-SGS method for Navier-Stokes equations.
  * @param       neles       Number of element cells
- * @param       nfvars      Number of flux variables
  * @param       nface       Number of faces depends on element type
- * @param       ndims       Dimensions
  * @param       nei_ele     Indices for neighbor cells [nface, neles]
- * @param       mapping     Reordered index by Reverse Cuthill-McKee algorithm [neles]
- * @param       unmapping   Original index before Reverse Cuthill-McKee algorithm [neles]
  * @param       fnorm_vol   Surface magnitude/cell volume [nface, neles]
  * @param       vec_fnorm   Surface vector [nface, ndims, neles]
  * @param       uptsb       Solution array [nfvars, neles]
@@ -38,21 +34,15 @@ void serial_pre_lusgs(int neles, int nface, double factor, \
  * @param       diag        Diagonal matrix array [neles]
  * @param       fspr        Wave speed for each cell face [nface, neles]
  */
-void ns_serial_lower_sweep(int neles, int nfvars, int nface, int ndims, \
-                           int *nei_ele, int *mapping, int *unmapping, double *fnorm_vol, double *vec_fnorm, \
-                           double *uptsb, double *rhsb, double *dub, double *diag, double *fspr);
+void ns_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                           UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
 
 
 /**
  * @brief       Lower sweep of LU-SGS method for RANS equations.
  * @param       neles       Number of element cells
- * @param       nvars       Number of conservative variables
- * @param       nfvars      Number of flux variables
  * @param       nface       Number of faces depends on element type
- * @param       ndims       Dimensions
  * @param       nei_ele     Indices for neighbor cells [nface, neles]
- * @param       mapping     Reordered index by Reverse Cuthill-McKee algorithm [neles]
- * @param       unmapping   Original index before Reverse Cuthill-McKee algorithm [neles]
  * @param       fnorm_vol   Surface magnitude/cell volume [nface, neles]
  * @param       vec_fnorm   Surface vector [nface, ndims, neles]
  * @param       uptsb       Solution array [nvars, neles]
@@ -62,20 +52,15 @@ void ns_serial_lower_sweep(int neles, int nfvars, int nface, int ndims, \
  * @param       fspr        Wave speed for each cell face [nface, neles]
  * @param       dsrc        Source term derivatives [nvars, neles]
  */
-void rans_serial_lower_sweep(int neles, int nvars, int nfvars, int nface, int ndims, \
-                             int *nei_ele, int *mapping, int *unmapping, double *fnorm_vol, double *vec_fnorm, \
-                             double *uptsb, double *rhsb, double *dub, double *diag, double *fspr, double *dsrc);
+void rans_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm, 
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
 
 
 /**
  * @brief       Upper sweep of LU-SGS method for Navier-Stokes equations.
  * @param       neles       Number of element cells
- * @param       nfvars      Number of flux variables
  * @param       nface       Number of faces depends on element type
- * @param       ndims       Dimensions
  * @param       nei_ele     Indices for neighbor cells [nface, neles]
- * @param       mapping     Reordered index by Reverse Cuthill-McKee algorithm [neles]
- * @param       unmapping   Original index before Reverse Cuthill-McKee algorithm [neles]
  * @param       fnorm_vol   Surface magnitude/cell volume [nface, neles]
  * @param       vec_fnorm   Surface vector [nface, ndims, neles]
  * @param       uptsb       Solution array [nfvars, neles]
@@ -84,21 +69,15 @@ void rans_serial_lower_sweep(int neles, int nvars, int nfvars, int nface, int nd
  * @param       diag        Diagonal matrix array [neles]
  * @param       fspr        Wave speed for each cell face [nface, neles]
  */
-void ns_serial_upper_sweep(int neles, int nfvars, int nface, int ndims, \
-                           int *nei_ele, int *mapping, int *unmapping, double *fnorm_vol, double *vec_fnorm, \
-                           double *uptsb, double *rhsb, double *dub, double *diag, double *fspr);
+void ns_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                           UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
 
 
 /**
  * @brief       Upper sweep of LU-SGS method for RANS equations.
  * @param       neles       Number of element cells
- * @param       nvars       Number of conservative variables
- * @param       nfvars      Number of flux variables
  * @param       nface       Number of faces depends on element type
- * @param       ndims       Dimensions
  * @param       nei_ele     Indices for neighbor cells [nface, neles]
- * @param       mapping     Reordered index by Reverse Cuthill-McKee algorithm [neles]
- * @param       unmapping   Original index before Reverse Cuthill-McKee algorithm [neles]
  * @param       fnorm_vol   Surface magnitude/cell volume [nface, neles]
  * @param       vec_fnorm   Surface vector [nface, ndims, neles]
  * @param       uptsb       Solution array [nvars, neles]
@@ -108,19 +87,25 @@ void ns_serial_upper_sweep(int neles, int nfvars, int nface, int ndims, \
  * @param       fspr        Wave speed for each cell face [nface, neles]
  * @param       dsrc        Source term derivatives [nvars, neles]
  */
-void rans_serial_upper_sweep(int neles, int nvars, int nfvars, int nface, int ndims, \
-                             int *nei_ele, int *mapping, int *unmapping, double *fnorm_vol, double *vec_fnorm, \
-                             double *uptsb, double *rhsb, double *dub, double *diag, double *fspr, double *dsrc);
+void rans_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
 
 
 /**
  * @brief       Updates solution array.
  * @param       neles       Number of element cells
- * @param       nvars       Number of conservative variables
+ * @param       uptsb       Solution array
+ * @param       rhsb        Result of LU-SGS sweeps
+ */                           
+void lusgs_serial_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
+
+
+/**
+ * @brief       Updates solution array.
+ * @param       neles       Number of element cells
  * @param       uptsb       Solution array
  * @param       rhsb        Result of LU-SGS sweeps
  */
-void serial_update(int neles, int nvars, double *uptsb, double *rhsb);
-
+void lusgs_serial_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
 
 #endif // LUSGS_H

@@ -71,7 +71,7 @@ void ****malloc_4d(const size_t rows, const size_t cols, const size_t depth, con
     void **ar3 = (void **)malloc(rows*cols*depth*sizeof(void*));
     void ***ar2 = (void ***)malloc(rows*cols*sizeof(void**));
     void ****ar = (void ****)malloc(rows*sizeof(void ***));
-    int i, j, k, idx;
+    int i, j, k;
     char *p = (char*)data;
     for (i=0; i<rows; i++){
         for (j=0; j<cols; j++){

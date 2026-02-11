@@ -10,36 +10,32 @@ from utils.pbutils import make_nei_ele, read_input, make_coloring
 
 def run(params, comm, lib):
     # Constants
-    nvars, nface, ndims = 5, 6, 3
+    nvars, nface = 7, 6
     gamma = 1.4
-    nx, ny, nz, npx, npy, npz, nstep = params
-    m, n, l = int(nx/npx), int(ny/npy), int(nz/npz)
+    nx, ny, nz, npx, npy, npz = params
+    m, n, l = nx//npx, ny//npy, nz//npz
     nele = m*n*l
+    half = nele//2
     rank = comm.Get_rank()
 
     # Ctypes functions
-    update = lib.parallel_update
+    update = lib.lusgs_parallel_ns_update
     pre_lusgs = lib.parallel_pre_lusgs
     lower_sweep = lib.ns_parallel_lower_sweep
     upper_sweep = lib.ns_parallel_upper_sweep
 
-    update.argtypes = [c_int, c_int, c_void_p, c_void_p]
-    pre_lusgs.argtypes = [c_int, c_int, c_double, \
+    update.argtypes = [c_int, c_void_p, c_void_p]
+    pre_lusgs.argtypes = [c_int, c_int, c_double,
                           c_void_p, c_void_p, c_void_p, c_void_p]
-    lower_sweep.argtypes = [c_int, c_int, c_int, c_int, c_int, c_int, \
-                            c_void_p, c_void_p, c_void_p, c_void_p, c_void_p, \
+    lower_sweep.argtypes = [c_int, c_int, c_int, c_int,
+                            c_void_p, c_void_p, c_void_p, c_void_p, c_void_p,
                             c_void_p, c_void_p, c_void_p, c_void_p, c_void_p]
-    upper_sweep.argtypes = [c_int, c_int, c_int, c_int, c_int, c_int, \
-                            c_void_p, c_void_p, c_void_p, c_void_p, c_void_p, \
+    upper_sweep.argtypes = [c_int, c_int, c_int, c_int,
+                            c_void_p, c_void_p, c_void_p, c_void_p, c_void_p,
                             c_void_p, c_void_p, c_void_p, c_void_p, c_void_p]
     
     if rank == 0:
-        print("[Run] Allocating arrays...")
-    
-    # Array allocation
-    nei_ele = np.empty((nface, nele), dtype=np.int32)
-    icolor = np.empty((nele,), dtype=np.int32)
-    lcolor = np.empty((nele,), dtype=np.int32)
+        print("[Run] Allocating arrays...", end='')
     
     # Flow variables & arrays
     rho, u, v, w, p = gamma, 1.5, 0, 0, 1
@@ -53,74 +49,65 @@ def run(params, comm, lib):
     fnorm_vol = np.ones((nface, nele), dtype=np.float64)
     vfi = np.array([[0, -1, 0], [-1, 0, 0], [0, 0, 1], [1, 0, 0], [0, 0, -1], [0, 1, 0]], dtype=np.float64)
     vec_fnorm = np.repeat(vfi[:, :, np.newaxis], nele, axis=2)
+    lcolor = np.empty((nele,), dtype=np.int32)
+    nei_ele = make_nei_ele(m, n, l)
+    icolor = make_coloring(m, n, l)
+    comm.Barrier()
+    if rank == 0:
+        print(" Done")
 
     # Initial condition
     if rank == 0:
-        print("[Run] Initializing arrays...")
+        print("[Run] Initializing arrays...", end='')
     upts[0] = rhs[0] = dub[0] = rho
     upts[1] = rhs[1] = dub[1] = rho*u
     upts[2] = rhs[2] = dub[2] = rho*v
     upts[3] = rhs[3] = dub[3] = rho*w
     upts[4] = rhs[4] = dub[4] = et
-
-    make_nei_ele(m, n, l, nei_ele)
-    make_coloring(m, n, l, icolor, lcolor)
+    lcolor[icolor[:half]] = 1
+    lcolor[icolor[half:]] = 2
+    comm.Barrier()
+    if rank == 0:
+        print(" Done")
 
     # Iteration
     if rank == 0:
-        print("[Run] Starting iteration...")
-    tarr = np.zeros(nstep, dtype=np.float64)
+        print("[Run] Colored LU-SGS computation...", end='')
+    pre_lusgs(nele, nface, 1.0, fnorm_vol.ctypes.data, dt.ctypes.data,
+                diag.ctypes.data, fspr.ctypes.data)
+    lower_sweep(0, half, nele, nface, nei_ele.ctypes.data,
+                icolor.ctypes.data, lcolor.ctypes.data, fnorm_vol.ctypes.data,
+                vec_fnorm.ctypes.data, upts.ctypes.data, rhs.ctypes.data,
+                dub.ctypes.data, diag.ctypes.data, fspr.ctypes.data)
+    lower_sweep(half, nele, nele, nface, nei_ele.ctypes.data,
+                icolor.ctypes.data, lcolor.ctypes.data, fnorm_vol.ctypes.data,
+                vec_fnorm.ctypes.data, upts.ctypes.data, rhs.ctypes.data,
+                dub.ctypes.data, diag.ctypes.data, fspr.ctypes.data)
+    upper_sweep(half, nele, nele, nface, nei_ele.ctypes.data,
+                icolor.ctypes.data, lcolor.ctypes.data, fnorm_vol.ctypes.data,
+                vec_fnorm.ctypes.data, upts.ctypes.data, rhs.ctypes.data,
+                dub.ctypes.data, diag.ctypes.data, fspr.ctypes.data)
+    upper_sweep(0, half, nele, nface, nei_ele.ctypes.data,
+                icolor.ctypes.data, lcolor.ctypes.data, fnorm_vol.ctypes.data,
+                vec_fnorm.ctypes.data, upts.ctypes.data, rhs.ctypes.data,
+                dub.ctypes.data, diag.ctypes.data, fspr.ctypes.data)
+    update(nele, upts.ctypes.data, rhs.ctypes.data)
     comm.Barrier()
-    for i in range(nstep):
-        start = time.time()
-        pre_lusgs(nele, nface, 1.0, fnorm_vol.ctypes.data, dt.ctypes.data, \
-                  diag.ctypes.data, fspr.ctypes.data)
-        lower_sweep(0, nele//2, nele, nvars, nface, ndims, nei_ele.ctypes.data, \
-                    icolor.ctypes.data, lcolor.ctypes.data, fnorm_vol.ctypes.data, \
-                    vec_fnorm.ctypes.data, upts.ctypes.data, rhs.ctypes.data, \
-                    dub.ctypes.data, diag.ctypes.data, fspr.ctypes.data)
-        lower_sweep(nele//2, nele, nele, nvars, nface, ndims, nei_ele.ctypes.data, \
-                    icolor.ctypes.data, lcolor.ctypes.data, fnorm_vol.ctypes.data, \
-                    vec_fnorm.ctypes.data, upts.ctypes.data, rhs.ctypes.data, \
-                    dub.ctypes.data, diag.ctypes.data, fspr.ctypes.data)
-        upper_sweep(nele//2, nele, nele, nvars, nface, ndims, nei_ele.ctypes.data, \
-                    icolor.ctypes.data, lcolor.ctypes.data, fnorm_vol.ctypes.data, \
-                    vec_fnorm.ctypes.data, upts.ctypes.data, rhs.ctypes.data, \
-                    dub.ctypes.data, diag.ctypes.data, fspr.ctypes.data)
-        upper_sweep(0, nele//2, nele, nvars, nface, ndims, nei_ele.ctypes.data, \
-                    icolor.ctypes.data, lcolor.ctypes.data, fnorm_vol.ctypes.data, \
-                    vec_fnorm.ctypes.data, upts.ctypes.data, rhs.ctypes.data, \
-                    dub.ctypes.data, diag.ctypes.data, fspr.ctypes.data)
-        update(nele, nvars, upts.ctypes.data, rhs.ctypes.data)
-        comm.Barrier()
-        tarr[i] = time.time() - start
-    
-    if nstep > 100:
-        return tarr[15:].mean()*1000
-    else:
-        return tarr.mean()*1000
+    if rank == 0:
+        print(" Done")
 
 
-def write_output(nprocs, params, times):
-    m, n, l, dm, dn, dl, nstep = params
+def write_output(nprocs, params):
+    m, n, l, dm, dn, dl = params
     neles = m*n*l
     
-    f = open("OMPOUTPUT_py_{}_{}.txt".format(nb.get_num_threads()*nprocs, neles), 'w')
-    f.write("========= LU-SGS example output =========\n\n")
-    f.write("*** Problem setup ***\n")
-    f.write("Number of cores: {}\n".format(nprocs))
-    f.write("Number of threads: {}\n".format(nb.get_num_threads()*nprocs))
-    f.write("Number of threads per core: {}\n".format(nb.get_num_threads()))
-    f.write("Number of iteration step: {}\n".format(nstep))
-    f.write("Number of elements: {} = {} x {} x {}\n".format(neles, m, n, l))
-    f.write("Partitioning with {}: {} x {} x {}\n".format(dm*dn*dl, dm, dn, dl))
-    f.write("Elements per core: {} = {} x {} x {}\n\n".format(neles//nprocs, m//dm, n//dn, l//dl))
-    f.write("*** Average runtime for each processor [ms] ***\n")
-    for i in range(nprocs):
-        f.write("{:.6f}\n".format(times[i]))
-    f.write("\n*** Average runtime for entire processors [ms] ***\n")
-    f.write("{:.6f}\n".format(sum(times)/nprocs))
-    f.close()
+    print("========= LU-SGS example info =========\n")
+    print("Number of cores: {}\n".format(nprocs))
+    print("Number of threads: {}\n".format(nb.get_num_threads()*nprocs))
+    print("Number of threads per core: {}\n".format(nb.get_num_threads()))
+    print("Number of elements: {} = {} x {} x {}\n".format(neles, m, n, l))
+    print("Partitioning with {}: {} x {} x {}\n".format(dm*dn*dl, dm, dn, dl))
+    print("Elements per core: {} = {} x {} x {}\n\n".format(neles//nprocs, m//dm, n//dn, l//dl))
 
 
 if __name__ == "__main__":
@@ -152,14 +139,14 @@ if __name__ == "__main__":
                     err = 0
     else:
         err = 0
-        params = np.empty(7, dtype=np.int64)
+        params = np.empty(6, dtype=np.int64)
 
     err = comm.bcast(err, root=0)
     if err == 1:
         sys.exit()
     
-    if len(sys.argv) > 2:
-        nthreads = eval(sys.argv[3].split('=')[-1])
+    if len(sys.argv) > 3:
+        nthreads = eval(sys.argv[3])
         nb.set_num_threads(nthreads)
     
     params = comm.bcast(params, root=0)
@@ -171,9 +158,4 @@ if __name__ == "__main__":
         print("[Error] Dynamic library file not found")
         sys.exit()
     
-    avtimei = run(params, comm, lib)
-    tbuf = comm.gather(avtimei)
-
-    if rank == 0:
-        print("[Main] Run finished. Writing result...")
-        write_output(nproc, params, tbuf)
+    run(params, comm, lib)

@@ -1,109 +1,63 @@
-import numba as nb
 import numpy as np
 import re
 
-@nb.jit(nopython=True, fastmath=True)
-def make_nei_ele(m, n, l, nei_ele):
+def make_nei_ele(m, n, l, dtype=np.int32):
     """
-    Computes nei_ele array
-
-    Only for hexahedral mesh
-
-    parameter
-    ---------
-    m : x direction elements
-    n : y direction elements
-    l : z direction elements
+    Build adjacency for a regular m*n*l grid (x,y,z) with linear index:
+        idx = x + m*y + (m*n)*z,   x∈[0,m), y∈[0,n), z∈[0,l)
+    Output:
+        adj_arr shape (6, m*n*l), order = [-x, +x, -y, +y, -z, +z]
+        Boundary faces point to self.
     """
-    
-    idx = 0
-    ml = m*l
-    nml = n*m*l
+    N = m*n*l
+    idx3d = np.arange(N, dtype=dtype).reshape(l, n, m)  # axes: [z, y, x]
+    adj = np.empty((6, l, n, m), dtype=dtype)
 
-    for j in range(n):
-        for i in range(m):
-            for k in range(l):
-                # Next or previous neighbor cell count
-                ny = idx-ml
-                py = idx+ml
-                nx = idx-l
-                px = idx+l
-                nz = idx-1
-                pz = idx+1
+    # Start by pointing every face to self; then overwrite interior neighbors.
+    adj[0] = idx3d  # -x
+    adj[1] = idx3d  # +x
+    adj[2] = idx3d  # -y
+    adj[3] = idx3d  # +y
+    adj[4] = idx3d  # -z
+    adj[5] = idx3d  # +z
 
-                # Handling grid boundary
-                # -y direction
-                if ny < 0:
-                    nei_ele[0, idx] = idx
-                else:
-                    nei_ele[0, idx] = ny
+    # x-neighbors (axis=-1)
+    adj[0][..., 1:] = idx3d[..., :-1]   # -x for x>=1
+    adj[1][..., :-1] = idx3d[..., 1:]   # +x for x<=m-2
 
-                # -x direction
-                if nx < j*ml:
-                    nei_ele[1, idx] = idx
-                else:
-                    nei_ele[1, idx] = nx
+    # y-neighbors (axis=1)
+    adj[2][:, 1:, :] = idx3d[:, :-1, :] # -y for y>=1
+    adj[3][:, :-1, :] = idx3d[:, 1:, :] # +y for y<=n-2
 
-                # +z direction                
-                if pz >= j*ml + (i+1)*l:
-                    nei_ele[2, idx] = idx
-                else:
-                    nei_ele[2, idx] = pz
-                
-                # +x direction                
-                if px >= (j+1)*ml:
-                    nei_ele[3, idx] = idx
-                else:
-                    nei_ele[3, idx] = px
+    # z-neighbors (axis=0)
+    adj[4][1:, :, :] = idx3d[:-1, :, :] # -z for z>=1
+    adj[5][:-1, :, :] = idx3d[1:, :, :] # +z for z<=l-2
 
-                # -z direction                
-                if nz < j*ml + i*l:
-                    nei_ele[4, idx] = idx
-                else:
-                    nei_ele[4, idx] = nz
-                
-                # +y direction
-                if py >= nml:
-                    nei_ele[5, idx] = idx
-                else:
-                    nei_ele[5, idx] = py
-                
-                idx += 1
+    return adj.reshape(6, N)
 
 
-@nb.jit(nopython=True, fastmath=True)
-def make_coloring(m, n, l, icolor, lcolor):
+def make_coloring(m, n, l):
     """
-    2-Color Algorithm for hexahedral mesh
+    Linearization (x-fastest): idx = x + m*y + (m*n)*z
+    Returns:
+      A, B  -> 1D arrays of intrinsic indices where (x+y+z) is even/odd.
+    Order matches the intrinsic numbering.
     """
-    neles = m*n*l
-    denom = neles//2
-    cb = denom
-    ml = m*l
-    
-    ca = 0
-    ele = 0
+    N = m * n * l
+    i = np.arange(N, dtype=np.int32)
 
-    while ele < neles:
-        for j in range(n):
-            ist = (j*ml)//2
-            iend = (j+1)*ml//2
-            
-            for ind in range(ist, iend):
-                icolor[ca+ind] = ele
-                lcolor[ele] = ca//denom
-                ele += 1
-                icolor[cb+ind] = ele
-                lcolor[ele] = cb//denom
-                ele += 1
-            
-            tmp = ca
-            ca = cb
-            cb = tmp
+    # Invert x-fastest mapping
+    x =  i              % m
+    y = (i // m)        % n
+    z =  i // (m * n)
+
+    even = ((x + y + z) & 1) == 0
+
+    return np.concatenate((i[even], i[~even]))
 
 
 def read_input(fname):
-    isnum = re.compile('\d+')
+    isnum = re.compile(r'\d+')
 
     try:
         src = open(fname).read()
@@ -112,7 +66,7 @@ def read_input(fname):
         return None
     
     nums = re.findall(isnum, src)
-    if len(nums) != 7:
+    if len(nums) != 6:
         print("[Error] Missing input parameter(s)")
         return None
     

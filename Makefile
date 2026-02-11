@@ -9,13 +9,18 @@ lusgs :
 	mkdir -p lib
 	cd src/lusgs; mkdir -p obj; make all
 
+krylov :
+	mkdir -p lib
+	cd src/krylov; mkdir -p obj; make all
+
 example :
 	cd examples; mkdir -p obj; make all
 
 all :
 	mkdir -p lib
-	cd src; make all
-	cd examples; mkdir -p obj; make all
+	cd src/krylov; mkdir -p obj; make all
+	cd src/lusgs; mkdir -p obj; make all
+# 	cd examples; mkdir -p obj; make all
 
 .PHONY : clean
 clean :

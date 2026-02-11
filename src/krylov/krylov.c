@@ -31,14 +31,11 @@
  *
  * =======================================================================================================================
  */
-
-#include <stdio.h>
-#include <math.h>
-#include "mkl.h"
 #include "krylov.h"
 #include "precon.h"
+#include <math.h>
+#include <omp.h>
 
-#define eps 2.22e-16 // Machine epsilon of double precision
 
 /**
  * @details     Overall process of GMRES routine.
@@ -46,67 +43,83 @@
  *              UCFD_STATUS_CONVERGED is returned when L-2 norm of the residual vector becomes smaller than `tol`,
  *              and UCFD_STATUS_NOT_CONVERGED is returned when maximum iteration finished.
  */
-ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, const int neles, const int nvars, const int m,
-                           const int *row_ptr, const int *col_ind, const int *diag_ind, double *pre_nnz_data,
-                           const double tol, const double itmax, double *x, double *b, double *H, double *V, double *g, double *y, double *w, double *r)
+ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, int bn, int block, int m, int *iter, double tol,
+                           int *row_ptr, int *col_ind, int *diag_ind, double *precon_nnz_data,
+                           double *x, double *b, double *H, double *V, double *g, double *y, double *w, double *r)
 {
-    int it, i, j;
-    const int n = neles * nvars;
+    int it, i, j, itmax;
+    const int n = bn * BLOCK;
     double beta, tmp, c, s, h1, h2, rr;
-    sparse_status_t status;
+    ucfd_precon_solve psolve;
+    sparse_status_t mklstat;
 
+    /* --------------------------------
+     * Set variables
+    -------------------------------- */
     // Sparse matrix description for system matrix A(op)
     struct matrix_descr descr;
     descr.type = SPARSE_MATRIX_TYPE_GENERAL;
     descr.mode = 0;
     descr.diag = 0;
+    
+    // Set preconditioner solver
+    if (precon_type == BILU) psolve = bilu_psolve;
+    else if (precon_type == LUSGS) psolve = lusgs_psolve;
+    else psolve = none_psolve;
 
-    // Computes residual : r := b - A @ x
-    cblas_dcopy(n, b, 1, r, 1);
-    status = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 1.0, r);
-    if (status != SPARSE_STATUS_SUCCESS)
-    {
-        printf("MKL Sparse matrix - vector multiplication error\n");
-        return UCFD_STATUS_ERROR;
+    // Maximum iteration
+    itmax = *iter;
+    it = 0;
+
+    /* --------------------------------
+     * Initial residual
+     1) r := -A @ x
+     2) r := b -A @ x (r += rhs)
+    -------------------------------- */
+    mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 0.0, r);
+    if (mklstat != SPARSE_STATUS_SUCCESS) {
+        *iter = mklstat;
+        return UCFD_MKL_FAILED;
     }
+    cblas_daxpy(n, 1.0, b, 1, r, 1);
 
-    for (it = 0; it < itmax; it++)
+    /* --------------------------------
+     * Outer iteration
+    -------------------------------- */
+    while (it < itmax)
     {
         beta = cblas_dnrm2(n, r, 1);
-        if (beta < tol)
+        if (beta < tol) {
+            *iter = it;
             return UCFD_STATUS_CONVERGED;
+        }
         
         // Left-preconditioning
-        if (precon_type == BILU)
-            bilu_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, r);
-        else if (precon_type == LUSGS)
-            lusgs_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, r);
+        psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, r);
 
         beta = cblas_dnrm2(n, r, 1);
         y[0] = beta;
 
         // V = r/beta
-        cblas_dcopy(n, r, 1, V, 1);
-        cblas_dscal(n, 1 / beta, V, 1);
+        #pragma omp parallel for
+        for (i=0; i<n; i++) {
+            V[i] = r[i]/beta;
+        }
 
+        /* --------------------------------
+         * Inner iteration (Restart)
+        -------------------------------- */
         for (j = 0; j < m; j++)
         {
-            status = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, 1.0, op, descr, &V[j * n], 0.0, w);
-            if (status != SPARSE_STATUS_SUCCESS)
-            {
-                printf("MKL Sparse matrix - vector multiplication error\n");
-                return UCFD_STATUS_ERROR;
+            mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, 1.0, op, descr, &V[j * n], 0.0, w);
+            if (mklstat != SPARSE_STATUS_SUCCESS) {
+                *iter = mklstat;
+                return UCFD_MKL_FAILED;
             }
-
-            // TODO : Use FFI
-            if (precon_type == BILU)
-                bilu_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, w);
-            else if (precon_type == LUSGS)
-                lusgs_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, w);
+            psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, w);
 
             // Arnoldi iteration
-            for (i = 0; i < (j + 1); i++)
-            {
+            for (i = 0; i < (j + 1); i++) {
                 tmp = cblas_ddot(n, w, 1, &V[i * n], 1);
                 H[j + m * i] = tmp;
                 cblas_daxpy(n, -tmp, &V[i * n], 1, w, 1);
@@ -114,8 +127,11 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, c
 
             tmp = cblas_dnrm2(n, w, 1);
             H[j + (j + 1) * m] = tmp;
-            cblas_dcopy(n, w, 1, &V[(j + 1) * n], 1);
-            cblas_dscal(n, 1 / tmp, &V[(j + 1) * n], 1);
+            
+            #pragma omp parallel for
+            for (i=0; i<n; i++) {
+                V[(j+1)*n+i] = w[i]/tmp;
+            }
 
             // Givens Rotation
             for (i = 0; i < j; i++)
@@ -150,56 +166,57 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, c
         cblas_dgemv(CblasRowMajor, CblasTrans, m, n, 1.0, V, n, y, 1, 1.0, x, 1);
 
         // Computes next iteration residual
-        cblas_dcopy(n, b, 1, r, 1);
-        status = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 1.0, r);
-        if (status != SPARSE_STATUS_SUCCESS)
-            return UCFD_STATUS_ERROR;
+        mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 0.0, r);
+        if (mklstat != SPARSE_STATUS_SUCCESS) {
+            *iter = mklstat;
+            return UCFD_MKL_FAILED;
+        }
+        cblas_daxpy(n, 1.0, b, 1, r, 1);
+        
+        ++it;
     }
-
-    return UCFD_STATUS_NOT_CONVERGED;
+    return UCFD_MAX_ITER;
 }
 
 /**
  * @details     Single iteration of GMRES.
- *              Residual array `r` must have non-empty values when using this function.
+ * @note        Residual array `r` must be initialized, `r := b - A @ x`.
  */
-ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, const int neles, const int nvars, const int m,
-                         const int *row_ptr, const int *col_ind, const int *diag_ind, double *pre_nnz_data,
+ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_solve psolve, const struct matrix_descr descr,
+                         int bn, int m, int *flag,
+                         int *row_ptr, int *col_ind, int *diag_ind, double *precon_nnz_data,
                          double *x, double *b, double *H, double *V, double *g, double *y, double *w, double *r)
 {
     int i, j;
-    const int n = neles * nvars;
+    const int n = bn * BLOCK;
     double beta, tmp, c, s, h1, h2, rr;
-    sparse_status_t status;
+    sparse_status_t mklstat;
+    *flag = 0;
 
-    // Sparse matrix description for system matrix A(op)
-    struct matrix_descr descr;
-    descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-    descr.mode = 0;
-    descr.diag = 0;
-
-    if (precon_type == BILU)
-        bilu_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, r);
-    else if (precon_type == LUSGS)
-        lusgs_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, r);
+    // Apply preconditioner
+    psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, r);
     
     beta = cblas_dnrm2(n, r, 1);
     y[0] = beta;
 
     // V = r/beta
-    cblas_dcopy(n, r, 1, V, 1);
-    cblas_dscal(n, 1 / beta, V, 1);
+    #pragma omp parallel for
+    for (i=0; i<n; i++) {
+        V[i] = r[i]/beta;
+    }
 
+    /* --------------------------------
+     * Inner iteration (Restart)
+    -------------------------------- */
     for (j = 0; j < m; j++)
     {
-        status = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, 1.0, op, descr, &V[j * n], 0.0, w);
-        if (status != SPARSE_STATUS_SUCCESS)
-            return UCFD_STATUS_ERROR;
+        mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, 1.0, op, descr, &V[j * n], 0.0, w);
+        if (mklstat != SPARSE_STATUS_SUCCESS) {
+            *flag = mklstat;
+            return UCFD_MKL_FAILED;
+        }
 
-        if (precon_type == BILU)
-            bilu_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, w);
-        else if (precon_type == LUSGS)
-            lusgs_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, w);
+        psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, w);
 
         // Arnoldi iteration
         for (i = 0; i < (j + 1); i++)
@@ -211,8 +228,11 @@ ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, con
 
         tmp = cblas_dnrm2(n, w, 1);
         H[j + (j + 1) * m] = tmp;
-        cblas_dcopy(n, w, 1, &V[(j + 1) * n], 1);
-        cblas_dscal(n, 1 / tmp, &V[(j + 1) * n], 1);
+
+        #pragma omp parallel for
+        for (i=0; i<n; i++) {
+            V[(j+1)*n+i] = w[i]/tmp;
+        }
 
         // Givens Rotation
         for (i = 0; i < j; i++)
@@ -247,10 +267,12 @@ ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, con
     cblas_dgemv(CblasRowMajor, CblasTrans, m, n, 1.0, V, n, y, 1, 1.0, x, 1);
 
     // Computes next iteration residual
-    cblas_dcopy(n, b, 1, r, 1);
-    status = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 1.0, r);
-    if (status != SPARSE_STATUS_SUCCESS)
-        return UCFD_STATUS_ERROR;
+    mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 0.0, r);
+    if (mklstat != SPARSE_STATUS_SUCCESS) {
+        *flag = mklstat;
+        return UCFD_MKL_FAILED;
+    }
+    cblas_daxpy(n, 1.0, b, 1, r, 1);
 
     return UCFD_STATUS_SUCCESS;
 }
@@ -261,15 +283,16 @@ ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, con
  *              UCFD_STATUS_CONVERGED is returned when L-2 norm of the residual vector becomes smaller than `tol`,
  *              and UCFD_STATUS_NOT_CONVERGED is returned when maximum iteration finished.
  */
-ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type, const int neles, const int nvars,
-                              const int *row_ptr, const int *col_ind, const int *diag_ind, double *pre_nnz_data,
-                              const double tol, const double itmax, double *x, double *b, double *r, double *p, double *v, double *s, double *t)
+ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type, int bn, int *iter, double tol,
+                              int *row_ptr, int *col_ind, int *diag_ind, double *precon_nnz_data,
+                              double *x, double *b, double *r, double *p, double *v, double *s, double *t)
 {
-    int it;
-    const int n = neles * nvars;
+    int it, itmax;
+    const int n = bn * BLOCK;
     double rho, rhoprev, alpha, beta, omega, resid;
     double rv, ts, tt;
-    sparse_status_t status;
+    ucfd_precon_solve psolve;
+    sparse_status_t mklstat;
 
     // Sparse matrix description for system matrix A(op)
     struct matrix_descr descr;
@@ -277,14 +300,21 @@ ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type
     descr.mode = 0;
     descr.diag = 0;
 
+    // Set preconditioner solver
+    if (precon_type == BILU) psolve = bilu_psolve;
+    else if (precon_type == LUSGS) psolve = lusgs_psolve;
+    else psolve = none_psolve;
+
+    itmax = *iter;
+    it = 0;
+
     // Computes residual : r := b - A @ x
-    cblas_dcopy(n, b, 1, r, 1);
-    status = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 1.0, r);
-    if (status != SPARSE_STATUS_SUCCESS)
-    {
-        printf("MKL Sparse matrix - vector multiplication error\n");
-        return UCFD_STATUS_ERROR;
+    mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 0.0, r);
+    if (mklstat != SPARSE_STATUS_SUCCESS) {
+        *iter = mklstat;
+        return UCFD_MKL_FAILED;
     }
+    cblas_daxpy(n, 1.0, b, 1, r, 1);
 
     // Choose r\tilde as r
     /* r[:n] = r
@@ -292,10 +322,9 @@ ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type
     cblas_dcopy(n, r, 1, &r[n], 1);
 
     // Outer iteration
-    for (it = 0; it < itmax; it++)
+    while (it < itmax)
     {
         resid = cblas_dnrm2(n, r, 1);
-        printf("%d : %.10f\n", it, resid);
         if (resid < tol)
             return UCFD_STATUS_CONVERGED;
 
@@ -319,19 +348,14 @@ ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type
 
         // phat = inv(M) @ p
         cblas_dcopy(n, p, 1, &p[n], 1);
-
-        // Apply preconditioner to p[n]~
-        if (precon_type == BILU)
-            bilu_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, &p[n]);
-        else if (precon_type == LUSGS)
-            lusgs_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, &p[n]);
+        psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, &p[n]);
 
         // v = A @ phat
-        status = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, 1.0, op, descr, &p[0], 0.0, v);
-        if (status != SPARSE_STATUS_SUCCESS)
+        mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, 1.0, op, descr, &p[0], 0.0, v);
+        if (mklstat != SPARSE_STATUS_SUCCESS)
         {
-            printf("MKL Sparse matrix - vector multiplication error\n");
-            return UCFD_STATUS_ERROR;
+            *iter = mklstat;
+            return UCFD_MKL_FAILED;
         }
 
         rv = cblas_ddot(n, v, 1, &r[n], 1);
@@ -351,17 +375,13 @@ ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type
 
         // shat = inv(M) @ s
         cblas_dcopy(n, s, 1, &s[n], 1);
+        psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, &s[n]);
 
-        if (precon_type == BILU)
-            bilu_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, &s[n]);
-        else if (precon_type == LUSGS)
-            lusgs_psolve(neles, nvars, row_ptr, col_ind, diag_ind, pre_nnz_data, &s[n]);
-
-        status = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, 1.0, op, descr, &s[0], 0.0, t);
-        if (status != SPARSE_STATUS_SUCCESS)
+        mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, 1.0, op, descr, &s[0], 0.0, t);
+        if (mklstat != SPARSE_STATUS_SUCCESS)
         {
-            printf("MKL Sparse matrix - vector multiplication error\n");
-            return UCFD_STATUS_ERROR;
+            *iter = mklstat;
+            return UCFD_MKL_FAILED;
         }
 
         ts = cblas_ddot(n, t, 1, s, 1);
@@ -376,7 +396,9 @@ ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type
 
         // Update rho
         rhoprev = rho;
+
+        ++it;
     }
 
-    return UCFD_STATUS_ERROR;
+    return UCFD_MAX_ITER;
 }

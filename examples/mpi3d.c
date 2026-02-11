@@ -17,9 +17,6 @@
  * 
  * =======================================================================================================================
  */
-
-#include <math.h>
-#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
@@ -28,27 +25,23 @@
 #include "arrays.h"
 #include "lusgs.h"
 
-#define nvars 5
-#define ndims 3
-#define ncellface 6
+#define ncellface 6     // Hexahedral cell
 #define root 0
 
-double run(int rank, int *params);
-void write_output(int nprocs, int *params, double *times);
+
+int run(int rank, int *params);
+void write_info(int nprocs, int *params);
 
 int main(int argc, char **argv)
 {
     int nprocs, rank;
     int dm, dn, dl;
     int err = 0;
-    int params[7];
-    double avtimei;
+    int params[6];
 
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    double *times = (double *)calloc(nprocs, sizeof(double));
 
     if (rank == 0) {
         if (argc < 2) {
@@ -74,7 +67,7 @@ int main(int argc, char **argv)
                     err = 1;
                 }
                 else {
-                    printf("[Main] 3D hexahedral example starts...\n");
+                    write_info(nprocs, params);
                 }
             }
         }
@@ -85,22 +78,13 @@ int main(int argc, char **argv)
 
     MPI_Bcast(&params, 7, MPI_INT, root, MPI_COMM_WORLD);
 
-    avtimei = run(rank, params);
-    
-    MPI_Gather(&avtimei, 1, MPI_DOUBLE, times, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-    if (rank == 0) {
-        printf("[Main] Run finished. Writing result...\n");
-        write_output(nprocs, params, times);
-    }
-
+    err = run(rank, params);
     MPI_Finalize();
-    free(times);
-    return 0;
+    return err;
 }
 
 
-double run(int rank, int *params)
+int run(int rank, int *params)
 {
     const double gamma = 1.4;
     const double rho = gamma;
@@ -113,35 +97,31 @@ double run(int rank, int *params)
     const int bn = params[1]/params[4];
     const int bl = params[2]/params[5];
     const int neles = bm*bn*bl;
-    const int nstep = params[6];
-    double start;
-    double avtime = 0.0;
 
-    if (rank == 0) printf("[Run] Allocating arrays...\n");
-    double **upts = (double **) malloc_2d(nvars, neles, sizeof(double));
-    double **rhs = (double **) malloc_2d(nvars, neles, sizeof(double));
-    double **dub = (double **) malloc_2d(nvars, neles, sizeof(double));
+    if (rank == root) printf("[Run] Allocating arrays...");
+    double **upts = (double **) malloc_2d(NVARS, neles, sizeof(double));
+    double **rhs = (double **) malloc_2d(NVARS, neles, sizeof(double));
+    double **dub = (double **) malloc_2d(NVARS, neles, sizeof(double));
     double *diag = (double *) calloc(neles, sizeof(double));
     double **fspr = (double **) malloc_2d(ncellface, neles, sizeof(double));
     double *dt = (double *) calloc(neles, sizeof(double));
     double **fnorm_vol = (double **) malloc_2d(ncellface, neles, sizeof(double));
-    double ***vec_fnorm = (double ***) malloc_3d(ncellface, ndims, neles, sizeof(double));
+    double ***vec_fnorm = (double ***) malloc_3d(ncellface, NDIMS, neles, sizeof(double));
     int **nei_ele = (int **) malloc_2d(ncellface, neles, sizeof(int));
-    int *mapping = (int *)calloc(neles, sizeof(int));
-    int *unmapping = (int *)calloc(neles, sizeof(int));
-    double *tarr = (double *)malloc(sizeof(double)*nstep);
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (rank == root) printf(" Done\n");
 
-    /* Pointer of each array */
+    /* Pointer of multi-dimensional array */
     double *uptsp = &upts[0][0];
     double *rhsp = &rhs[0][0];
     double *dubp = &dub[0][0];
     double *fsprp = &fspr[0][0];
     double *fnp = &fnorm_vol[0][0];
     double *vfp = &vec_fnorm[0][0][0];
-    int *nep = &nei_ele[0][0];
+    int *neip = &nei_ele[0][0];
 
     /* Initialize */
-    if (rank == 0) printf("[Run] Initializing arrays...\n");
+    if (rank == root) printf("[Run] Initializing arrays...");
     for (int i=0; i < neles; i++) {
         upts[0][i] = rho;
         upts[1][i] = rho*u;
@@ -166,7 +146,7 @@ double run(int rank, int *params)
         for (int j=0; j<ncellface; j++) {
             fnorm_vol[j][i] = 1.0;
             fspr[j][i] = 1.0;
-            for (int k=0; k<ndims; k++) {
+            for (int k=0; k<NDIMS; k++) {
                 vec_fnorm[j][k][i] = 0.0;
             }
         }
@@ -178,34 +158,24 @@ double run(int rank, int *params)
         vec_fnorm[4][2][i] = -1.0;
         vec_fnorm[5][1][i] = 1.0;
     }
-
-    if (rank == 0) printf("[Run] Constructing nei_ele array...\n");
-    make_nei_ele(bm, bn, bl, nei_ele);
-
-    if (rank == 0) printf("[Run] Processing Reverse Cuthill-McKee...\n");
-    make_reordering(neles, ncellface, nei_ele, mapping, unmapping);
-
-    if (rank == 0) printf("[Run] Starting iteration...\n");
+    if (make_nei_ele(bm, bn, bl, nei_ele)) return 1;
     MPI_Barrier(MPI_COMM_WORLD);
-    for (int i=0; i<nstep; i++) {
-        start = MPI_Wtime();
-        serial_pre_lusgs(neles, ncellface, 1.0, fnp, dt, diag, fsprp);
-        ns_serial_lower_sweep(neles, nvars, ncellface, ndims,
-                    nep, mapping, unmapping, fnp, vfp, \
-                    uptsp, rhsp, dubp, diag, fsprp);
-        ns_serial_upper_sweep(neles, nvars, ncellface, ndims,
-                    nep, mapping, unmapping, fnp, vfp, \
-                    uptsp, rhsp, dubp, diag, fsprp);
-        serial_update(neles, nvars, uptsp, rhsp);
-        MPI_Barrier(MPI_COMM_WORLD);
-        tarr[i] = (double) MPI_Wtime() - start;
-    }
+    if (rank == root) printf(" Done\n");
 
-    for (int i=0; i<nstep; i++)
-        avtime += tarr[i];
-    avtime = avtime*1000/nstep;
+    if (rank == root) printf("[Run] LU-SGS computation...");
+    serial_pre_lusgs(neles, ncellface, 1.0, fnp, dt, diag, fsprp);
+    ns_serial_lower_sweep(neles, ncellface,
+                neip, fnp, vfp, \
+                uptsp, rhsp, dubp, diag, fsprp);
+    ns_serial_upper_sweep(neles, ncellface,
+                neip, fnp, vfp, \
+                uptsp, rhsp, dubp, diag, fsprp);
+    lusgs_serial_ns_update(neles, uptsp, rhsp);
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (rank == root) printf(" Done\n");
 
     //deallocate array
+    if (rank == root) printf("[Run] Deallocate arrays...");
     dealloc_2d((void **) upts);
     dealloc_2d((void **) rhs);
     dealloc_2d((void **) dub);
@@ -213,19 +183,18 @@ double run(int rank, int *params)
     dealloc_2d((void **) fnorm_vol);
     dealloc_3d((void ***) vec_fnorm);
     dealloc_2d((void **) nei_ele);
-    free(mapping);
-    free(unmapping);
     free(diag);
     free(dt);
-    free(tarr);
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (rank == root) printf(" Done\n");
 
-    return avtime;
+    return 0;
 }
 
 /**
- * @brief       Write output file as txt format
+ * @brief       write information in command output
  */
-void write_output(int nprocs, int *params, double *times)
+void write_info(int nprocs, int *params)
 {
     int m = params[0];
     int n = params[1];
@@ -233,29 +202,13 @@ void write_output(int nprocs, int *params, double *times)
     int dm = params[3];
     int dn = params[4];
     int dl = params[5];
-    int nstep = params[6];
     int neles = m*n*l;
-    double avtime = 0.0;
-    char filename[100];
 
-    // Make filename
-    sprintf(filename, "MPIOUTPUT_c_%d_%d.txt", nprocs, neles);
-    FILE *outfile = fopen(filename, "w");
-    fprintf(outfile, "========= LU-SGS example output =========\n\n");
-    fprintf(outfile, "*** Problem setup ***\n");
-    fprintf(outfile, "Number of cores: %d\n", nprocs);
-    fprintf(outfile, "Number of iteration step: %d\n", nstep);
-    fprintf(outfile, "Number of elements: %d = %d x %d x %d\n", neles, m, n, l);
-    fprintf(outfile, "Partitioning with %d: %d x %d x %d\n", dm*dn*dl, dm, dn, dl);
-    fprintf(outfile, "Elements per core: %d = %d x %d x %d\n\n", neles/nprocs, m/dm, n/dn, l/dl);
-    fprintf(outfile, "*** Average runtime for each processor [ms] ***\n");
-    for (int i=0; i<nprocs; i++) {
-        avtime += times[i];
-        fprintf(outfile, "%lf\n", times[i]);
-    }
-    fprintf(outfile, "\n*** Average runtime for entire processors [ms] ***\n");
-    fprintf(outfile, "%lf\n", avtime/nprocs);
-
-    fclose(outfile);
+    // Print
+    printf("========= LU-SGS example info =========\n");
+    printf("Number of cores: %d\n", nprocs);
+    printf("Number of elements: %d = %d x %d x %d\n", neles, m, n, l);
+    printf("Partitioning with %d: %d x %d x %d\n", dm*dn*dl, dm, dn, dl);
+    printf("Elements per core: %d = %d x %d x %d\n\n", neles/nprocs, m/dm, n/dn, l/dl);
 }
 

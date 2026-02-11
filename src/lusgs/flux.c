@@ -16,15 +16,7 @@
  * 
  * =======================================================================================================================
  */
-
 #include "flux.h"
-
-// #ifndef CONST_H
-//     /** Specific heat ratio */
-//     #define gamma   1.4
-//     /** Minimum pressure value */
-//     #define pmin    1e-15
-// #endif
 
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 
@@ -34,7 +26,7 @@
  *              typically Rusanov flux is implemented.  
  *              Therefore, only convective flux is used.
  */
-void ns_flux_container(int nfvars, int ndims, double *u, double *nf, double *f)
+void ns_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f)
 {   
     /**
      * Variable description :  
@@ -43,35 +35,35 @@ void ns_flux_container(int nfvars, int ndims, double *u, double *nf, double *f)
      * `temp` : \f$\rho^2 \times (u^2 + v^2)\f$  
      * `contrav` : Contravariant velocity
      */
-    double rho = u[0];
-    double et = u[nfvars-1];
-    double temp = 0.0;
-    double contrav = 0.0;
+    UCFD_FLOAT rho = u[0];
+    UCFD_FLOAT et = u[NFVARS-1];
+    UCFD_FLOAT temp = 0.0;
+    UCFD_FLOAT contrav = 0.0;
     int i;
 
-    for (i=0; i<ndims; i++) {
+    for (i=0; i<NDIMS; i++) {
         contrav += u[i+1]*nf[i];
         temp += u[i+1]*u[i+1];
     }
     contrav /= rho;
 
     // Apply lower bound of pressure value
-    double p = (gamma - 1.0)*(et - 0.5*temp/rho);
-    if (p < pmin) {
-        p = pmin;
-        et = p/(gamma-1.0) + 0.5*temp/rho;
-        u[nfvars-1] = et;
+    UCFD_FLOAT p = (GAMMA - 1.0)*(et - 0.5*temp/rho);
+    if (p < PMIN) {
+        p = PMIN;
+        et = p/(GAMMA-1.0) + 0.5*temp/rho;
+        u[NFVARS-1] = et;
     }
     
     // Total enthalpy
-    double ht = et + p;
+    UCFD_FLOAT ht = et + p;
 
     // Computes flux array
     f[0] = rho*contrav;
-    for (int i=0; i<ndims; i++) {
+    for (UCFD_INT i=0; i<NDIMS; i++) {
         f[i+1] = u[i+1] * contrav + nf[i]*p;
     }
-    f[nfvars-1] = ht*contrav;
+    f[NFVARS-1] = ht*contrav;
 }
 
 /**
@@ -82,41 +74,35 @@ void ns_flux_container(int nfvars, int ndims, double *u, double *nf, double *f)
  *              Convective flux in RANS equations is computed
  *              simply by multiplying conservative variables and contravariant velocity.
  */
-void rans_flux_container(int nfvars, int ndims, int nturbvars, double *u, double *nf, double *f)
+void rans_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f)
 {
-    double rho = u[0];
-    double contrav = 0.0;
+    UCFD_FLOAT rho = u[0];
+    UCFD_FLOAT contrav = 0.0;
 
-    for (int i=0; i<ndims; i++) {
+    for (UCFD_INT i=0; i<NDIMS; i++) {
         contrav += u[i+1] * nf[i];
     }
     contrav /= rho;
 
-    for (int i=0; i<nturbvars; i++) {
-        f[i] = u[nfvars+i]*contrav;
+    for (UCFD_INT i=0; i<NTURBVARS; i++) {
+        f[i] = u[NFVARS+i]*contrav;
     }
 }
 
 
-int rans_source_jacobian(int nvars, int ntvars, double betast, \
-                         double *uf, double *tmat, double *dsrc)
+ucfd_status_t rans_source_jacobian(UCFD_FLOAT *uf, UCFD_FLOAT tmat[NTURBVARS][NTURBVARS], UCFD_FLOAT *dsrc)
 {
     /* 1-equation RANS model (Spalart-Allmaras) */
-    if (ntvars == 1) {
-        tmat[0] += dsrc[nvars-1];
-    }
+    if (NTURBVARS == 1) tmat[0][0] += dsrc[NVARS-1];
 
     /* 2-equations RANS model (kw-SST) */
-    else if (ntvars == 2) {
-        double k = uf[nvars-2] / uf[0];
-        tmat[0] += dsrc[nvars-2];
-        tmat[1] += max(betast*k, 0.0);
-        tmat[3] += dsrc[nvars-1];
+    else if (NTURBVARS == 2) {
+        UCFD_FLOAT k = uf[NVARS-2] / uf[0];
+        tmat[0][0] += dsrc[NVARS-2];
+        tmat[0][1] += max(BETAST*k, 0.0);
+        tmat[1][1] += dsrc[NVARS-1];
     }
+    else return UCFD_STATUS_NOT_SUPPORTED;
 
-    else {
-        return -1;
-    }
-
-    return 0;
+    return UCFD_STATUS_SUCCESS;
 }
