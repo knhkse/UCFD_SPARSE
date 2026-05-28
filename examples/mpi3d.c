@@ -164,13 +164,13 @@ int run(int rank, int *params)
 
     if (rank == root) printf("[Run] LU-SGS computation...");
     serial_pre_lusgs(neles, ncellface, 1.0, fnp, dt, diag, fsprp);
-    ns_serial_lower_sweep(neles, ncellface,
+    serial_ns_lower_sweep(neles, ncellface,
                 neip, fnp, vfp, \
-                uptsp, rhsp, dubp, diag, fsprp);
-    ns_serial_upper_sweep(neles, ncellface,
+                uptsp, dubp, diag, fsprp);
+    serial_ns_upper_sweep(neles, ncellface,
                 neip, fnp, vfp, \
-                uptsp, rhsp, dubp, diag, fsprp);
-    lusgs_serial_ns_update(neles, uptsp, rhsp);
+                uptsp, dubp, diag, fsprp);
+    serial_ns_lusgs_update(neles, uptsp, dubp);
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == root) printf(" Done\n");
 

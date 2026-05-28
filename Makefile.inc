@@ -9,11 +9,12 @@ IFLAGS = -I$(SRCDIR)
 ## Intel oneAPI (Recommended)
 CC = icx
 CFLAGS = -Wall -O3 -ffast-math -qopenmp
+OMPFLAG = -qopenmp
 
 ## GCC or Clang
 # CC = mpicc
 # CFLAGS = -Wall -O3 -ffast-math -fopenmp
-
+# OMPFLAG = -fopenmp
 
 # LU-SGS macros
 ## Equation parameters

@@ -40,7 +40,7 @@
  *              which has less memory requirement.  
  *              Diffusive margin of wave speed is applied.
  */
-void serial_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor, \
+void serial_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
                       UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
 {
     UCFD_INT idx;       // Element index
@@ -71,8 +71,8 @@ void serial_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor, \
  *              which has the same flux shape.  
  *              solution array is stored in `dub` array.
  */
-void ns_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                           UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+void serial_ns_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                           UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
 {   
     UCFD_INT idx, neib, jdx, kdx;
     UCFD_FLOAT du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
@@ -117,7 +117,7 @@ void ns_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UC
         }
         // Update dub array
         for (kdx=0; kdx<NFVARS; kdx++)
-            dub[neles*kdx + idx] = (rhsb[neles*kdx + idx] - 0.5*df[kdx])/diag[idx];
+            dub[neles*kdx + idx] = (dub[neles*kdx + idx] - 0.5*df[kdx])/diag[idx];
     }
 }
 
@@ -126,8 +126,8 @@ void ns_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UC
  *              This function is used for RANS equations.  
  *              solution array is stored in `dub` array.
  */
-void rans_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm, 
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+void serial_rans_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm, 
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
 {
     UCFD_INT idx, neib, jdx, kdx;
     UCFD_FLOAT du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
@@ -176,7 +176,7 @@ void rans_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, 
         }
         // Update dub array
         for (kdx=0; kdx<NTURBVARS; kdx++) {
-            dub[neles*(kdx+NFVARS) + idx] = (rhsb[neles*(kdx+NFVARS)+idx] - \
+            dub[neles*(kdx+NFVARS) + idx] = (dub[neles*(kdx+NFVARS)+idx] - \
                                             0.5*df[kdx])/(diag[idx]+dsrc[neles*(kdx+NFVARS)+idx]);
         }
     }
@@ -187,11 +187,11 @@ void rans_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, 
  * @details     By processing upper sweep, next time step solution \f$\Delta Q\f$ is computed.
  *              This function is used for Euler or Navier-Stokes equations,
  *              which has the same flux shape.  
- *              Solution array is stored in `rhsb` array,
+ *              Solution difference array is stored in `dub` array,
  *              since right-hand-side array is no longer needed.
  */
-void ns_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                           UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+void serial_ns_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                           UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
 {
     UCFD_INT idx, neib, jdx, kdx;
     UCFD_FLOAT du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
@@ -218,7 +218,7 @@ void ns_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UC
             if (neib > idx) {
                 for (kdx=0; kdx<NFVARS; kdx++) {
                     u[kdx] = uptsb[neles*kdx + neib];
-                    du[kdx] = u[kdx] + rhsb[neles*kdx + neib];
+                    du[kdx] = u[kdx] + dub[neles*kdx + neib];
                 }
                 
                 ns_flux_container(u, nf, f);
@@ -230,13 +230,13 @@ void ns_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UC
                 
                 for (kdx=0; kdx<NFVARS; kdx++) {
                     df[kdx] += (dfj[kdx] - fspr[neles*jdx + idx] \
-                                * rhsb[neles*kdx + neib])*fnorm_vol[neles*jdx + idx];
+                                * dub[neles*kdx + neib])*fnorm_vol[neles*jdx + idx];
                 }
             }
         }
-        // Update rhsb array
+        // Update dub array
         for (kdx=0; kdx<NFVARS; kdx++) {
-            rhsb[neles*kdx + idx] = dub[neles*kdx + idx] - 0.5*df[kdx]/diag[idx];
+            dub[neles*kdx + idx] = dub[neles*kdx + idx] - 0.5*df[kdx]/diag[idx];
         }
     }
 }
@@ -245,11 +245,11 @@ void ns_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UC
 /**
  * @details     By processing upper sweep, next time step solution \f$\Delta Q\f$ is computed.
  *              This function is used for RANS equations.  
- *              Solution array is stored in `rhsb` array,
+ *              Solution array is stored in `dub` array,
  *              since right-hand-side array is no longer needed.
  */
-void rans_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+void serial_rans_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
 {
     UCFD_INT idx, neib, jdx, kdx;
     UCFD_FLOAT du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
@@ -280,7 +280,7 @@ void rans_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, 
                 }
 
                 for (kdx=NFVARS; kdx<NVARS; kdx++) {
-                    du[kdx] += rhsb[neles*kdx + neib];
+                    du[kdx] += dub[neles*kdx + neib];
                 }
 
                 rans_flux_container(u, nf, f);
@@ -292,45 +292,26 @@ void rans_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, 
 
                 for (kdx=0; kdx<NTURBVARS; kdx++) {
                     df[kdx] += (dfj[kdx] - fspr[neles*jdx+idx] \
-                                * rhsb[neles*(kdx+NFVARS)+neib])*fnorm_vol[neles*jdx+idx];
+                                * dub[neles*(kdx+NFVARS)+neib])*fnorm_vol[neles*jdx+idx];
                 }
             }
         }
-        // Update rhsb array
+        // Update dub array
         for (kdx=0; kdx<NTURBVARS; kdx++) {
-            rhsb[neles*(kdx+NFVARS)+idx] = dub[neles*(kdx+NFVARS)+idx] - \
+            dub[neles*(kdx+NFVARS)+idx] = dub[neles*(kdx+NFVARS)+idx] - \
                                         0.5*df[kdx]/(diag[idx] + dsrc[neles*(kdx+NFVARS)+idx]);
         }
     }
 }
 
-/**
- * @details     solution array updated by adding \f$\Delta Q\f$.
- *              Be aware that `rhsb` array in function parameter
- *              is the difference array after upper sweep,
- *              not the right-hand-side array.
- */
-void lusgs_serial_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb)
-{
-    UCFD_INT idx, kdx;
-    
-    // Iterate for all cell
-    for (idx=0; idx<neles; idx++) {
-        // Update conservative variables
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            // Indexing 2D array as 1D
-            uptsb[neles*kdx + idx] += rhsb[neles*kdx + idx];
-        }
-    }
-}
 
 /**
  * @details     solution array updated by adding \f$\Delta Q\f$.
- *              Be aware that `rhsb` array in function parameter
+ *              Be aware that `dub` array in function parameter
  *              is the difference array after upper sweep,
  *              not the right-hand-side array.
  */
-void lusgs_serial_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb)
+void serial_lusgs_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub)
 {
     UCFD_INT idx, kdx;
     
@@ -339,7 +320,7 @@ void lusgs_serial_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb)
         // Update conservative variables
         for (kdx=0; kdx<NVARS; kdx++) {
             // Indexing 2D array as 1D
-            uptsb[neles*kdx + idx] += rhsb[neles*kdx + idx];
+            uptsb[neles*kdx + idx] += dub[neles*kdx + idx];
         }
     }
 }
