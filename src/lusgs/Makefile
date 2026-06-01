@@ -41,10 +41,13 @@ else
 endif
 
 ifeq ($(NTURBVARS),)
-  NTURBVARS = $(shell expr $(NVARS) - $(NFVARS))
-  ifeq ($(NTURBVARS), 0)
-    $(info `NTURBVARS` is not defined, default value is 0.)
+  $(info `NTURBVARS` is not defined, Auto setting...)
+  TEMP = $(shell expr $(NVARS) - $(NFVARS))
+  ifeq ($(TEMP), 0)
     $(info N-S equations mode; Do not use rans-prefixed functions.)
+    NTURBVARS = 1
+  else
+    NTURBVARS = $TEMP
   endif
   CFLAGS += -DNTURBVARS=$(NTURBVARS)
 else ifeq ($(filter $(NTURBVARS), 0 1 2),)
