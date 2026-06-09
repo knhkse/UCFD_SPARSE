@@ -5,7 +5,7 @@
  *              Multi-thread computation is enabled using <omp.h> header file.  
  *              In contrast to LU-SGS method, Block LU-SGS method uses `block operator` instead of `spectral radius`.  
  * 
- * @note        In case of RANS equations, add `rans_parallel_pre_blusgs` function right after the `ns_parallel_pre_blusgs` function.  
+ * @note        In case of RANS equations, add `parallel_rans_pre_blusgs` function right after the `parallel_ns_pre_blusgs` function.  
  *              There is only `block_sweep` function instead of `block_lower_sweep` or `block_upper_sweep` in `blusgs.c`.  
  *              To execute properly, `n0` and `ne` arguments must be input in appropriate order.
  * 
@@ -37,8 +37,8 @@
  *              Diagonal matrices is composed of block operator matrix, which size is n-by-n.
  *              `n` is the number of conservative variables in Navier-Stokes equations.
  */
-void ns_parallel_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                          UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat)
+void parallel_ns_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
+                            UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat)
 {
     UCFD_INT idx, jdx, kdx, row, col;
     UCFD_FLOAT fv, dti;
@@ -88,9 +88,9 @@ void ns_parallel_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  *              Diagonal matrices is composed of block operator matrix, which size is n-by-n.
  *              `n` is the number of turbulent variables in RANS equations.
  */
-void rans_parallel_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                            UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *uptsb, UCFD_FLOAT *dt,
-                            UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat, UCFD_FLOAT *dsrc)
+void parallel_rans_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
+                              UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *uptsb, UCFD_FLOAT *dt,
+                              UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat, UCFD_FLOAT *dsrc)
 {
     UCFD_INT idx, jdx, kdx, row, col;
     UCFD_FLOAT fv;
@@ -152,7 +152,7 @@ void rans_parallel_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  * @note        The last argument array, `fjmat` is NOT identical with ns_serial_pre_blusgs function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void ns_parallel_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+void parallel_ns_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
                              UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol,
                              UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat)
 {
@@ -209,10 +209,10 @@ void ns_parallel_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
  *              This function is used for RANS equations.
  *              solution array is stored in `dub` array.
  * 
- * @note        The last argument array, `tjmat` is NOT identical with `rans_parallel_pre_blusgs` function.  
+ * @note        The last argument array, `tjmat` is NOT identical with `parallel_rans_pre_blusgs` function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void rans_parallel_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+void parallel_rans_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
                                UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol,
                                UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat)
 {
@@ -269,28 +269,7 @@ void rans_parallel_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
 /**
  * @details     solution array is updated by adding \f$\Delta Q\f$.
  */
-void blusgs_parallel_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres)
-{
-    UCFD_INT idx, kdx;
-
-    #pragma omp parallel for private(kdx)
-    for (idx=0; idx<neles; idx++) {
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            uptsb[idx+neles*kdx] += dub[idx+neles*kdx];
-
-            // Initialize dub array
-            dub[idx+neles*kdx] = 0.0;
-        }
-        // Initialize sub-residual array
-        subres[idx] = 0.0;
-    }
-}
-
-
-/**
- * @details     solution array is updated by adding \f$\Delta Q\f$.
- */
-void blusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres)
+void parallel_blusgs_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub)
 {
     UCFD_INT idx, kdx;
 
@@ -298,11 +277,6 @@ void blusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, 
     for (idx=0; idx<neles; idx++) {
         for (kdx=0; kdx<NVARS; kdx++) {
             uptsb[idx+neles*kdx] += dub[idx+neles*kdx];
-
-            // Initialize dub array
-            dub[idx+neles*kdx] = 0.0;
         }
-        // Initialize sub-residual array
-        subres[idx] = 0.0;
     }
 }

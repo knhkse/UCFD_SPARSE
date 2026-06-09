@@ -76,9 +76,9 @@ void parallel_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  *              which has less memory requirement.  
  *              Diffusive margin of wave speed is applied.
  */
-void ns_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+void parallel_ns_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
                              UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
 {   
     UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
     UCFD_FLOAT du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
@@ -127,7 +127,7 @@ void ns_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
         }
         // Update dub array
         for (kdx=0; kdx<NFVARS; kdx++)
-            dub[neles*kdx + idx] = (rhsb[neles*kdx + idx] - 0.5*df[kdx])/diag[idx];
+            dub[neles*kdx + idx] = (dub[neles*kdx + idx] - 0.5*df[kdx])/diag[idx];
     }
 }
 
@@ -136,9 +136,9 @@ void ns_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
  *              This function is used for RANS equations.  
  *              solution array is stored in `dub` array.
  */
-void rans_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+void parallel_rans_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
                                UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                               UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+                               UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
 {
     UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
     UCFD_FLOAT du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
@@ -191,7 +191,7 @@ void rans_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
         }
         // Update dub array
         for (kdx=0; kdx<NTURBVARS; kdx++) {
-            dub[neles*(kdx+NFVARS) + idx] = (rhsb[neles*(kdx+NFVARS)+idx] - \
+            dub[neles*(kdx+NFVARS) + idx] = (dub[neles*(kdx+NFVARS)+idx] - \
                                             0.5*df[kdx])/(diag[idx]+dsrc[neles*(kdx+NFVARS)+idx]);
         }
     }
@@ -202,12 +202,11 @@ void rans_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
  * @details     By processing upper sweep, next time step solution \f$\Delta Q\f$ is computed.
  *              This function is used for Euler or Navier-Stokes equations,
  *              which has the same flux shape.  
- *              Solution array is stored in `rhsb` array,
- *              since right-hand-side array is no longer needed.
+ *              Solution array is stored in `dub` array.
  */
-void ns_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+void parallel_ns_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
                              UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
 {   
     UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
     UCFD_FLOAT du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
@@ -238,7 +237,7 @@ void ns_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
             if (lcolor[neib] > curr_level) {
                 for (kdx=0; kdx<NFVARS; kdx++) {
                     u[kdx] = uptsb[neles*kdx + neib];
-                    du[kdx] = u[kdx] + rhsb[neles*kdx + neib];
+                    du[kdx] = u[kdx] + dub[neles*kdx + neib];
                 }
                 
                 ns_flux_container(u, nf, f);
@@ -249,13 +248,13 @@ void ns_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
                 }
                 for (kdx=0; kdx<NFVARS; kdx++) {
                     df[kdx] += (dfj[kdx] - fspr[neles*jdx + idx] \
-                                * rhsb[neles*kdx + neib])*fnorm_vol[neles*jdx + idx];
+                                * dub[neles*kdx + neib])*fnorm_vol[neles*jdx + idx];
                 }
             }
         }
-        // Update rhsb array
+        // Update dub array
         for (kdx=0; kdx<NFVARS; kdx++) {
-            rhsb[neles*kdx + idx] = dub[neles*kdx + idx] - 0.5*df[kdx]/diag[idx];
+            dub[neles*kdx + idx] = dub[neles*kdx + idx] - 0.5*df[kdx]/diag[idx];
         }
     }
 }
@@ -264,12 +263,11 @@ void ns_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
 /**
  * @details     By processing upper sweep, next time step solution \f$\Delta Q\f$ is computed.
  *              This function is used for RANS equations.  
- *              Solution array is stored in `rhsb` array,
- *              since right-hand-side array is no longer needed.
+ *              Solution array is stored in `dub` array.
  */
-void rans_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+void parallel_rans_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
                                UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                               UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+                               UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
 {
     UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
     UCFD_FLOAT du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
@@ -304,7 +302,7 @@ void rans_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
                 }
 
                 for (kdx=NFVARS; kdx<NVARS; kdx++) {
-                    du[kdx] += rhsb[neles*kdx + neib];
+                    du[kdx] += dub[neles*kdx + neib];
                 }
 
                 rans_flux_container(u, nf, f);
@@ -316,13 +314,13 @@ void rans_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
 
                 for (kdx=0; kdx<NTURBVARS; kdx++) {
                     df[kdx] += (dfj[kdx] - fspr[neles*jdx+idx] \
-                                * rhsb[neles*(kdx+NFVARS)+neib])*fnorm_vol[neles*jdx+idx];
+                                * dub[neles*(kdx+NFVARS)+neib])*fnorm_vol[neles*jdx+idx];
                 }
             }
         }
-        // Update rhsb array
+        // Update dub array
         for (kdx=0; kdx<NTURBVARS; kdx++) {
-            rhsb[neles*(kdx+NFVARS)+idx] = dub[neles*(kdx+NFVARS)+idx] - \
+            dub[neles*(kdx+NFVARS)+idx] = dub[neles*(kdx+NFVARS)+idx] - \
                                         0.5*df[kdx]/(diag[idx] + dsrc[neles*(kdx+NFVARS)+idx]);
         }
     }
@@ -331,43 +329,20 @@ void rans_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
 
 /**
  * @details     solution array is updated by adding \f$\Delta Q\f$.
- *              Be aware that `rhsb` array in function parameter
+ *              Be aware that `dub` array in function parameter
  *              is the difference array after upper sweep,
  *              not the right-hand-side array.
  */
-void lusgs_parallel_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb)
+void parallel_lusgs_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub)
 {
     UCFD_INT idx, kdx;
 
     #pragma omp parallel for private(kdx)
-    // Iterate for all cell
-    for (idx=0; idx<neles; idx++) {
-        // Update conservative variables
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            // Indexing 2D array as 1D
-            uptsb[neles*kdx + idx] += rhsb[neles*kdx + idx];
-        }
-    }
-}
-
-
-/**
- * @details     solution array is updated by adding \f$\Delta Q\f$.
- *              Be aware that `rhsb` array in function parameter
- *              is the difference array after upper sweep,
- *              not the right-hand-side array.
- */
-void lusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb)
-{
-    UCFD_INT idx, kdx;
-
-    #pragma omp parallel for private(kdx)
-    // Iterate for all cell
     for (idx=0; idx<neles; idx++) {
         // Update conservative variables
         for (kdx=0; kdx<NVARS; kdx++) {
             // Indexing 2D array as 1D
-            uptsb[neles*kdx + idx] += rhsb[neles*kdx + idx];
+            uptsb[neles*kdx + idx] += dub[neles*kdx + idx];
         }
     }
 }

@@ -1,5 +1,5 @@
 # Common files
-SRCDIR = $(UCFD_PATH)/src
+SRCDIR = $(UCFD_PATH)/src/common
 CONFIG = $(SRCDIR)/config.h
 TYPES = $(SRCDIR)/ucfd_types.h
 IFLAGS = -I$(SRCDIR)
@@ -9,11 +9,12 @@ IFLAGS = -I$(SRCDIR)
 ## Intel oneAPI (Recommended)
 CC = icx
 CFLAGS = -Wall -O3 -ffast-math -qopenmp
+OMPFLAG = -qopenmp
 
 ## GCC or Clang
 # CC = mpicc
 # CFLAGS = -Wall -O3 -ffast-math -fopenmp
-
+# OMPFLAG = -fopenmp
 
 # LU-SGS macros
 ## Equation parameters
@@ -23,9 +24,9 @@ NTURBVARS = 2
 NDIMS = 3
 
 ## Constants (Optional)
-#GAMMA = 1.4
-#PMIN = 1e-3
-#BETAST = 0.09
+# GAMMA = 1.4
+# PMIN = 1e-3
+# BETAST = 0.09
 
 ## Data types (Optional)
 # FLOAT32 = 0

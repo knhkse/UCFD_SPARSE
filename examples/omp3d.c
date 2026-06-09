@@ -178,15 +178,15 @@ int run(int rank, int *params) {
 
     if (rank == 0) printf("[Run] Colored LU-SGS computation...");
     parallel_pre_lusgs(neles, ncellface, 1.0, fnp, dt, diag, fsprp);
-    ns_parallel_lower_sweep(0, half, neles, ncellface, \
-                            neip, icolor, lcolor, fnp, vfp, uptsp, rhsp, dubp, diag, fsprp);
-    ns_parallel_lower_sweep(half, neles, neles, ncellface, \
-                            neip, icolor, lcolor, fnp, vfp, uptsp, rhsp, dubp, diag, fsprp);
-    ns_parallel_upper_sweep(half, neles, neles, ncellface, \
-                            neip, icolor, lcolor, fnp, vfp, uptsp, rhsp, dubp, diag, fsprp);
-    ns_parallel_upper_sweep(0, half, neles, ncellface, \
-                            neip, icolor, lcolor, fnp, vfp, uptsp, rhsp, dubp, diag, fsprp);
-    lusgs_parallel_ns_update(neles, uptsp, rhsp);
+    parallel_ns_lower_sweep(0, half, neles, ncellface, \
+                            neip, icolor, lcolor, fnp, vfp, uptsp, dubp, diag, fsprp);
+    parallel_ns_lower_sweep(half, neles, neles, ncellface, \
+                            neip, icolor, lcolor, fnp, vfp, uptsp, dubp, diag, fsprp);
+    parallel_ns_upper_sweep(half, neles, neles, ncellface, \
+                            neip, icolor, lcolor, fnp, vfp, uptsp, dubp, diag, fsprp);
+    parallel_ns_upper_sweep(0, half, neles, ncellface, \
+                            neip, icolor, lcolor, fnp, vfp, uptsp, dubp, diag, fsprp);
+    lusgs_parallel_ns_update(neles, uptsp, dubp);
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == root) printf(" Done\n");
 

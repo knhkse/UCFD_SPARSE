@@ -7,6 +7,7 @@
 CC ?= gcc
 INT64 ?= 0
 FLOAT32 ?= 0
+OMPFLAG ?= -fopenmp
 
 # Get configuration from `Makefile.inc`
 include $(UCFD_PATH)/Makefile.inc
@@ -39,20 +40,26 @@ else
   CFLAGS += -DNFVARS=$(NFVARS)
 endif
 
+ifeq ($(NTURBVARS),)
+  $(info `NTURBVARS` is not defined, Auto setting...)
+  TEMP = $(shell expr $(NVARS) - $(NFVARS))
+  ifeq ($(TEMP), 0)
+    $(info N-S equations mode; Do not use rans-prefixed functions.)
+    NTURBVARS = 1
+  else
+    NTURBVARS = $TEMP
+  endif
+  CFLAGS += -DNTURBVARS=$(NTURBVARS)
+else ifeq ($(filter $(NTURBVARS), 0 1 2),)
+  $(error `NTURBVARS` must be defined as 0, 1 or 2)
+else
+  CFLAGS += -DNTURBVARS=$(NTURBVARS)
+endif
+
 ifeq ($(NDIMS),)
   $(error `NDIMS` must be defined)
 else
   CFLAGS += -DNDIMS=$(NDIMS)
-endif
-
-ifeq ($(NTURBVARS),)
-  $(info `NTURBVARS` is not defined, default value is 1.)
-  $(info Do not rans_* functions; it may expect incorrect results.)
-  CFLAGS += -DNTURBVARS=1
-else ifeq ($(filter $(NTURBVARS), 1 2),)
-  $(error `NTURBVARS` must be defined as 1 or 2)
-else
-  CFLAGS += -DNTURBVARS=$(NTURBVARS)
 endif
 
 # Constants
@@ -122,7 +129,7 @@ $(DLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE)
 	cp $@ $(UCFD_PATH)/lib
 
 $(DCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE)
-	$(CC) -fPIC -shared -o $@ $^
+	$(CC) $(OMPFLAG) -fPIC -shared -o $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
 

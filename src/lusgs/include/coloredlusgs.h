@@ -34,14 +34,13 @@ void parallel_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  * @param       fnorm_vol   Surface magnitude/cell volume
  * @param       vec_fnorm   Surface vector
  * @param       uptsb       Solution array
- * @param       rhsb        Residual (RHS) array
  * @param       dub         Difference array for update (output)
  * @param       diag        Diagonal matrix array
  * @param       fspr        Wave speed for each cell face
  */
-void ns_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+void parallel_ns_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
                              UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
 
 
 /**
@@ -56,14 +55,13 @@ void ns_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
  * @param       fnorm_vol   Surface magnitude/cell volume
  * @param       vec_fnorm   Surface vector
  * @param       uptsb       Solution array
- * @param       rhsb        Residual (RHS) array
  * @param       dub         Difference array for update (output)
  * @param       diag        Diagonal matrix array
  * @param       fspr        Wave speed for each cell face
  */
-void rans_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+void parallel_rans_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
                                UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                               UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
+                               UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
 
 
 /**
@@ -78,14 +76,13 @@ void rans_parallel_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
  * @param       fnorm_vol   Surface magnitude/cell volume
  * @param       vec_fnorm   Surface vector
  * @param       uptsb       Solution array
- * @param       rhsb        Residual (RHS) array
  * @param       dub         Difference array for update (output)
  * @param       diag        Diagonal matrix array
  * @param       fspr        Wave speed for each cell face
  */
-void ns_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+void parallel_ns_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
                              UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
 
 
 /**
@@ -100,31 +97,30 @@ void ns_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
  * @param       fnorm_vol   Surface magnitude/cell volume
  * @param       vec_fnorm   Surface vector
  * @param       uptsb       Solution array
- * @param       rhsb        Residual (RHS) array
  * @param       dub         Difference array for update (output)
  * @param       diag        Diagonal matrix array
  * @param       fspr        Wave speed for each cell face
  */
-void rans_parallel_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
+void parallel_rans_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
                                UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                               UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
+                               UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
 
 
 /**
  * @brief       Updates solution array.
  * @param       neles       Number of element cells
  * @param       uptsb       Solution array
- * @param       rhsb        Result of LU-SGS sweeps
+ * @param       dub        Result of LU-SGS sweeps
  */
-void lusgs_parallel_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
+void parallel_ns_lusgs_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub);
 
 
 /**
  * @brief       Updates solution array.
  * @param       neles       Number of element cells
  * @param       uptsb       Solution array
- * @param       rhsb        Result of LU-SGS sweeps
+ * @param       dub        Result of LU-SGS sweeps
  */
-void lusgs_parallel_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
+void parallel_lusgs_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub);
 
 #endif

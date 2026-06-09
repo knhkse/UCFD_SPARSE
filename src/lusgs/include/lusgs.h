@@ -34,8 +34,8 @@ void serial_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  * @param       diag        Diagonal matrix array [neles]
  * @param       fspr        Wave speed for each cell face [nface, neles]
  */
-void ns_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                           UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
+void serial_ns_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                           UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
 
 
 /**
@@ -46,14 +46,13 @@ void ns_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UC
  * @param       fnorm_vol   Surface magnitude/cell volume [nface, neles]
  * @param       vec_fnorm   Surface vector [nface, ndims, neles]
  * @param       uptsb       Solution array [nvars, neles]
- * @param       rhsb        Residual (RHS) array [nvars, neles]
  * @param       dub         Difference array for update [nvars, neles] (output)
  * @param       diag        Diagonal matrix array [neles]
  * @param       fspr        Wave speed for each cell face [nface, neles]
  * @param       dsrc        Source term derivatives [nvars, neles]
  */
-void rans_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm, 
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
+void serial_rans_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm, 
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
 
 
 /**
@@ -69,8 +68,8 @@ void rans_serial_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, 
  * @param       diag        Diagonal matrix array [neles]
  * @param       fspr        Wave speed for each cell face [nface, neles]
  */
-void ns_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                           UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
+void serial_ns_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                           UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr);
 
 
 /**
@@ -81,23 +80,13 @@ void ns_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UC
  * @param       fnorm_vol   Surface magnitude/cell volume [nface, neles]
  * @param       vec_fnorm   Surface vector [nface, ndims, neles]
  * @param       uptsb       Solution array [nvars, neles]
- * @param       rhsb        Residual (RHS) array [nvars, neles]
  * @param       dub         Difference array for update [nvars, neles] (output)
  * @param       diag        Diagonal matrix array [neles]
  * @param       fspr        Wave speed for each cell face [nface, neles]
  * @param       dsrc        Source term derivatives [nvars, neles]
  */
-void rans_serial_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
-
-
-/**
- * @brief       Updates solution array.
- * @param       neles       Number of element cells
- * @param       uptsb       Solution array
- * @param       rhsb        Result of LU-SGS sweeps
- */                           
-void lusgs_serial_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
+void serial_rans_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
+                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc);
 
 
 /**
@@ -106,6 +95,6 @@ void lusgs_serial_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb)
  * @param       uptsb       Solution array
  * @param       rhsb        Result of LU-SGS sweeps
  */
-void lusgs_serial_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
+void serial_lusgs_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *rhsb);
 
 #endif // LUSGS_H
