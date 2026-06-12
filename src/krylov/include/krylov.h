@@ -4,8 +4,9 @@
 */
 #ifndef KRYLOV_H
 #define KRYLOV_H
-#include "mkl.h"
+#include <mkl.h>
 #include "ucfd_types.h"
+#include "sparse.h"
 #include "config.h"
 
 #ifndef EPS
@@ -35,9 +36,8 @@
  * @param       w                   Arnoldi iteration array
  * @param       r                   Residual array
  */
-ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, int bn, int block, int m, int *iter, double tol,
-                           int *row_ptr, int *col_ind, int *diag_ind, double *precon_nnz_data,
-                           double *x, double *b, double *H, double *V, double *g, double *y, double *w, double *r);
+ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, UCFD_INT bn, UCFD_INT block, UCFD_INT m, UCFD_INT *iter, UCFD_FLOAT tol,
+                           ucfd_spmat *precon, UCFD_FLOAT *x, UCFD_FLOAT *b, UCFD_FLOAT *H, UCFD_FLOAT *V, UCFD_FLOAT *g, UCFD_FLOAT *y, UCFD_FLOAT *w, UCFD_FLOAT *r);
 
 
 /**
@@ -61,9 +61,8 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, i
 * @param       r                    Residual array
 */
 ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_solve psolve, const struct matrix_descr descr,
-                         int bn, int m, int *flag,
-                         int *row_ptr, int *col_ind, int *diag_ind, double *precon_nnz_data,
-                         double *x, double *b, double *H, double *V, double *g, double *y, double *w, double *r);
+                         UCFD_INT bn, UCFD_INT m, UCFD_INT *flag, ucfd_spmat *precon,
+                         UCFD_FLOAT *x, UCFD_FLOAT *b, UCFD_FLOAT *H, UCFD_FLOAT *V, UCFD_FLOAT *g, UCFD_FLOAT *y, UCFD_FLOAT *w, UCFD_FLOAT *r);
 
 
 /**
@@ -83,8 +82,7 @@ ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_solve psolve, const str
  * @param       r                   Residual array
  * @param       p                   
  */
-ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type, int bn, int *iter, double tol,
-                              int *row_ptr, int *col_ind, int *diag_ind, double *precon_nnz_data,
-                              double *x, double *b, double *r, double *p, double *v, double *s, double *t);
+ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type, UCFD_INT bn, UCFD_INT *iter, UCFD_FLOAT tol,
+                              ucfd_spmat *precon, UCFD_FLOAT *x, UCFD_FLOAT *b, UCFD_FLOAT *r, UCFD_FLOAT *p, UCFD_FLOAT *v, UCFD_FLOAT *s, UCFD_FLOAT *t);
 
 #endif // KRYLOV_H

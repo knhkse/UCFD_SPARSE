@@ -32,9 +32,12 @@
  * =======================================================================================================================
  */
 #include "krylov.h"
-#include "precon.h"
+
 #include <math.h>
 #include <omp.h>
+#include <string.h>
+
+#include "precon.h"
 
 
 /**
@@ -43,13 +46,12 @@
  *              UCFD_STATUS_CONVERGED is returned when L-2 norm of the residual vector becomes smaller than `tol`,
  *              and UCFD_STATUS_NOT_CONVERGED is returned when maximum iteration finished.
  */
-ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, int bn, int block, int m, int *iter, double tol,
-                           int *row_ptr, int *col_ind, int *diag_ind, double *precon_nnz_data,
-                           double *x, double *b, double *H, double *V, double *g, double *y, double *w, double *r)
+ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, UCFD_INT bn, UCFD_INT block, UCFD_INT m, UCFD_INT *iter, UCFD_FLOAT tol,
+                           ucfd_spmat *precon, UCFD_FLOAT *x, UCFD_FLOAT *b, UCFD_FLOAT *H, UCFD_FLOAT *V, UCFD_FLOAT *g, UCFD_FLOAT *y, UCFD_FLOAT *w, UCFD_FLOAT *r)
 {
-    int it, i, j, itmax;
-    const int n = bn * BLOCK;
-    double beta, tmp, c, s, h1, h2, rr;
+    UCFD_INT it, i, j, itmax;
+    const UCFD_INT n = bn * BLOCK;
+    UCFD_FLOAT beta, tmp, c, s, h1, h2, rr;
     ucfd_precon_solve psolve;
     sparse_status_t mklstat;
 
@@ -73,15 +75,15 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, i
 
     /* --------------------------------
      * Initial residual
-     1) r := -A @ x
-     2) r := b -A @ x (r += rhs)
+     1) r := b
+     2) r := -1.0 * A @ b + 1.0*r
     -------------------------------- */
-    mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 0.0, r);
+    memcpy(r, b, sizeof(double)*n);
+    mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 1.0, r);
     if (mklstat != SPARSE_STATUS_SUCCESS) {
         *iter = mklstat;
         return UCFD_MKL_FAILED;
     }
-    cblas_daxpy(n, 1.0, b, 1, r, 1);
 
     /* --------------------------------
      * Outer iteration
@@ -95,7 +97,7 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, i
         }
         
         // Left-preconditioning
-        psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, r);
+        psolve(precon, r);
 
         beta = cblas_dnrm2(n, r, 1);
         y[0] = beta;
@@ -116,7 +118,7 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, i
                 *iter = mklstat;
                 return UCFD_MKL_FAILED;
             }
-            psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, w);
+            psolve(precon, w);
 
             // Arnoldi iteration
             for (i = 0; i < (j + 1); i++) {
@@ -166,12 +168,12 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, i
         cblas_dgemv(CblasRowMajor, CblasTrans, m, n, 1.0, V, n, y, 1, 1.0, x, 1);
 
         // Computes next iteration residual
-        mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 0.0, r);
+        memcpy(r, b, sizeof(double)*n);
+        mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 1.0, r);
         if (mklstat != SPARSE_STATUS_SUCCESS) {
             *iter = mklstat;
             return UCFD_MKL_FAILED;
         }
-        cblas_daxpy(n, 1.0, b, 1, r, 1);
         
         ++it;
     }
@@ -183,18 +185,17 @@ ucfd_status_t serial_gmres(sparse_matrix_t op, ucfd_precon_type_t precon_type, i
  * @note        Residual array `r` must be initialized, `r := b - A @ x`.
  */
 ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_solve psolve, const struct matrix_descr descr,
-                         int bn, int m, int *flag,
-                         int *row_ptr, int *col_ind, int *diag_ind, double *precon_nnz_data,
-                         double *x, double *b, double *H, double *V, double *g, double *y, double *w, double *r)
+                         UCFD_INT bn, UCFD_INT m, UCFD_INT *flag, ucfd_spmat *precon,
+                         UCFD_FLOAT *x, UCFD_FLOAT *b, UCFD_FLOAT *H, UCFD_FLOAT *V, UCFD_FLOAT *g, UCFD_FLOAT *y, UCFD_FLOAT *w, UCFD_FLOAT *r)
 {
-    int i, j;
-    const int n = bn * BLOCK;
-    double beta, tmp, c, s, h1, h2, rr;
+    UCFD_INT i, j;
+    const UCFD_INT n = bn * BLOCK;
+    UCFD_FLOAT beta, tmp, c, s, h1, h2, rr;
     sparse_status_t mklstat;
     *flag = 0;
 
     // Apply preconditioner
-    psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, r);
+    psolve(precon, r);
     
     beta = cblas_dnrm2(n, r, 1);
     y[0] = beta;
@@ -216,7 +217,7 @@ ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_solve psolve, const str
             return UCFD_MKL_FAILED;
         }
 
-        psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, w);
+        psolve(precon, w);
 
         // Arnoldi iteration
         for (i = 0; i < (j + 1); i++)
@@ -263,16 +264,8 @@ ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_solve psolve, const str
     // Back substitution
     cblas_dtrsv(CblasRowMajor, CblasUpper, CblasNoTrans, CblasNonUnit, m, H, m, y, 1);
 
-    // Update
+    // Update solution array
     cblas_dgemv(CblasRowMajor, CblasTrans, m, n, 1.0, V, n, y, 1, 1.0, x, 1);
-
-    // Computes next iteration residual
-    mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, -1.0, op, descr, x, 0.0, r);
-    if (mklstat != SPARSE_STATUS_SUCCESS) {
-        *flag = mklstat;
-        return UCFD_MKL_FAILED;
-    }
-    cblas_daxpy(n, 1.0, b, 1, r, 1);
 
     return UCFD_STATUS_SUCCESS;
 }
@@ -283,14 +276,13 @@ ucfd_status_t step_gmres(sparse_matrix_t op, ucfd_precon_solve psolve, const str
  *              UCFD_STATUS_CONVERGED is returned when L-2 norm of the residual vector becomes smaller than `tol`,
  *              and UCFD_STATUS_NOT_CONVERGED is returned when maximum iteration finished.
  */
-ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type, int bn, int *iter, double tol,
-                              int *row_ptr, int *col_ind, int *diag_ind, double *precon_nnz_data,
-                              double *x, double *b, double *r, double *p, double *v, double *s, double *t)
+ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type, UCFD_INT bn, UCFD_INT *iter, UCFD_FLOAT tol,
+                              ucfd_spmat *precon, UCFD_FLOAT *x, UCFD_FLOAT *b, UCFD_FLOAT *r, UCFD_FLOAT *p, UCFD_FLOAT *v, UCFD_FLOAT *s, UCFD_FLOAT *t)
 {
-    int it, itmax;
-    const int n = bn * BLOCK;
-    double rho, rhoprev, alpha, beta, omega, resid;
-    double rv, ts, tt;
+    UCFD_INT it, itmax;
+    const UCFD_INT n = bn * BLOCK;
+    UCFD_FLOAT rho, rhoprev, alpha, beta, omega, resid;
+    UCFD_FLOAT rv, ts, tt;
     ucfd_precon_solve psolve;
     sparse_status_t mklstat;
 
@@ -348,7 +340,7 @@ ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type
 
         // phat = inv(M) @ p
         cblas_dcopy(n, p, 1, &p[n], 1);
-        psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, &p[n]);
+        psolve(precon, &p[n]);
 
         // v = A @ phat
         mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, 1.0, op, descr, &p[0], 0.0, v);
@@ -375,7 +367,7 @@ ucfd_status_t serial_bicgstab(sparse_matrix_t op, ucfd_precon_type_t precon_type
 
         // shat = inv(M) @ s
         cblas_dcopy(n, s, 1, &s[n], 1);
-        psolve(bn, row_ptr, col_ind, diag_ind, precon_nnz_data, &s[n]);
+        psolve(precon, &s[n]);
 
         mklstat = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, 1.0, op, descr, &s[0], 0.0, t);
         if (mklstat != SPARSE_STATUS_SUCCESS)

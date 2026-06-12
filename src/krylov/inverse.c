@@ -36,7 +36,7 @@
  */
 void ludcmp(UCFD_FLOAT *A)
 {
-    int row, col, kdx, nrow;
+    UCFD_INT row, col, kdx, nrow;
     UCFD_FLOAT val;
 
     if (BLOCK == 1) {               // 1-equation RANS model
@@ -74,7 +74,7 @@ void ludcmp(UCFD_FLOAT *A)
  */
 void lusub(UCFD_FLOAT *LU, UCFD_FLOAT *b)
 {
-    int row, col, nrow;
+    UCFD_INT row, col, nrow;
     UCFD_FLOAT val;
 
     if (BLOCK == 1) {                       // 1-equation RANS model
@@ -94,6 +94,7 @@ void lusub(UCFD_FLOAT *LU, UCFD_FLOAT *b)
         // Backward substitution
         b[BLOCK-1] /= LU[BLOCK*BLOCK-1];
         for (row=BLOCK-2; row>-1; row--) {
+            nrow = row*BLOCK;
             val = 0.0;
             for (col=row+1; col<BLOCK; col++)
                 val += LU[nrow+col]*b[col];
@@ -104,7 +105,7 @@ void lusub(UCFD_FLOAT *LU, UCFD_FLOAT *b)
 
 void lusubmattrans(UCFD_FLOAT *LU, UCFD_FLOAT *B)
 {
-    int row, col, scol;
+    UCFD_INT row, col, scol;
     UCFD_FLOAT val;
 
     if (BLOCK == 1) {                       // 1-equation RANS model

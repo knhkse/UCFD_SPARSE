@@ -25,6 +25,5 @@ typedef enum
     LUSGS = 2
 } ucfd_precon_type_t;
 
-typedef void (*ucfd_precon_solve)(int, int*, int*, int*, double*, double*);
 
 #endif  // _UCFD_TYPES_H

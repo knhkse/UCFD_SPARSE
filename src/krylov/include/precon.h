@@ -1,9 +1,3 @@
-#ifndef PRECON_H
-#define PRECON_H
-#include "ucfd_types.h"
-#include "config.h"
-
-
 /**
  * @file        precon.h
  * @brief       Header file for preconditioners for Krylov subspace methods
@@ -11,60 +5,47 @@
  *              `prepare` must be executed before Krylov method routine starts.
  *              `psolve` function is executed in Krylov method to solve Px = b.
  */
+#ifndef PRECON_H
+#define PRECON_H
+#include "ucfd_types.h"
+#include "sparse.h"
+#include "config.h"
+
 
 /**
  * @brief       Block fill-in Incomplete LU preconditioner for BSR matrix format.
- * @param       bn          Number of element cells
- * @param       blk         Block size of BSR matrix
- * @param       iw          Working array
- * @param       row_ptr     Row-directional index pointer array of the matrix
- * @param       col_ind     Column index array of the matrix
- * @param       diag_ind    Diagonal matrix index array based on `row_ptr`
- * @param       nnz_data    Non-zero value array of the matrix
+ * @param       precon      Preconditioner structure
+ * @param       iw          Working array to compute BILU preparation
  */
-ucfd_status_t bilu_prepare(int bn, int *iw,
-                           int *row_ptr, int *col_ind, int *diag_ind, double *nnz_data);
+ucfd_sparse_status_t bilu_prepare(ucfd_spmat *precon, UCFD_INT *iw);
 
 /**
  * @brief       Solver function for BILU preconditioner.
- * @param       bn          Number of element cells
- * @param       blk         Block size of BSR matrix
- * @param       row_ptr     Row-directional index pointer array of the matrix
- * @param       col_ind     Column index array of the matrix
- * @param       diag_ind    Diagonal matrix index array based on `row_ptr`
- * @param       nnz_data    Non-zero value array of the matrix
+ * @param       precon      Preconditioner structure
  * @param       b           Right-hand-side
  */
-void bilu_psolve(int bn, int *row_ptr,
-                 int *col_ind, int *diag_ind, double *nnz_data, double *b);
+void bilu_psolve(ucfd_spmat *precon, UCFD_FLOAT *b);
+
 
 /**
  * @brief       LU-SGS preconditioner for BSR matrix format.
- * @param       bn          Number of element cells
- * @param       blk         Block size of BSR matrix
- * @param       diag_ind    Diagonal matrix index array based on `row_ptr`
- * @param       nnz_data    Non-zero value array of the matrix
+ * @param       precon      Preconditioner structure
  */
-ucfd_status_t lusgs_prepare(int bn, int *diag_ind, double *nnz_data);
+ucfd_status_t lusgs_prepare(ucfd_spmat *precon);
 
 /**
  * @brief       Solver function for LU-SGS preconditioner.
- * @param       bn          Number of element cells
- * @param       blk         Block size of BSR matrix
- * @param       row_ptr     Row-directional index pointer array of the matrix
- * @param       col_ind     Column index array of the matrix
- * @param       diag_ind    Diagonal matrix index array based on `row_ptr`
- * @param       nnz_data    Non-zero value array of the matrix
+ * @param       precon      Preconditioner structure
  * @param       b           Right-hand-side
  */
-void lusgs_psolve(int bn, int *row_ptr,
-                  int *col_ind, int *diag_ind, double *nnz_data, double *b);
+void lusgs_psolve(ucfd_spmat *precon, UCFD_FLOAT *b);
 
 
 /**
  * @brief       Unpreconditioned solver
+ * @param       precon      Preconditioner structure
+ * @param       b           Right-hand-side
  */
-void none_psolve(int bn, int *row_ptr,
-                 int *col_ind, int *diag_ind, double *nnz_data, double *b);
+void none_psolve(ucfd_spmat *precon, UCFD_FLOAT *b);
 
 #endif // PRECON.H
