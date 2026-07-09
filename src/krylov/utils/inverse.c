@@ -34,33 +34,33 @@
 /**
  * @details     Decompose matrix A into lower and upper triangular matrix
  */
-void ludcmp(UCFD_FLOAT *A)
+void ludcmp(UCFDInt block, UCFDReal *A)
 {
-    UCFD_INT row, col, kdx, nrow;
-    UCFD_FLOAT val;
+    UCFDInt row, col, kdx, nrow;
+    UCFDReal val;
 
-    if (BLOCK == 1) {               // 1-equation RANS model
+    if (block == 1) {               // 1-equation RANS model
         A[0] = 1.0/A[0];
     }
 
     else {
-        for (row=1; row<BLOCK; row++) {     // Skip first row
-            nrow = BLOCK*row;
+        for (row=1; row<block; row++) {     // Skip first row
+            nrow = block*row;
             A[nrow] /= A[0];
-            for (col=1; col<BLOCK; col++) {
+            for (col=1; col<block; col++) {
                 // Lower triangular matrix
                 if (row > col) {
                     val = 0.0;
                     for (kdx=0; kdx<col; kdx++)
-                        val += A[nrow+kdx] * A[col + BLOCK*kdx];
-                    A[nrow+col] = (A[nrow+col] - val)/A[(BLOCK+1)*col];
+                        val += A[nrow+kdx] * A[col + block*kdx];
+                    A[nrow+col] = (A[nrow+col] - val)/A[(block+1)*col];
                 }
 
                 // Upper triangular matrix
                 else {
                     val = 0.0;
                     for (kdx=0; kdx<row; kdx++)
-                        val += A[nrow+kdx]*A[BLOCK*kdx+col];
+                        val += A[nrow+kdx]*A[block*kdx+col];
                     A[nrow+col] -= val;
                 }
             }
@@ -72,19 +72,19 @@ void ludcmp(UCFD_FLOAT *A)
 /**
  * @details     This function performs Forward/Backward substitution of LU decomposed matrix.
  */
-void lusub(UCFD_FLOAT *LU, UCFD_FLOAT *b)
+void lusub(UCFDInt block, UCFDReal *LU, UCFDReal *b)
 {
-    UCFD_INT row, col, nrow;
-    UCFD_FLOAT val;
+    UCFDInt row, col, nrow;
+    UCFDReal val;
 
-    if (BLOCK == 1) {                       // 1-equation RANS model
+    if (block == 1) {                       // 1-equation RANS model
         b[0] *= LU[0];
     }
 
     else {
         // Forward substitution
-        for (row=1; row<BLOCK; row++) {
-            nrow = row*BLOCK;
+        for (row=1; row<block; row++) {
+            nrow = row*block;
             val = 0.0;
             for (col=0; col<row; col++)
                 val += LU[nrow+col]*b[col];
@@ -92,45 +92,45 @@ void lusub(UCFD_FLOAT *LU, UCFD_FLOAT *b)
         }
 
         // Backward substitution
-        b[BLOCK-1] /= LU[BLOCK*BLOCK-1];
-        for (row=BLOCK-2; row>-1; row--) {
-            nrow = row*BLOCK;
+        b[block-1] /= LU[block*block-1];
+        for (row=block-2; row>-1; row--) {
+            nrow = row*block;
             val = 0.0;
-            for (col=row+1; col<BLOCK; col++)
+            for (col=row+1; col<block; col++)
                 val += LU[nrow+col]*b[col];
             b[row] = (b[row] - val)/LU[nrow+row];
         }
     }
 }
 
-void lusubmattrans(UCFD_FLOAT *LU, UCFD_FLOAT *B)
+void lusubmattrans(UCFDInt block, UCFDReal *LU, UCFDReal *B)
 {
-    UCFD_INT row, col, scol;
-    UCFD_FLOAT val;
+    UCFDInt row, col, scol;
+    UCFDReal val;
 
-    if (BLOCK == 1) {                       // 1-equation RANS model
+    if (block == 1) {                       // 1-equation RANS model
         B[0] *= LU[0];
     }
 
     else {
         // Forward substitution
-        for (scol=0; scol<BLOCK; scol++) B[scol*BLOCK] /= LU[0];
-        for (row=1; row<BLOCK; row++) {
-            for (scol=0; scol<BLOCK; scol++) {
+        for (scol=0; scol<block; scol++) B[scol*block] /= LU[0];
+        for (row=1; row<block; row++) {
+            for (scol=0; scol<block; scol++) {
                 val = 0.0;
                 for (col=0; col<row; col++)
-                    val += B[scol*BLOCK+col] * LU[col*BLOCK+row];
-                B[scol*BLOCK+row] = (B[scol*BLOCK+row] - val)/LU[row*BLOCK+row];
+                    val += B[scol*block+col] * LU[col*block+row];
+                B[scol*block+row] = (B[scol*block+row] - val)/LU[row*block+row];
             }
         }
 
         // Backward substitution
-        for (row=BLOCK-2; row>-1; row--) {
-            for (scol=0; scol<BLOCK; scol++) {
+        for (row=block-2; row>-1; row--) {
+            for (scol=0; scol<block; scol++) {
                 val = 0.0;
-                for (col=row+1; col<BLOCK; col++)
-                    val += B[scol*BLOCK+col] * LU[col*BLOCK+row];
-                B[scol*BLOCK+row] -= val;
+                for (col=row+1; col<block; col++)
+                    val += B[scol*block+col] * LU[col*block+row];
+                B[scol*block+row] -= val;
             }
         }
     }
