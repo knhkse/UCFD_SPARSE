@@ -12,7 +12,7 @@
  * @param       n   Dimension of the A matrix
  * @param       A   Target matrix to decompose
  */
-void ludcmp(int n, UCFD_FLOAT A[n][n]);
+void ludcmp(int n, UCFDReal A[n][n]);
 
 /**
  * @brief       Forward/Backward Substitution function.
@@ -20,6 +20,6 @@ void ludcmp(int n, UCFD_FLOAT A[n][n]);
  * @param       LU  LU decomposed matrix
  * @param       b   Right-hand-side vector
  */
-void lusub(int n, UCFD_FLOAT LU[n][n], UCFD_FLOAT *b);
+void lusub(int n, UCFDReal LU[n][n], UCFDReal *b);
 
 #endif //INVERSE_H

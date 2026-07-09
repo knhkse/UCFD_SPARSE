@@ -6,25 +6,25 @@
 #define COLOREDBLUSGS_H
 #include "config.h"
 
-void parallel_ns_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                          UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat);
+void parallel_ns_pre_blusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+                          UCFDReal *fnorm_vol, UCFDReal *dt, UCFDReal *diag, UCFDReal *fjmat);
 
 
-void parallel_rans_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                            UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *uptsb, UCFD_FLOAT *dt,
-                            UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat, UCFD_FLOAT *dsrc);
+void parallel_rans_pre_blusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+                            UCFDReal *fnorm_vol, UCFDReal *uptsb, UCFDReal *dt,
+                            UCFDReal *tdiag, UCFDReal *tjmat, UCFDReal *dsrc);
 
 
-void parallel_ns_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                             UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol,
-                             UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat);
+void parallel_ns_block_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                             UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol,
+                             UCFDReal *rhsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fjmat);
 
 
-void parallel_rans_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                               UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol,
-                               UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat);
+void parallel_rans_block_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                               UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol,
+                               UCFDReal *rhsb, UCFDReal *dub, UCFDReal *tdiag, UCFDReal *tjmat);
 
 
-void parallel_blusgs_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub);
+void parallel_blusgs_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub);
 
 #endif

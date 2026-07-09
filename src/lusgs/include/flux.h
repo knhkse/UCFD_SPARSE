@@ -38,7 +38,7 @@
  * @param       nf          Surface vector
  * @param       f           Flux vector
  */
-void ns_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f);
+void ns_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f);
 
 /**
  * @brief       Computes flux for RANS equations.
@@ -46,7 +46,7 @@ void ns_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f);
  * @param       nf          Surface vector
  * @param       f           Flux vector
  */
-void rans_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f);
+void rans_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f);
 
 
 /**
@@ -56,6 +56,6 @@ void rans_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f);
  * @param       tmat        Turbulence Jacobian matrix
  * @param       dsrc        Source term derivatives vector
  */
-ucfd_status_t rans_source_jacobian(UCFD_FLOAT *uf, UCFD_FLOAT tmat[NTURBVARS][NTURBVARS], UCFD_FLOAT *dsrc);
+ucfd_status_t rans_source_jacobian(UCFDReal *uf, UCFDReal tmat[NTURBVARS][NTURBVARS], UCFDReal *dsrc);
 
 #endif //FLUX_H

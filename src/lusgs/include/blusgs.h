@@ -17,8 +17,8 @@
  * @param       diag        (Output) Diagonal matrix for LU-SGS method [nfvars, nfvars, neles]
  * @param       fjmat       Inward block operator include flux Jacobian at each cell face [nfvars, nfvars, nface, neles]
  */
-void ns_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                          UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat);
+void ns_serial_pre_blusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+                          UCFDReal *fnorm_vol, UCFDReal *dt, UCFDReal *diag, UCFDReal *fjmat);
 
 
 /**
@@ -33,9 +33,9 @@ void ns_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  * @param       tjmat       Inward block operator include flux Jacobian at each cell face [ntvars, ntvars, nface, neles]
  * @param       dsrc        Source term derivatives [nvars, neles]
  */
-void rans_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                            UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *uptsb, UCFD_FLOAT *dt,
-                            UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat, UCFD_FLOAT *dsrc);
+void rans_serial_pre_blusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+                            UCFDReal *fnorm_vol, UCFDReal *uptsb, UCFDReal *dt,
+                            UCFDReal *tdiag, UCFDReal *tjmat, UCFDReal *dsrc);
 
 
 /**
@@ -49,9 +49,9 @@ void rans_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  * @param       diag        Diagonal matrix array [nfvars, nfvars, neles]
  * @param       fjmat       Outward block operator include flux Jacobian at each cell face [nfvars, nfvars, nface, neles]
  */
-void ns_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
-                                 UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
-                                 UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat);
+void ns_serial_block_lower_sweep(UCFDInt neles, UCFDInt nface,
+                                 UCFDInt *nei_ele, UCFDReal *fnorm_vol,
+                                 UCFDReal *rhsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fjmat);
 
 
 /**
@@ -65,9 +65,9 @@ void ns_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
  * @param       tdiag       Turbulent diagonal matrix array [ntvars, ntvars, neles]
  * @param       tjmat       Outward block operator include flux Jacobian at each cell face [ntvars, ntvars, nface, neles]
  */
-void rans_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
-                                   UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
-                                   UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat);
+void rans_serial_block_lower_sweep(UCFDInt neles, UCFDInt nface,
+                                   UCFDInt *nei_ele, UCFDReal *fnorm_vol,
+                                   UCFDReal *rhsb, UCFDReal *dub, UCFDReal *tdiag, UCFDReal *tjmat);
 
 
 /**
@@ -81,9 +81,9 @@ void rans_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
  * @param       diag        Diagonal matrix array [nfvars, nfvars, neles]
  * @param       fjmat       Outward block operator include flux Jacobian at each cell face [nfvars, nfvars, nface, neles]
  */
-void ns_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
-                                 UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
-                                 UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat);
+void ns_serial_block_upper_sweep(UCFDInt neles, UCFDInt nface,
+                                 UCFDInt *nei_ele, UCFDReal *fnorm_vol,
+                                 UCFDReal *rhsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fjmat);
 
 
 /**
@@ -97,9 +97,9 @@ void ns_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
  * @param       tdiag       Turbulent diagonal matrix array [ntvars, ntvars, neles]
  * @param       tjmat       Outward block operator include flux Jacobian at each cell face [ntvars, ntvars, nface, neles]
  */
-void rans_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
-                                   UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
-                                   UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat);
+void rans_serial_block_upper_sweep(UCFDInt neles, UCFDInt nface,
+                                   UCFDInt *nei_ele, UCFDReal *fnorm_vol,
+                                   UCFDReal *rhsb, UCFDReal *dub, UCFDReal *tdiag, UCFDReal *tjmat);
 
 
 /**
@@ -109,7 +109,7 @@ void rans_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
  * @param       dub         Result of Block LU-SGS sweeps
  * @param       subres      Residual of each sub-iteration
  */
-void blusgs_serial_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres);
+void blusgs_serial_ns_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub, UCFDReal *subres);
 
 
 /**
@@ -119,6 +119,6 @@ void blusgs_serial_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub,
  * @param       dub         Result of Block LU-SGS sweeps
  * @param       subres      Residual of each sub-iteration
  */
-void blusgs_serial_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres);
+void blusgs_serial_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub, UCFDReal *subres);
 
 #endif // BLUSGS_H
