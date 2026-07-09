@@ -43,12 +43,12 @@
  *              Diffusive margin of wave speed is applied.
  */
 __global__ void
-pre_lusgs_kernel(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                 UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+pre_lusgs_kernel(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+                 UCFDReal *fnorm_vol, UCFDReal *dt, UCFDReal *diag, UCFDReal *fspr)
 {
-    UCFD_INT idx;        // Element index
-    UCFD_INT jdx;        // Face index
-    UCFD_FLOAT lamf;    // Spectral radius at each face
+    UCFDInt idx;        // Element index
+    UCFDInt jdx;        // Face index
+    UCFDReal lamf;    // Spectral radius at each face
 
     idx = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -78,13 +78,13 @@ pre_lusgs_kernel(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  *              Diffusive margin of wave speed is applied.
  */
 __global__ void
-ns_lower_sweep_kernel(UCFD_INT interval, UCFD_INT n0, UCFD_INT neles, UCFD_INT nface,
-                      UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                      UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+ns_lower_sweep_kernel(UCFDInt interval, UCFDInt n0, UCFDInt neles, UCFDInt nface,
+                      UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                      UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr)
 {
-    UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
-    UCFD_FLOAT du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
-    UCFD_FLOAT u[NFVARS], f[NFVARS];
+    UCFDInt _idx, idx, jdx, kdx, neib, curr_level;
+    UCFDReal du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
+    UCFDReal u[NFVARS], f[NFVARS];
     
     // Lower sweep via coloring
     _idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -141,13 +141,13 @@ ns_lower_sweep_kernel(UCFD_INT interval, UCFD_INT n0, UCFD_INT neles, UCFD_INT n
  *              solution array is stored in `dub` array.
  */
 __global__ void
-rans_lower_sweep_kernel(UCFD_INT interval, UCFD_INT n0, UCFD_INT neles, UCFD_INT nface,
-                        UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                        UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+rans_lower_sweep_kernel(UCFDInt interval, UCFDInt n0, UCFDInt neles, UCFDInt nface,
+                        UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                        UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr, UCFDReal *dsrc)
 {
-    UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
-    UCFD_FLOAT du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
-    UCFD_FLOAT u[NVARS], f[NTURBVARS];
+    UCFDInt _idx, idx, jdx, kdx, neib, curr_level;
+    UCFDReal du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
+    UCFDReal u[NVARS], f[NTURBVARS];
 
     _idx = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -215,13 +215,13 @@ rans_lower_sweep_kernel(UCFD_INT interval, UCFD_INT n0, UCFD_INT neles, UCFD_INT
  *              since right-hand-side array is no longer needed.
  */
 __global__ void
-ns_upper_sweep_kernel(UCFD_INT interval, UCFD_INT n0, UCFD_INT neles, UCFD_INT nface,
-                      UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                      UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+ns_upper_sweep_kernel(UCFDInt interval, UCFDInt n0, UCFDInt neles, UCFDInt nface,
+                      UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                      UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr)
 {   
-    UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
-    UCFD_FLOAT du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
-    UCFD_FLOAT u[NFVARS], f[NFVARS];
+    UCFDInt _idx, idx, jdx, kdx, neib, curr_level;
+    UCFDReal du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
+    UCFDReal u[NFVARS], f[NFVARS];
 
     // Upper sweep via coloring
     _idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -283,13 +283,13 @@ ns_upper_sweep_kernel(UCFD_INT interval, UCFD_INT n0, UCFD_INT neles, UCFD_INT n
  *              since right-hand-side array is no longer needed.
  */
 __global__ void
-rans_upper_sweep_kernel(UCFD_INT interval, UCFD_INT n0, UCFD_INT neles, UCFD_INT nface,
-                        UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                        UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+rans_upper_sweep_kernel(UCFDInt interval, UCFDInt n0, UCFDInt neles, UCFDInt nface,
+                        UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                        UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr, UCFDReal *dsrc)
 {
-    UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
-    UCFD_FLOAT du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
-    UCFD_FLOAT u[NVARS], f[NTURBVARS];
+    UCFDInt _idx, idx, jdx, kdx, neib, curr_level;
+    UCFDReal du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
+    UCFDReal u[NVARS], f[NTURBVARS];
 
     _idx = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -355,9 +355,9 @@ rans_upper_sweep_kernel(UCFD_INT interval, UCFD_INT n0, UCFD_INT neles, UCFD_INT
  *              not the right-hand-side array.
  */
 __global__ void
-lusgs_update_kernel(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub)
+lusgs_update_kernel(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub)
 {
-    UCFD_INT idx, kdx;
+    UCFDInt idx, kdx;
 
     idx = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -376,8 +376,8 @@ lusgs_update_kernel(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub)
  * External functions
  */
 extern "C" void
-cuda_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-               UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+cuda_pre_lusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+               UCFDReal *fnorm_vol, UCFDReal *dt, UCFDReal *diag, UCFDReal *fspr)
 {
     const int bpg = (neles + TPB - 1) / TPB;
 
@@ -385,11 +385,11 @@ cuda_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
 }
 
 extern "C" void
-cuda_ns_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                    UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                    UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+cuda_ns_lower_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                    UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                    UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr)
 {
-    UCFD_INT interval = ne - n0;
+    UCFDInt interval = ne - n0;
     const int bpg = int((interval + TPB - 1) / TPB);
 
     ns_lower_sweep_kernel<<<bpg, TPB>>>(interval, n0, neles, nface, nei_ele, icolor, lcolor, fnorm_vol,
@@ -397,11 +397,11 @@ cuda_ns_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
 }
 
 extern "C" void
-cuda_rans_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                      UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                      UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+cuda_rans_lower_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                      UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                      UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr, UCFDReal *dsrc)
 {
-    UCFD_INT interval = ne - n0;
+    UCFDInt interval = ne - n0;
     const int bpg = int((interval + TPB - 1) / TPB);
 
     rans_lower_sweep_kernel<<<bpg, TPB>>>(interval, n0, neles, nface, nei_ele, icolor, lcolor, fnorm_vol,
@@ -409,11 +409,11 @@ cuda_rans_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
 }
 
 extern "C" void
-cuda_ns_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                    UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                    UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+cuda_ns_upper_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                    UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                    UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr)
 {
-    UCFD_INT interval = ne - n0;
+    UCFDInt interval = ne - n0;
     const int bpg = int((interval + TPB - 1) / TPB);
 
     ns_upper_sweep_kernel<<<bpg, TPB>>>(interval, n0, neles, nface, nei_ele, icolor, lcolor, fnorm_vol,
@@ -421,11 +421,11 @@ cuda_ns_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
 }
 
 extern "C" void
-cuda_rans_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                      UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                      UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+cuda_rans_upper_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                      UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                      UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr, UCFDReal *dsrc)
 {
-    UCFD_INT interval = ne - n0;
+    UCFDInt interval = ne - n0;
     const int bpg = int((interval + TPB - 1) / TPB);
 
     rans_upper_sweep_kernel<<<bpg, TPB>>>(interval, n0, neles, nface, nei_ele, icolor, lcolor, fnorm_vol,
@@ -433,7 +433,7 @@ cuda_rans_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
 }
 
 extern "C" void
-cuda_lusgs_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub)
+cuda_lusgs_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub)
 {
     const int bpg = (neles + TPB - 1) / TPB;
 

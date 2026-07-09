@@ -8,7 +8,7 @@
  *              typically Rusanov flux is implemented.  
  *              Therefore, only convective flux is used.
  */
-__device__ void ns_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f)
+__device__ void ns_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f)
 {
     /**
      * Variable description :  
@@ -17,10 +17,10 @@ __device__ void ns_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f)
      * `temp` : \f$\rho^2 \times (u^2 + v^2)\f$  
      * `contrav` : Contravariant velocity
      */
-    UCFD_FLOAT rho = u[0];
-    UCFD_FLOAT et = u[NFVARS-1];
-    UCFD_FLOAT temp = 0.0;
-    UCFD_FLOAT contrav = 0.0;
+    UCFDReal rho = u[0];
+    UCFDReal et = u[NFVARS-1];
+    UCFDReal temp = 0.0;
+    UCFDReal contrav = 0.0;
     int i;
 
     for (i=0; i<NDIMS; i++) {
@@ -30,7 +30,7 @@ __device__ void ns_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f)
     contrav /= rho;
 
     // Apply lower bound of pressure value
-    UCFD_FLOAT p = (GAMMA - 1.0)*(et - 0.5*temp/rho);
+    UCFDReal p = (GAMMA - 1.0)*(et - 0.5*temp/rho);
     if (p < PMIN) {
         p = PMIN;
         et = p/(GAMMA-1.0) + 0.5*temp/rho;
@@ -38,11 +38,11 @@ __device__ void ns_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f)
     }
     
     // Total enthalpy
-    UCFD_FLOAT ht = et + p;
+    UCFDReal ht = et + p;
 
     // Computes flux array
     f[0] = rho*contrav;
-    for (UCFD_INT i=0; i<NDIMS; i++) {
+    for (UCFDInt i=0; i<NDIMS; i++) {
         f[i+1] = u[i+1] * contrav + nf[i]*p;
     }
     f[NFVARS-1] = ht*contrav;
@@ -56,35 +56,35 @@ __device__ void ns_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f)
  *              Convective flux in RANS equations is computed
  *              simply by multiplying conservative variables and contravariant velocity.
  */
-__device__ void rans_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f)
+__device__ void rans_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f)
 {
-    UCFD_FLOAT rho = u[0];
-    UCFD_FLOAT contrav = 0.0;
+    UCFDReal rho = u[0];
+    UCFDReal contrav = 0.0;
 
-    for (UCFD_INT i=0; i<NDIMS; i++) {
+    for (UCFDInt i=0; i<NDIMS; i++) {
         contrav += u[i+1] * nf[i];
     }
     contrav /= rho;
 
-    for (UCFD_INT i=0; i<NTURBVARS; i++) {
+    for (UCFDInt i=0; i<NTURBVARS; i++) {
         f[i] = u[NFVARS+i]*contrav;
     }
 }
 
 
-ucfd_status_t rans_source_jacobian(UCFD_FLOAT *uf, UCFD_FLOAT tmat[NTURBVARS][NTURBVARS], UCFD_FLOAT *dsrc)
+ucfd_status_t rans_source_jacobian(UCFDReal *uf, UCFDReal tmat[NTURBVARS][NTURBVARS], UCFDReal *dsrc)
 {
     /* 1-equation RANS model (Spalart-Allmaras) */
     if (NTURBVARS == 1) tmat[0][0] += dsrc[NVARS-1];
 
     /* 2-equations RANS model (kw-SST) */
     else if (NTURBVARS == 2) {
-        UCFD_FLOAT k = uf[NVARS-2] / uf[0];
+        UCFDReal k = uf[NVARS-2] / uf[0];
         tmat[0][0] += dsrc[NVARS-2];
         tmat[0][1] += max(BETAST*k, 0.0);
         tmat[1][1] += dsrc[NVARS-1];
     }
     else return UCFD_STATUS_NOT_SUPPORTED;
 
-    return UCFD_STATUS_SUCCESS;
+    return UCFD_SUCCESS;
 }

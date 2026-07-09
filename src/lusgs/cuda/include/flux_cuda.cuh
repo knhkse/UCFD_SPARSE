@@ -52,7 +52,7 @@
  *              typically Rusanov flux is implemented.  
  *              Therefore, only convective flux is used.
  */
-__device__ void ns_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f);
+__device__ void ns_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f);
 
 /**
  * @details     Computes convective flux for RANS one- or two-equations.  
@@ -62,9 +62,9 @@ __device__ void ns_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f);
  *              Convective flux in RANS equations is computed
  *              simply by multiplying conservative variables and contravariant velocity.
  */
-__device__ void rans_flux_container(UCFD_FLOAT *u, UCFD_FLOAT *nf, UCFD_FLOAT *f);
+__device__ void rans_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f);
 
 
-ucfd_status_t rans_source_jacobian(UCFD_FLOAT *uf, UCFD_FLOAT tmat[NTURBVARS][NTURBVARS], UCFD_FLOAT *dsrc);
+ucfd_status_t rans_source_jacobian(UCFDReal *uf, UCFDReal tmat[NTURBVARS][NTURBVARS], UCFDReal *dsrc);
 
 #endif
