@@ -129,7 +129,7 @@ $(DLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE)
 	cp $@ $(UCFD_PATH)/lib
 
 $(DCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE)
-	$(CC) $(OMPFLAG) -fPIC -shared -o $@ $^
+	$(CC) $(OMPFLAG) -shared -o $@ $^
 	cp $@ $(UCFD_PATH)/lib
 
 

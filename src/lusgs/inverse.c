@@ -34,10 +34,10 @@
 /**
  * @details     Decompose matrix A into lower and upper triangular matrix
  */
-void ludcmp(int n, UCFD_FLOAT A[n][n])
+void ludcmp(int n, UCFDReal A[n][n])
 {
     int row, col, kdx;
-    UCFD_FLOAT val;
+    UCFDReal val;
 
     if (n == 1) {               // 1-equation RANS model
         A[0][0] = 1.0/A[0][0];
@@ -71,10 +71,10 @@ void ludcmp(int n, UCFD_FLOAT A[n][n])
 /**
  * @details     This function performs Forward/Backward substitution of LU decomposed matrix.
  */
-void lusub(int n, UCFD_FLOAT LU[n][n], UCFD_FLOAT *b)
+void lusub(int n, UCFDReal LU[n][n], UCFDReal *b)
 {
     int row, col;
-    UCFD_FLOAT val;
+    UCFDReal val;
 
     if (n == 1) {                       // 1-equation RANS model
         b[0] *= LU[0][0];

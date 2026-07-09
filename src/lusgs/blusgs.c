@@ -36,12 +36,12 @@
  *              `n` is the number of conservative variables in Navier-Stokes equations,
  *              or the number of turbulent variables in RANS equations.
  */
-void ns_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                          UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat)
+void ns_serial_pre_blusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+                          UCFDReal *fnorm_vol, UCFDReal *dt, UCFDReal *diag, UCFDReal *fjmat)
 {
-    UCFD_INT idx, jdx, kdx, row, col;
-    UCFD_FLOAT fv, dti;
-    UCFD_FLOAT dmat[NFVARS][NFVARS];
+    UCFDInt idx, jdx, kdx, row, col;
+    UCFDReal fv, dti;
+    UCFDReal dmat[NFVARS][NFVARS];
 
     for (idx=0; idx<neles; idx++) {
         // Initialize diagonal matrix
@@ -87,14 +87,14 @@ void ns_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  *              `n` is the number of conservative variables in Navier-Stokes equations,
  *              or the number of turbulent variables in RANS equations.
  */
-void rans_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                            UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *uptsb, UCFD_FLOAT *dt,
-                            UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat, UCFD_FLOAT *dsrc)
+void rans_serial_pre_blusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+                            UCFDReal *fnorm_vol, UCFDReal *uptsb, UCFDReal *dt,
+                            UCFDReal *tdiag, UCFDReal *tjmat, UCFDReal *dsrc)
 {
-    UCFD_INT idx, jdx, kdx, row, col;
-    UCFD_FLOAT fv;
-    UCFD_FLOAT tmat[NTURBVARS][NTURBVARS];
-    UCFD_FLOAT uf[NVARS], dsrcf[NVARS];
+    UCFDInt idx, jdx, kdx, row, col;
+    UCFDReal fv;
+    UCFDReal tmat[NTURBVARS][NTURBVARS];
+    UCFDReal uf[NVARS], dsrcf[NVARS];
 
     for (idx=0; idx<neles; idx++) {
         // Initialize diagonal matrix
@@ -150,14 +150,14 @@ void rans_serial_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  * @note        The last argument array, `fjmat` is NOT identical with ns_serial_pre_blusgs function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void ns_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
-                                 UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
-                                 UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat)
+void ns_serial_block_lower_sweep(UCFDInt neles, UCFDInt nface,
+                                 UCFDInt *nei_ele, UCFDReal *fnorm_vol,
+                                 UCFDReal *rhsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fjmat)
 {
-    UCFD_INT idx, jdx, kdx, neib;
-    UCFD_INT row, col;
-    UCFD_FLOAT rhs[NFVARS], dmat[NFVARS][NFVARS];
-    UCFD_FLOAT val, fv;
+    UCFDInt idx, jdx, kdx, neib;
+    UCFDInt row, col;
+    UCFDReal rhs[NFVARS], dmat[NFVARS][NFVARS];
+    UCFDReal val, fv;
 
     // Lower sweep via mapping
     for (idx=0; idx<neles; idx++) {
@@ -209,14 +209,14 @@ void ns_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
  * @note        The last argument array, `tjmat` is NOT identical with ns_serial_pre_blusgs function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void rans_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
-                                   UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
-                                   UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat)
+void rans_serial_block_lower_sweep(UCFDInt neles, UCFDInt nface,
+                                   UCFDInt *nei_ele, UCFDReal *fnorm_vol,
+                                   UCFDReal *rhsb, UCFDReal *dub, UCFDReal *tdiag, UCFDReal *tjmat)
 {
-    UCFD_INT idx, jdx, kdx, neib;
-    UCFD_INT row, col;
-    UCFD_FLOAT val, fv;
-    UCFD_FLOAT rhs[NTURBVARS], tmat[NTURBVARS][NTURBVARS];
+    UCFDInt idx, jdx, kdx, neib;
+    UCFDInt row, col;
+    UCFDReal val, fv;
+    UCFDReal rhs[NTURBVARS], tmat[NTURBVARS][NTURBVARS];
 
     // Lower sweep via mapping
     for (idx=0; idx<neles; idx++) {
@@ -269,14 +269,14 @@ void rans_serial_block_lower_sweep(UCFD_INT neles, UCFD_INT nface,
  * @note        The last argument array, `fjmat` is NOT identical with ns_serial_pre_blusgs function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void ns_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
-                                 UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
-                                 UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat)
+void ns_serial_block_upper_sweep(UCFDInt neles, UCFDInt nface,
+                                 UCFDInt *nei_ele, UCFDReal *fnorm_vol,
+                                 UCFDReal *rhsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fjmat)
 {
-    UCFD_INT idx, jdx, kdx, neib;
-    UCFD_INT row, col;
-    UCFD_FLOAT val, fv;
-    UCFD_FLOAT rhs[NFVARS], dmat[NFVARS][NFVARS];
+    UCFDInt idx, jdx, kdx, neib;
+    UCFDInt row, col;
+    UCFDReal val, fv;
+    UCFDReal rhs[NFVARS], dmat[NFVARS][NFVARS];
 
     // Upper sweep via mapping
     for (idx=neles-1; idx>-1; idx--) {
@@ -328,14 +328,14 @@ void ns_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
  * @note        The last argument array, `tjmat` is NOT identical with ns_serial_pre_blusgs function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void rans_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
-                                   UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol,
-                                   UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat)
+void rans_serial_block_upper_sweep(UCFDInt neles, UCFDInt nface,
+                                   UCFDInt *nei_ele, UCFDReal *fnorm_vol,
+                                   UCFDReal *rhsb, UCFDReal *dub, UCFDReal *tdiag, UCFDReal *tjmat)
 {
-    UCFD_INT idx, jdx, kdx, neib;
-    UCFD_INT row, col;
-    UCFD_FLOAT val, fv;
-    UCFD_FLOAT rhs[NTURBVARS], tmat[NTURBVARS][NTURBVARS];
+    UCFDInt idx, jdx, kdx, neib;
+    UCFDInt row, col;
+    UCFDReal val, fv;
+    UCFDReal rhs[NTURBVARS], tmat[NTURBVARS][NTURBVARS];
 
     // Lower sweep via mapping
     for (idx=neles-1; idx>-1; idx--) {
@@ -383,9 +383,9 @@ void rans_serial_block_upper_sweep(UCFD_INT neles, UCFD_INT nface,
 /**
  * @details     solution array is updated by adding \f$\Delta Q\f$.
  */
-void blusgs_serial_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres)
+void blusgs_serial_ns_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub, UCFDReal *subres)
 {
-    UCFD_INT idx, kdx;
+    UCFDInt idx, kdx;
 
     for (idx=0; idx<neles; idx++) {
         for (kdx=0; kdx<NFVARS; kdx++) {
@@ -403,9 +403,9 @@ void blusgs_serial_ns_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub,
 /**
  * @details     solution array is updated by adding \f$\Delta Q\f$.
  */
-void blusgs_serial_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *subres)
+void blusgs_serial_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub, UCFDReal *subres)
 {
-    UCFD_INT idx, kdx;
+    UCFDInt idx, kdx;
 
     for (idx=0; idx<neles; idx++) {
         for (kdx=0; kdx<NVARS; kdx++) {

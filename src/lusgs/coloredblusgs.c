@@ -37,12 +37,12 @@
  *              Diagonal matrices is composed of block operator matrix, which size is n-by-n.
  *              `n` is the number of conservative variables in Navier-Stokes equations.
  */
-void parallel_ns_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                            UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat)
+void parallel_ns_pre_blusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+                            UCFDReal *fnorm_vol, UCFDReal *dt, UCFDReal *diag, UCFDReal *fjmat)
 {
-    UCFD_INT idx, jdx, kdx, row, col;
-    UCFD_FLOAT fv, dti;
-    UCFD_FLOAT dmat[NFVARS][NFVARS];
+    UCFDInt idx, jdx, kdx, row, col;
+    UCFDReal fv, dti;
+    UCFDReal dmat[NFVARS][NFVARS];
 
     #pragma omp parallel for private(jdx, kdx, row, col, fv, dmat, dti)
     for (idx=0; idx<neles; idx++) {
@@ -88,14 +88,14 @@ void parallel_ns_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  *              Diagonal matrices is composed of block operator matrix, which size is n-by-n.
  *              `n` is the number of turbulent variables in RANS equations.
  */
-void parallel_rans_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                              UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *uptsb, UCFD_FLOAT *dt,
-                              UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat, UCFD_FLOAT *dsrc)
+void parallel_rans_pre_blusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+                              UCFDReal *fnorm_vol, UCFDReal *uptsb, UCFDReal *dt,
+                              UCFDReal *tdiag, UCFDReal *tjmat, UCFDReal *dsrc)
 {
-    UCFD_INT idx, jdx, kdx, row, col;
-    UCFD_FLOAT fv;
-    UCFD_FLOAT tmat[NTURBVARS][NTURBVARS];
-    UCFD_FLOAT uf[NVARS], dsrcf[NVARS];
+    UCFDInt idx, jdx, kdx, row, col;
+    UCFDReal fv;
+    UCFDReal tmat[NTURBVARS][NTURBVARS];
+    UCFDReal uf[NVARS], dsrcf[NVARS];
 
     #pragma omp parallel for private(jdx, kdx, row, col, fv, tmat, uf, dsrcf)
     for (idx=0; idx<neles; idx++) {
@@ -152,14 +152,14 @@ void parallel_rans_pre_blusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  * @note        The last argument array, `fjmat` is NOT identical with ns_serial_pre_blusgs function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void parallel_ns_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                             UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol,
-                             UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fjmat)
+void parallel_ns_block_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                             UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol,
+                             UCFDReal *rhsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fjmat)
 {
-    UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
-    UCFD_INT row, col;
-    UCFD_FLOAT val, fv;
-    UCFD_FLOAT rhs[NFVARS], dmat[NFVARS][NFVARS];
+    UCFDInt _idx, idx, jdx, kdx, neib, curr_level;
+    UCFDInt row, col;
+    UCFDReal val, fv;
+    UCFDReal rhs[NFVARS], dmat[NFVARS][NFVARS];
 
     // Lower/Upper sweep via coloring
     #pragma omp parallel for private(idx, jdx, kdx, neib, curr_level, row, col, rhs, dmat, val, fv)
@@ -212,14 +212,14 @@ void parallel_ns_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
  * @note        The last argument array, `tjmat` is NOT identical with `parallel_rans_pre_blusgs` function.  
  *              For more details, refer to the Block LU-SGS in the document.
  */
-void parallel_rans_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                               UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol,
-                               UCFD_FLOAT *rhsb, UCFD_FLOAT *dub, UCFD_FLOAT *tdiag, UCFD_FLOAT *tjmat)
+void parallel_rans_block_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                               UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol,
+                               UCFDReal *rhsb, UCFDReal *dub, UCFDReal *tdiag, UCFDReal *tjmat)
 {
-    UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
-    UCFD_INT row, col;
-    UCFD_FLOAT val, fv;
-    UCFD_FLOAT rhs[NTURBVARS], tmat[NTURBVARS][NTURBVARS];
+    UCFDInt _idx, idx, jdx, kdx, neib, curr_level;
+    UCFDInt row, col;
+    UCFDReal val, fv;
+    UCFDReal rhs[NTURBVARS], tmat[NTURBVARS][NTURBVARS];
 
     // Lower/Upper sweep via coloring
     #pragma omp parallel for private(idx, jdx, kdx, neib, curr_level, row, col, rhs, tmat, val, fv)
@@ -269,9 +269,9 @@ void parallel_rans_block_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
 /**
  * @details     solution array is updated by adding \f$\Delta Q\f$.
  */
-void parallel_blusgs_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub)
+void parallel_blusgs_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub)
 {
-    UCFD_INT idx, kdx;
+    UCFDInt idx, kdx;
 
     #pragma omp parallel for private(kdx)
     for (idx=0; idx<neles; idx++) {

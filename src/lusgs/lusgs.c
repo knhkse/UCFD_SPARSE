@@ -40,12 +40,12 @@
  *              which has less memory requirement.  
  *              Diffusive margin of wave speed is applied.
  */
-void serial_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                      UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+void serial_pre_lusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+                      UCFDReal *fnorm_vol, UCFDReal *dt, UCFDReal *diag, UCFDReal *fspr)
 {
-    UCFD_INT idx;       // Element index
-    UCFD_INT jdx;       // Face index
-    UCFD_FLOAT lamf;    // Spectral radius at each face
+    UCFDInt idx;       // Element index
+    UCFDInt jdx;       // Face index
+    UCFDReal lamf;    // Spectral radius at each face
 
     for (idx=0; idx<neles; idx++) {
         // Diagonals of implicit operator
@@ -71,12 +71,12 @@ void serial_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  *              which has the same flux shape.  
  *              solution array is stored in `dub` array.
  */
-void serial_ns_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                           UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+void serial_ns_lower_sweep(UCFDInt neles, UCFDInt nface, UCFDInt *nei_ele, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                           UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr)
 {   
-    UCFD_INT idx, neib, jdx, kdx;
-    UCFD_FLOAT du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
-    UCFD_FLOAT u[NFVARS], f[NFVARS];
+    UCFDInt idx, neib, jdx, kdx;
+    UCFDReal du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
+    UCFDReal u[NFVARS], f[NFVARS];
     
     // Lower sweep via mapping
     for (idx=0; idx<neles; idx++) {
@@ -126,12 +126,12 @@ void serial_ns_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UC
  *              This function is used for RANS equations.  
  *              solution array is stored in `dub` array.
  */
-void serial_rans_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm, 
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+void serial_rans_lower_sweep(UCFDInt neles, UCFDInt nface, UCFDInt *nei_ele, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm, 
+                             UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr, UCFDReal *dsrc)
 {
-    UCFD_INT idx, neib, jdx, kdx;
-    UCFD_FLOAT du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
-    UCFD_FLOAT u[NVARS], f[NTURBVARS];
+    UCFDInt idx, neib, jdx, kdx;
+    UCFDReal du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
+    UCFDReal u[NVARS], f[NTURBVARS];
 
     // Lower sweep via mapping
     for (idx=0; idx<neles; idx++) {
@@ -190,12 +190,12 @@ void serial_rans_lower_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, 
  *              Solution difference array is stored in `dub` array,
  *              since right-hand-side array is no longer needed.
  */
-void serial_ns_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                           UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+void serial_ns_upper_sweep(UCFDInt neles, UCFDInt nface, UCFDInt *nei_ele, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                           UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr)
 {
-    UCFD_INT idx, neib, jdx, kdx;
-    UCFD_FLOAT du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
-    UCFD_FLOAT u[NFVARS], f[NFVARS];
+    UCFDInt idx, neib, jdx, kdx;
+    UCFDReal du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
+    UCFDReal u[NFVARS], f[NFVARS];
     
     // Upper sweep via mapping
     for (idx=neles-1; idx>-1; idx--) {
@@ -248,12 +248,12 @@ void serial_ns_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UC
  *              Solution array is stored in `dub` array,
  *              since right-hand-side array is no longer needed.
  */
-void serial_rans_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+void serial_rans_upper_sweep(UCFDInt neles, UCFDInt nface, UCFDInt *nei_ele, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                             UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr, UCFDReal *dsrc)
 {
-    UCFD_INT idx, neib, jdx, kdx;
-    UCFD_FLOAT du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
-    UCFD_FLOAT u[NVARS], f[NTURBVARS];
+    UCFDInt idx, neib, jdx, kdx;
+    UCFDReal du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
+    UCFDReal u[NVARS], f[NTURBVARS];
 
     // Upper sweep via mapping
     for (idx=neles-1; idx>-1; idx--) {
@@ -311,9 +311,9 @@ void serial_rans_upper_sweep(UCFD_INT neles, UCFD_INT nface, UCFD_INT *nei_ele, 
  *              is the difference array after upper sweep,
  *              not the right-hand-side array.
  */
-void serial_lusgs_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub)
+void serial_lusgs_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub)
 {
-    UCFD_INT idx, kdx;
+    UCFDInt idx, kdx;
     
     // Iterate for all cell
     for (idx=0; idx<neles; idx++) {

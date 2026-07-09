@@ -43,11 +43,11 @@
  *              which has less memory requirement.  
  *              Diffusive margin of wave speed is applied.
  */
-void parallel_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
-                        UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *dt, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+void parallel_pre_lusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
+                        UCFDReal *fnorm_vol, UCFDReal *dt, UCFDReal *diag, UCFDReal *fspr)
 {
-    UCFD_INT idx, jdx;
-    UCFD_FLOAT lamf;
+    UCFDInt idx, jdx;
+    UCFDReal lamf;
 
     #pragma omp parallel for private(jdx, lamf)
     for (idx=0; idx<neles; idx++) {
@@ -76,13 +76,13 @@ void parallel_pre_lusgs(UCFD_INT neles, UCFD_INT nface, UCFD_FLOAT factor,
  *              which has less memory requirement.  
  *              Diffusive margin of wave speed is applied.
  */
-void parallel_ns_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                             UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+void parallel_ns_lower_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                             UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                             UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr)
 {   
-    UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
-    UCFD_FLOAT du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
-    UCFD_FLOAT u[NFVARS], f[NFVARS];
+    UCFDInt _idx, idx, jdx, kdx, neib, curr_level;
+    UCFDReal du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
+    UCFDReal u[NFVARS], f[NFVARS];
     
     // Lower sweep via coloring
     #pragma omp parallel for private(idx, jdx, kdx, neib, curr_level, du, dfj, df, nf, u, f)
@@ -136,13 +136,13 @@ void parallel_ns_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
  *              This function is used for RANS equations.  
  *              solution array is stored in `dub` array.
  */
-void parallel_rans_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                               UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                               UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+void parallel_rans_lower_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                               UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                               UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr, UCFDReal *dsrc)
 {
-    UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
-    UCFD_FLOAT du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
-    UCFD_FLOAT u[NVARS], f[NTURBVARS];
+    UCFDInt _idx, idx, jdx, kdx, neib, curr_level;
+    UCFDReal du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
+    UCFDReal u[NVARS], f[NTURBVARS];
 
     #pragma omp parallel for private(idx, jdx, kdx, neib, curr_level, du, dfj, df, nf, u, f)
     // Lower sweep via coloring
@@ -204,13 +204,13 @@ void parallel_rans_lower_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
  *              which has the same flux shape.  
  *              Solution array is stored in `dub` array.
  */
-void parallel_ns_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                             UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                             UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr)
+void parallel_ns_upper_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                             UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                             UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr)
 {   
-    UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
-    UCFD_FLOAT du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
-    UCFD_FLOAT u[NFVARS], f[NFVARS];
+    UCFDInt _idx, idx, jdx, kdx, neib, curr_level;
+    UCFDReal du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
+    UCFDReal u[NFVARS], f[NFVARS];
 
     // Upper sweep via coloring
     #pragma omp parallel for private(idx, jdx, kdx, neib, curr_level, du, dfj, df, nf, u, f)
@@ -265,13 +265,13 @@ void parallel_ns_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT 
  *              This function is used for RANS equations.  
  *              Solution array is stored in `dub` array.
  */
-void parallel_rans_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_INT nface,
-                               UCFD_INT *nei_ele, UCFD_INT *icolor, UCFD_INT *lcolor, UCFD_FLOAT *fnorm_vol, UCFD_FLOAT *vec_fnorm,
-                               UCFD_FLOAT *uptsb, UCFD_FLOAT *dub, UCFD_FLOAT *diag, UCFD_FLOAT *fspr, UCFD_FLOAT *dsrc)
+void parallel_rans_upper_sweep(UCFDInt n0, UCFDInt ne, UCFDInt neles, UCFDInt nface,
+                               UCFDInt *nei_ele, UCFDInt *icolor, UCFDInt *lcolor, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
+                               UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr, UCFDReal *dsrc)
 {
-    UCFD_INT _idx, idx, jdx, kdx, neib, curr_level;
-    UCFD_FLOAT du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
-    UCFD_FLOAT u[NVARS], f[NTURBVARS];
+    UCFDInt _idx, idx, jdx, kdx, neib, curr_level;
+    UCFDReal du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
+    UCFDReal u[NVARS], f[NTURBVARS];
 
     #pragma omp parallel for private(idx, jdx, kdx, neib, curr_level, du, dfj, df, nf, u, f)
     // Upper sweep via coloring
@@ -333,9 +333,9 @@ void parallel_rans_upper_sweep(UCFD_INT n0, UCFD_INT ne, UCFD_INT neles, UCFD_IN
  *              is the difference array after upper sweep,
  *              not the right-hand-side array.
  */
-void parallel_lusgs_update(UCFD_INT neles, UCFD_FLOAT *uptsb, UCFD_FLOAT *dub)
+void parallel_lusgs_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub)
 {
-    UCFD_INT idx, kdx;
+    UCFDInt idx, kdx;
 
     #pragma omp parallel for private(kdx)
     for (idx=0; idx<neles; idx++) {
