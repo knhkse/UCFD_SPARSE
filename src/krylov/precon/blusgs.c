@@ -104,12 +104,12 @@ static ucfd_status_t BLUSGSPreconDestroy(Precon precon)
 }
 
 
-ucfd_status_t UCFDCreateBLUSGS(Precon *precon, UCFDInt bn, UCFDInt block, UCFDReal *values)
+ucfd_status_t UCFDPreconSetBLUSGS(Precon *precon, UCFDInt bn, UCFDInt block, UCFDReal *values)
 {
-    UCFDNullCheck(*precon, "Preconditioner must be initialized\n");
+    UCFDCheckNull(*precon, "Preconditioner must be initialized\n");
     Precon pc = *precon;
     Precon_BLUSGS *blu = (Precon_BLUSGS *)calloc(1, sizeof(*blu));
-    UCFDNullCheck(blu, "BLU-SGS precon allocation failed\n");
+    UCFDCheckNull(blu, "BLU-SGS precon allocation failed\n");
 
     blu->bn             = bn;
     blu->block          = block;

@@ -4,7 +4,7 @@
 ucfd_status_t UCFDMatInit(SpMat *mat)
 {
     SpMat m = (SpMat)calloc(1, sizeof(*m));
-    UCFDNullCheck(m, "Matrix allocation failed\n");
+    UCFDCheckNull(m, "Matrix allocation failed\n");
 
     m->type_name = NULL;
     m->data      = NULL;
@@ -16,7 +16,7 @@ ucfd_status_t UCFDMatInit(SpMat *mat)
 
 ucfd_status_t UCFDMatMult(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
-    UCFDNullCheck(A->type_name, "Matrix type must be set\n");
+    UCFDCheckNull(A->type_name, "Matrix type must be set\n");
     UCFDCall(A->ops->spmv(alpha, A, x, beta, y));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

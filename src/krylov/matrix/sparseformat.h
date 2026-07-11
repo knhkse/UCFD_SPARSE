@@ -41,3 +41,9 @@ typedef struct {
 #endif
 
 
+#if defined(USE_CUDA)
+
+
+
+
+#endif

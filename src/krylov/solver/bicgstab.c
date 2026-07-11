@@ -23,8 +23,8 @@ static ucfd_status_t fused_reduction(UCFDReal *rt, UCFDReal *s, UCFDReal *t,
 
 static ucfd_status_t BICGSTABSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
 {
-    UCFDNullCheck(solver->type_name, "Solver must be initialized\n");
-    UCFDNullCheck(A->type_name, "Matrix must be constructed\n");
+    UCFDCheckNull(solver->type_name, "Solver must be initialized\n");
+    UCFDCheckNull(A->type_name, "Matrix must be constructed\n");
     Solver_BICGSTAB *bcs = (Solver_BICGSTAB *)solver->data;
     UCFDInt n = A->n;
     UCFDInt iter = 0;
@@ -150,7 +150,7 @@ ucfd_status_t UCFDCreateBICGSTAB(Solver *solver, UCFDInt n, UCFDInt maxiter, UCF
     Solver s = *solver;
     s->type_name = BICGSTAB;
     Solver_BICGSTAB *bcs = (Solver_BICGSTAB *)calloc(1, sizeof(*bcs));
-    UCFDNullCheck(bcs, "BiCGstab solver allocation failed\n");
+    UCFDCheckNull(bcs, "BiCGstab solver allocation failed\n");
 
     bcs->r          = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
     bcs->rt         = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));

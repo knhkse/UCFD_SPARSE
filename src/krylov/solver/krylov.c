@@ -4,7 +4,7 @@
 ucfd_status_t UCFDSolverInit(Solver *solver)
 {
     Solver s = (Solver)calloc(1, sizeof(*s));
-    UCFDNullCheck(s, "Solver allocation failed\n");
+    UCFDCheckNull(s, "Solver allocation failed\n");
 
     s->type_name = NULL;
     s->tol       = 1e-5;

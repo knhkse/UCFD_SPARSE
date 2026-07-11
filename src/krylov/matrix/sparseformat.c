@@ -34,7 +34,7 @@ ucfd_status_t MatCreateCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *coli
     m->type_name = CSR;
 
     SpMat_CSR *csr = (SpMat_CSR *)calloc(1, sizeof(*csr));
-    UCFDNullCheck(csr, "CSR matrix creation failed\n");
+    UCFDCheckNull(csr, "CSR matrix creation failed\n");
 
     csr->dummy          = 'c';
     
@@ -106,7 +106,7 @@ ucfd_status_t MatCreateBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr,
     m->type_name = BSR;
 
     SpMat_BSR *bsr = (SpMat_BSR *)calloc(1, sizeof(*bsr));
-    UCFDNullCheck(bsr, "BSR matrix creation failed\n");
+    UCFDCheckNull(bsr, "BSR matrix creation failed\n");
 
     bsr->bn             = bn;
     bsr->block          = blk;
@@ -150,7 +150,7 @@ ucfd_status_t MatCreateMKLBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowp
     m->type_name = MKLBSR;
 
     SpMat_MKLBSR *bsr = (SpMat_MKLBSR *)calloc(1, sizeof(*bsr));
-    UCFDNullCheck(bsr, "MKL BSR matrix creation failed\n");
+    UCFDCheckNull(bsr, "MKL BSR matrix creation failed\n");
 
     bsr->bn                    = bn;
     bsr->block                 = blk;
@@ -192,7 +192,7 @@ ucfd_status_t MatCreateMKLCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *c
     m->type_name = MKLCSR;
 
     SpMat_MKLCSR *csr = (SpMat_MKLCSR *)calloc(1, sizeof(*csr));
-    UCFDNullCheck(csr, "MKL CSR matrix creation failed\n");
+    UCFDCheckNull(csr, "MKL CSR matrix creation failed\n");
 
     csr->handle.desc.type      = SPARSE_MATRIX_TYPE_GENERAL;
     csr->handle.desc.mode      = 0;

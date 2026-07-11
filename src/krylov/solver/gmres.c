@@ -41,9 +41,9 @@ static ucfd_status_t Arnoldi_CGS2(Solver solver, Precon pc, SpMat A, UCFDInt n, 
 
 static ucfd_status_t GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
 {
-    UCFDNullCheck(solver->type_name, "Solver must be initialized\n");
-    UCFDNullCheck(pc->type_name, "Preconditioner must be initialized\n");
-    UCFDNullCheck(A->type_name, "Matrix must be constructed\n");
+    UCFDCheckNull(solver->type_name, "Solver must be initialized\n");
+    UCFDCheckNull(pc->type_name, "Preconditioner must be initialized\n");
+    UCFDCheckNull(A->type_name, "Matrix must be constructed\n");
     Solver_GMRES *gmres = (Solver_GMRES *)solver->data;
     UCFDInt n = A->n;
 
@@ -160,7 +160,7 @@ ucfd_status_t UCFDCreateGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxi
     Solver s = *solver;
     s->type_name = GMRES;
     Solver_GMRES *gmres = (Solver_GMRES *)calloc(1, sizeof(*gmres));
-    UCFDNullCheck(gmres, "GMRES solver allocation failed\n");
+    UCFDCheckNull(gmres, "GMRES solver allocation failed\n");
 
     gmres->restart = m;
     /* Allocate working arrays */

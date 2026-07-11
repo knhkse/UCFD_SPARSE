@@ -36,23 +36,25 @@
 #endif
 
 
-#define UCFDNullCheck(obj, msg)                                             \
+#define UCFDCheckNull(obj, msg)                                             \
     do {                                                                    \
-        if (!(obj)) fprintf(stderr, msg);                                   \
+        if (!(obj)) {                                                       \
+            fprintf(stderr, msg);                                           \
+            exit(EXIT_FAILURE);                                             \
+        }                                                                   \
     } while (0)
 
-#define UCFDCompare(obj1, obj2, ...)                                        \
+#define UCFDMatch(obj1, obj2, ...)                                          \
     do {                                                                    \
         if (obj1 != obj2) fprintf(stderr, __VA_ARGS__);                     \
     } while (0)
 
-#define UCFDError(msg)                                                      \
-    do {                                                                    \
-        fprintf(stderr, msg);                                               \
-        exit(EXIT_FAILURE);                                                 \
-    } while (0)
 
 
+
+/**
+ * Library error-checking macros
+ */
 #define UCFDCall(call)                                                      \
     do {                                                                    \
         ucfd_status_t st_ = (call);                                         \

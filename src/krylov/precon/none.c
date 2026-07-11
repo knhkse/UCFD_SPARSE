@@ -1,20 +1,20 @@
 #include "ucfdpcimpl.h"
 
 
-static ucfd_status_t NonePreconFunction(Precon precon)
+static inline ucfd_status_t NonePreconFunction(Precon precon)
 {
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static ucfd_status_t NonePreconApply(Precon precon, UCFDReal *x)
+static inline ucfd_status_t NonePreconApply(Precon precon, UCFDReal *x)
 {
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDCreateNonePrecon(Precon *precon)
+ucfd_status_t UCFDPreconCreateNone(Precon *precon)
 {
     Precon pc = (Precon)calloc(1, sizeof(*pc));
-    UCFDNullCheck(pc, "Precon allocation failed\n");
+    UCFDCheckNull(pc, "Precon allocation failed\n");
 
     pc->type_name       = NONE;
     pc->rowptr          = NULL;
