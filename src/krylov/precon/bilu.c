@@ -26,11 +26,11 @@ static ucfd_status_t BILUPreconPrepare(Precon precon)
             ked = precon -> rowptr[ck+1];
             
             // A[i,k] := A[i,k] @ inv(A[k,k])
-            lusubmattrans(block, &(bilu->values[kk*blkdim]), &(bilu->values[kdx*blkdim]));
+            lusubmattrans(block, &(precon->values[kk*blkdim]), &(precon->values[kdx*blkdim]));
             // memcpy(Aik, &values[kdx*blkdim], sizeof(double)*block);
             for (row=0; row<block; row++) {
                 for (col=0; col<block; col++)
-                    Aik[row][col] = bilu->values[kdx*blkdim+row*block+col];
+                    Aik[row][col] = precon->values[kdx*blkdim+row*block+col];
             }
 
             // Prepare iw
@@ -46,8 +46,8 @@ static ucfd_status_t BILUPreconPrepare(Precon precon)
                         for (col=0; col<block; col++) {
                             v = 0.0;
                             for (ele=0; ele<block; ele++)
-                                v += Aik[row][ele] * bilu->values[iwj*blkdim+ele*block+col];
-                            bilu->values[jj*blkdim+row*block+col] -= v;
+                                v += Aik[row][ele] * precon->values[iwj*blkdim+ele*block+col];
+                            precon->values[jj*blkdim+row*block+col] -= v;
                         }
                     }
                 }
@@ -57,7 +57,7 @@ static ucfd_status_t BILUPreconPrepare(Precon precon)
             for (jj=kst; jj<ked; jj++) bilu->iw[precon -> colidx[jj]] = -1;
         }
         // LU decomposition of current row diagonal matrix
-        ludcmp(block, &(bilu->values[ed*blkdim]));
+        ludcmp(block, &(precon->values[ed*blkdim]));
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -90,7 +90,7 @@ static ucfd_status_t BILUPreconApply(Precon precon, UCFDReal *b)
             {
                 v = 0.0;
                 for (col = 0; col < block; col++)
-                    v += bilu->values[col + row * block + jdx * blkdim] * b[col + cind * block];
+                    v += precon->values[col + row * block + jdx * blkdim] * b[col + cind * block];
                 arr[row] -= v;
             }
         }
@@ -117,13 +117,13 @@ static ucfd_status_t BILUPreconApply(Precon precon, UCFDReal *b)
             {
                 v = 0.0;
                 for (col = 0; col < block; col++)
-                    v += bilu->values[col + row * block + jdx * blkdim] * b[col + cind * block];
+                    v += precon->values[col + row * block + jdx * blkdim] * b[col + cind * block];
                 arr[row] -= v;
             }
         }
 
         // LU substitution for vector
-        lusub(block, &(bilu->values[dd*blkdim]), arr);
+        lusub(block, &(precon->values[dd*blkdim]), arr);
         for (row=0; row<block; row++) b[idx*block+row] = arr[row];
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -137,15 +137,14 @@ ucfd_status_t BILUPreconDestroy(Precon precon)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDCreateBILU(Precon *precon, UCFDInt bn, UCFDInt block, UCFDReal *values)
+ucfd_status_t UCFDPreconSetBILU(Precon *precon, UCFDInt bn, UCFDInt block)
 {
     Precon pc = *precon;
     Precon_BILU *bilu = (Precon_BILU *)calloc(1, sizeof(*bilu));
-    UCFDNullCheck(bilu, "BILU precon allocation failed\n");
+    UCFDCheckNull(bilu, "BILU precon allocation failed\n");
 
     bilu->bn            = bn;
     bilu->block         = block;
-    bilu->values        = values;
     bilu->iw            = (UCFDInt *)malloc((size_t)bn*sizeof(UCFDInt));
     
     /* Initialize working array */

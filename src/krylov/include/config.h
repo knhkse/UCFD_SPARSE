@@ -50,3 +50,8 @@
     #endif
 #endif
 
+#if defined(USE_CUDA)
+    #if !defined(TPB)
+        #define TPB 128         // Default Threads-per-block size
+    #endif
+#endif

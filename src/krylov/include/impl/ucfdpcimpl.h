@@ -16,6 +16,7 @@ struct _Precon {
     UCFDInt *rowptr;
     UCFDInt *colidx;
     UCFDInt *diagslots;
+    UCFDReal *values;
     void *data;
     struct _PreconOps ops[1];
 };

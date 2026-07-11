@@ -13,11 +13,11 @@ static ucfd_status_t BLUSGSPreconPrepare(Precon precon)
     UCFDInt blkdim = block*block;
     UCFDReal *diagblock;
 
-    OMPWrapper(didx)
+    OMPWrapper(didx, diagblock)
     for (idx=0; idx<bn; idx++) {
         didx = precon->diagslots[idx];
         diagblock = &blu->diagvalues[idx*blkdim];
-        memcpy(diagblock, &blu->values[didx*blkdim], sizeof(UCFDReal)*blkdim);
+        memcpy(diagblock, &precon->values[didx*blkdim], sizeof(UCFDReal)*blkdim);
         ludcmp(block, diagblock);
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -51,7 +51,7 @@ static ucfd_status_t BLUSGSPreconApply(Precon precon, UCFDReal *b)
             {
                 v = 0.0;
                 for (col = 0; col < block; col++)
-                    v += blu->values[col + row * block + jdx * blkdim] * b[col + cind * block];
+                    v += precon->values[col + row * block + jdx * blkdim] * b[col + cind * block];
                 arr[row] -= v;
             }
         }
@@ -80,7 +80,7 @@ static ucfd_status_t BLUSGSPreconApply(Precon precon, UCFDReal *b)
             {
                 v = 0.0;
                 for (col = 0; col < block; col++)
-                    v += blu->values[col + row * block + jdx * blkdim] * b[col + cind * block];
+                    v += precon->values[col + row * block + jdx * blkdim] * b[col + cind * block];
                 arr[row] += v;
             }
         }
@@ -104,7 +104,7 @@ static ucfd_status_t BLUSGSPreconDestroy(Precon precon)
 }
 
 
-ucfd_status_t UCFDPreconSetBLUSGS(Precon *precon, UCFDInt bn, UCFDInt block, UCFDReal *values)
+ucfd_status_t UCFDPreconSetBLUSGS(Precon *precon, UCFDInt bn, UCFDInt block)
 {
     UCFDCheckNull(*precon, "Preconditioner must be initialized\n");
     Precon pc = *precon;
@@ -113,7 +113,6 @@ ucfd_status_t UCFDPreconSetBLUSGS(Precon *precon, UCFDInt bn, UCFDInt block, UCF
 
     blu->bn             = bn;
     blu->block          = block;
-    blu->values         = values;
     blu->diagvalues     = (UCFDReal *)calloc((size_t)bn*block*block, sizeof(UCFDReal));
 
     pc->type_name       = BLUSGS;

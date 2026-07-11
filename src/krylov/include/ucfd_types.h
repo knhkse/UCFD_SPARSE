@@ -21,8 +21,7 @@
 typedef enum
 {
     UCFD_SUCCESS = 0,
-    UCFD_FAILED  = 1,
-    UCFD_DIVERGED = 2
+    UCFD_FAILED  = 1
 } ucfd_status_t;
 
 

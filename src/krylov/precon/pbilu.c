@@ -26,11 +26,11 @@ static ucfd_status_t PBILUPreconPreparePerColor(UCFDInt nstart, UCFDInt nend, Pr
             ked = precon -> rowptr[ck+1];
             
             // A[i,k] := A[i,k] @ inv(A[k,k])
-            lusubmattrans(block, &(bilu->values[kk*blkdim]), &(bilu->values[kdx*blkdim]));
+            lusubmattrans(block, &(precon->values[kk*blkdim]), &(precon->values[kdx*blkdim]));
             // memcpy(Aik, &values[kdx*blkdim], sizeof(double)*block);
             for (row=0; row<block; row++) {
                 for (col=0; col<block; col++)
-                    Aik[row][col] = bilu->values[kdx*blkdim+row*block+col];
+                    Aik[row][col] = precon->values[kdx*blkdim+row*block+col];
             }
 
             // Prepare iw
@@ -46,8 +46,8 @@ static ucfd_status_t PBILUPreconPreparePerColor(UCFDInt nstart, UCFDInt nend, Pr
                         for (col=0; col<block; col++) {
                             v = 0.0;
                             for (ele=0; ele<block; ele++)
-                                v += Aik[row][ele] * bilu->values[iwj*blkdim+ele*block+col];
-                            bilu->values[jj*blkdim+row*block+col] -= v;
+                                v += Aik[row][ele] * precon->values[iwj*blkdim+ele*block+col];
+                            precon->values[jj*blkdim+row*block+col] -= v;
                         }
                     }
                 }
@@ -57,7 +57,7 @@ static ucfd_status_t PBILUPreconPreparePerColor(UCFDInt nstart, UCFDInt nend, Pr
             for (jj=kst; jj<ked; jj++) bilu->iw[precon -> colidx[jj]] = -1;
         }
         // LU decomposition of current row diagonal matrix
-        ludcmp(block, &(bilu->values[ed*blkdim]));
+        ludcmp(block, &(precon->values[ed*blkdim]));
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -103,7 +103,7 @@ static ucfd_status_t PBILUPreconLowerApply(UCFDInt nstart, UCFDInt nend, Precon 
             {
                 v = 0.0;
                 for (col = 0; col < block; col++)
-                    v += bilu->values[col + row * block + jdx * blkdim] * b[col + cind * block];
+                    v += precon->values[col + row * block + jdx * blkdim] * b[col + cind * block];
                 arr[row] -= v;
             }
         }
@@ -144,13 +144,13 @@ static ucfd_status_t PBILUPreconUpperApply(UCFDInt nstart, UCFDInt nend, Precon 
             {
                 v = 0.0;
                 for (col = 0; col < block; col++)
-                    v += bilu->values[col + row * block + jdx * blkdim] * b[col + cind * block];
+                    v += precon->values[col + row * block + jdx * blkdim] * b[col + cind * block];
                 arr[row] -= v;
             }
         }
 
         // LU substitution for vector
-        lusub(block, &(bilu->values[dd*blkdim]), arr);
+        lusub(block, &(precon->values[dd*blkdim]), arr);
         for (row=0; row<block; row++) b[idx*block+row] = arr[row];
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -172,21 +172,20 @@ static ucfd_status_t PBILUPreconApply(Precon precon, UCFDReal *b)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDCreatePBILU(Precon *precon, UCFDInt bn, UCFDInt block, UCFDInt ncolors, UCFDInt *icolors, UCFDReal *values)
+ucfd_status_t UCFDPreconSetPBILU(Precon *precon, UCFDInt bn, UCFDInt block, UCFDInt ncolors, UCFDInt *icolors)
 {
     Precon pc = *precon;
     Precon_PBILU *pbilu = (Precon_PBILU *)calloc(1, sizeof(*pbilu));
-    UCFDNullCheck(pbilu, "BILU precon allocation failed\n");
+    UCFDCheckNull(pbilu, "PBILU precon allocation failed\n");
 
     ((Precon_BILU *)pbilu)->bn          = bn;
     ((Precon_BILU *)pbilu)->block       = block;
-    ((Precon_BILU *)pbilu)->values      = values;
     ((Precon_BILU *)pbilu)->iw          = (UCFDInt *)malloc((size_t)bn*sizeof(UCFDInt));
     pbilu->ncolors                      = ncolors;
     pbilu->icolors                      = icolors;
 
     /* Initialize working array */
-    for (UCFDInt i = 0; i < bn; i++) pbilu->parent.iw[i] = -1;
+    for (UCFDInt i = 0; i < bn; i++) ((Precon_BILU *)pbilu)->iw[i] = -1;
 
     pc->type_name                       = PBILU;
     pc->data                            = pbilu;

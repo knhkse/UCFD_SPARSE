@@ -35,6 +35,7 @@
     #define OMPSumReduction(...)
 #endif
 
+#define UCFDWarning(msg) fprintf(stderr, msg);
 
 #define UCFDCheckNull(obj, msg)                                             \
     do {                                                                    \
@@ -48,8 +49,6 @@
     do {                                                                    \
         if (obj1 != obj2) fprintf(stderr, __VA_ARGS__);                     \
     } while (0)
-
-
 
 
 /**

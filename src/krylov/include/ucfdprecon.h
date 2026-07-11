@@ -14,13 +14,13 @@ typedef const char *PreconType;
 
 
 /* General functions */
-// UCFD_EXTERN ucfd_status_t UCFDPreconInitfromMatrix(Precon*, SpMat, UCFDInt*);
-UCFD_EXTERN ucfd_status_t UCFDPreconInitfromArrays(Precon*, UCFDInt*, UCFDInt*, UCFDInt*);
-UCFD_EXTERN ucfd_status_t UCFDPreconPrep(Precon);
+UCFD_EXTERN ucfd_status_t UCFDPreconCreatefromMatrix(Precon*, SpMat, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDPreconCreatefromArrays(Precon*, UCFDInt*, UCFDInt*, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDPreconPrepare(Precon);
 UCFD_EXTERN ucfd_status_t UCFDPreconDestroy(Precon*);
 
 /* Specific functions */
-UCFD_EXTERN ucfd_status_t UCFDCreateBILU(Precon*, UCFDInt, UCFDInt, UCFDReal*);
-UCFD_EXTERN ucfd_status_t UCFDCreateBLUSGS(Precon*, UCFDInt, UCFDInt, UCFDReal*);
-UCFD_EXTERN ucfd_status_t UCFDCreatePBILU(Precon*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*, UCFDReal*);
-UCFD_EXTERN ucfd_status_t UCFDCreateNonePrecon(Precon*);
+UCFD_EXTERN ucfd_status_t UCFDPreconSetBILU(Precon*, UCFDInt, UCFDInt);
+UCFD_EXTERN ucfd_status_t UCFDPreconSetBLUSGS(Precon*, UCFDInt, UCFDInt);
+UCFD_EXTERN ucfd_status_t UCFDPreconSetPBILU(Precon*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);
+UCFD_EXTERN ucfd_status_t UCFDPreconCreateNone(Precon*);
