@@ -104,3 +104,14 @@
         }                                                                   \
     } while (0)
 
+#define CheckCUDAPointer(ptr)                                               \
+    do {                                                                    \
+        UCFDCheckNull(ptr, "Null pointer is given\n");                      \
+        struct cudaPointerAttributes attr;                                  \
+        CUDACall(cudaPointerGetAttributes(&attr, ptr));                     \
+        if (attr.type != cudaMemoryTypeDevice) {                            \
+            fprintf(stderr, "%s:%d : Device pointer must be passed\n",      \
+                    __FILE__, __LINE__);                                    \
+            exit(EXIT_FAILURE);                                             \
+        }                                                                   \
+    } while (0)

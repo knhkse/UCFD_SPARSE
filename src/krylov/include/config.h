@@ -33,6 +33,7 @@
  * Intel MKL configuration
  */
 #if defined(USE_MKL)
+    #include <mkl.h>
     #if defined(MKL_MEMTYPE_AGGRESIVE)
         #define MKL_MEMTYPE SPARSE_MEMORY_AGGRESSIVE
     #else
@@ -50,8 +51,25 @@
     #endif
 #endif
 
+/**
+ * CUDA configuration
+ */
 #if defined(USE_CUDA)
     #if !defined(TPB)
         #define TPB 128         // Default Threads-per-block size
+    #endif
+#endif
+
+#if defined(USE_CUSPARSE)
+    #if defined(UCFD_INT64)
+        #define CUSPARSE_INTTYPE CUSPARSE_INDEX_64I
+    #else
+        #define CUSPARSE_INTTYPE CUSPARSE_INDEX_32I
+    #endif
+
+    #if defined(UCFD_FLOAT32)
+        #define CUSPARSE_REALTYPE CUDA_R_32F
+    #else
+        #define CUSPARSE_REALTYPE CUDA_R_64F
     #endif
 #endif

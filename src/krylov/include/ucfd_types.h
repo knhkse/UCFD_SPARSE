@@ -2,13 +2,9 @@
  * @file        ucfd_types.h
  * @brief       Header file for UCFD_SPRASE Library types
  */
-#ifndef _UCFD_TYPES_H
-#define _UCFD_TYPES_H
-#include <stdbool.h>
-#if defined(USE_MKL)
-    #include <mkl.h>
-#endif
+#pragma once
 
+#include <stdbool.h>
 #include "config.h"
 #include "macros.h"
 
@@ -44,6 +40,3 @@ typedef enum
 } ucfd_precon_type_t;
 
 typedef bool UCFDBool;
-
-
-#endif  // _UCFD_TYPES_H

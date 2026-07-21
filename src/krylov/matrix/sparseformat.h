@@ -41,9 +41,34 @@ typedef struct {
 #endif
 
 
-#if defined(USE_CUDA)
+#if defined(USE_CUSPARSE)
+typedef struct {
+    cusparseHandle_t handle;
+    cusparseSpMatDescr_t op;
+    cusparseDnVecDescr_t vecX, vecY;
+    void *buffer;
+    size_t buffersize;
+    UCFDReal *tmp;
+} cuSPARSEContext;
+
+typedef struct {
+    cusparseHandle_t handle;
+    cusparseMatDescr_t descr;
+} cuSPARSEContext_legacy;
 
 
+typedef struct {
+    cuSPARSEContext ctx;
+} SpMat_CUSPARSECSR;
 
-
+typedef struct {
+#if CUSPARSE_VER_MAJOR >= 13
+    cuSPARSEContext ctx;
+#else
+    cuSPARSEContext_legacy ctx;
+#endif
+    UCFDInt bn;
+    UCFDInt block;
+    UCFDInt bnnz;
+} SpMat_CUSPARSEBSR;
 #endif

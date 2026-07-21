@@ -10,13 +10,20 @@ typedef const char *SpMatType;
 #define BSR             "bsr"
 #define MKLCSR          "mklcsr"
 #define MKLBSR          "mklbsr"
+#define CUDACSR         "cudacsr"
+#define CUSPCSR         "cusparsecsr"
+#define CUDABSR         "cudabsr"
+#define CUSPBSR         "cusparsebsr"
 
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 /* Matrix lifecycle API */
 UCFD_EXTERN ucfd_status_t UCFDMatInit(SpMat*);
 UCFD_EXTERN ucfd_status_t UCFDMatDestroy(SpMat*);
 UCFD_EXTERN ucfd_status_t UCFDMatMult(UCFDReal, SpMat, UCFDReal*, UCFDReal, UCFDReal*);
-
 
 /* Matrix Setting API */
 UCFD_EXTERN ucfd_status_t MatCreateBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
@@ -24,4 +31,16 @@ UCFD_EXTERN ucfd_status_t MatCreateCSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFD
 #if defined(USE_MKL)
 UCFD_EXTERN ucfd_status_t MatCreateMKLBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t MatCreateMKLCSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+#endif
+#if defined(USE_CUDA)
+UCFD_EXTERN ucfd_status_t MatCreateCUDACSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t MatCreateCUDABSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+#endif
+#if defined(USE_CUSPARSE)
+UCFD_EXTERN ucfd_status_t MatCreateCUSPARSECSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t MatCreateCUSPARSEBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+#endif
+
+#if defined(__cplusplus)
+}
 #endif

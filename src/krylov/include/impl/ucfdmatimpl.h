@@ -25,8 +25,3 @@ struct _SpMat {
     struct _SpMatOps ops[1];
 };
 
-
-
-
-
-
