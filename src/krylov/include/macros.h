@@ -3,24 +3,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "ucfd_types.h"
-
-#if defined(USE_MKL)
-    #include <mkl.h>
-#endif
-
-#if defined(USE_CUDA)
-    #include <cuda_runtime.h>
-#endif
-
-#if defined(USE_CUBLAS)
-    #include <cublas_v2.h>
-#endif
-
-#if defined(USE_CUSPARSE)
-    #include <cusparse.h>
-#endif
-
+/**
+ * Vendor headers (mkl.h, cuda_runtime.h, cublas_v2.h, cusparse.h) are owned
+ * by config.h. This file must be reachable only through ucfd_types.h (which
+ * includes config.h first), never included on its own or before config.h -
+ * otherwise the *Call macros below reference vendor status types that don't
+ * exist yet.
+ */
 
 #define UCFDFunctionReturn(...) return __VA_ARGS__
 #define UCFD_EXTERN extern __attribute__((visibility("default")))
