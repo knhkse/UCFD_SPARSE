@@ -52,7 +52,6 @@ ucfd_status_t UCFDPreconPrepare(Precon precon)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
 ucfd_status_t UCFDPreconDestroy(Precon *precon)
 {
     if (!precon || !*precon) UCFDFunctionReturn(UCFD_SUCCESS);

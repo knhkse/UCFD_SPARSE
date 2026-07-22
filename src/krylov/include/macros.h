@@ -24,7 +24,7 @@
     #define OMPSumReduction(...)
 #endif
 
-#define UCFDWarning(msg) fprintf(stderr, msg);
+#define UCFDWarning(msg) fprintf(stderr, "%s", msg);
 
 #define UCFDCheckNull(obj, msg)                                             \
     do {                                                                    \

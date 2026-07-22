@@ -9,8 +9,6 @@
 #include <float.h>
 #include <inttypes.h>
 
-// TODO : Auto-generation by Makefile
-
 /**
  * Integer type designation
  */

@@ -6,7 +6,9 @@
 
 
 __global__ static void
-_SpMV_CUDACSR(UCFDReal alpha, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values, UCFDReal *x, UCFDReal beta, UCFDReal *y)
+_SpMV_CUDACSR(UCFDReal alpha, UCFDInt n,
+              UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values,
+              UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
     UCFDInt idx, jdx, rs, ed;
     UCFDReal s;
@@ -68,7 +70,9 @@ MatCreateCUDACSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDRe
 
 template<UCFDInt blk>
 __global__ static void
-_SpMV_CUDABSR(UCFDReal alpha, UCFDInt bn, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values, UCFDReal *x, UCFDReal beta, UCFDReal *y)
+_SpMV_CUDABSR(UCFDReal alpha, UCFDInt bn,
+              UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values,
+              UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
     UCFDInt idx, jdx, kdx, row, col, st, ed;
     UCFDReal v, mat[blk*blk], arr[blk], xprt[blk];

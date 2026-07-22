@@ -195,10 +195,3 @@ ucfd_status_t UCFDPreconSetPBILU(Precon *precon, UCFDInt bn, UCFDInt block, UCFD
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
-
-
-
-
-
-
-
