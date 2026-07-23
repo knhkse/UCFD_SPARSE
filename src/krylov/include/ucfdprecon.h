@@ -20,6 +20,7 @@ extern "C" {
 /* General functions */
 UCFD_EXTERN ucfd_status_t UCFDPreconCreatefromMatrix(Precon*, SpMat, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDPreconCreatefromArrays(Precon*, UCFDInt*, UCFDInt*, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDPreconCreateNone(Precon*);
 UCFD_EXTERN ucfd_status_t UCFDPreconPrepare(Precon);
 UCFD_EXTERN ucfd_status_t UCFDPreconDestroy(Precon*);
 
@@ -27,8 +28,6 @@ UCFD_EXTERN ucfd_status_t UCFDPreconDestroy(Precon*);
 UCFD_EXTERN ucfd_status_t UCFDPreconSetBILU(Precon*, UCFDInt, UCFDInt);
 UCFD_EXTERN ucfd_status_t UCFDPreconSetBLUSGS(Precon*, UCFDInt, UCFDInt);
 UCFD_EXTERN ucfd_status_t UCFDPreconSetPBILU(Precon*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);
-UCFD_EXTERN ucfd_status_t UCFDPreconCreateNone(Precon*);
-
 #if defined(USE_CUDA)
 UCFD_EXTERN ucfd_status_t UCFDPreconSetCUDABILU(Precon*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);
 #endif

@@ -51,20 +51,17 @@
 
 /**
  * CUDA configuration
+ * Import cuBLAS automatically
+ * Currently, Krylov subspace methods for CUDA computation
+ * require cuBLAS functions
  */
 #if defined(USE_CUDA)
     #include <cuda_runtime.h>
+    #include <cublas_v2.h>
 
     #if !defined(TPB)
         #define TPB 128         // Default Threads-per-block size
     #endif
-#endif
-
-/**
- * cuBLAS configuration
- */
-#if defined(USE_CUBLAS)
-    #include <cublas_v2.h>
 #endif
 
 /**

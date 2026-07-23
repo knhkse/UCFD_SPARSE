@@ -1,10 +1,11 @@
 #include "gmres.h"
 
 
-static ucfd_status_t Arnoldi_CGS2(Solver solver, Precon pc, SpMat A, UCFDInt n, UCFDInt j, UCFDReal *wnorm)
+static ucfd_status_t arnoldi_cgs2(Solver solver, Precon pc, SpMat A, UCFDInt j, UCFDReal *wnorm)
 {
     Solver_GMRES *gmres = (Solver_GMRES *)solver->data;
     const UCFDInt k = j + 1;
+    UCFDInt n = A->n;
     UCFDReal hsub;
 
     UCFDReal *Vj = gmres->V;
@@ -49,8 +50,8 @@ static ucfd_status_t GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, 
 
     const UCFDInt m = gmres->restart;
     const UCFDInt ld = m + 1;
-    UCFDInt iter = 0, i, j, jj, k, s, c;
-    UCFDReal wnorm, beta, *Hcol, t, rr, h1, h2, sum;
+    UCFDInt iter = 0, i, j, jj, k;
+    UCFDReal wnorm, beta, *Hcol, t, rr, h1, h2, sum, s, c;
     UCFDReal abeta = 0.0; /* Absolute residual */
     
     /**
@@ -80,7 +81,7 @@ static ucfd_status_t GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, 
         for (j=0; j<m; j++)
         {
             /* Arnoldi iteration */
-            UCFDCall(Arnoldi_CGS2(solver, pc, A, n, j, &wnorm));
+            UCFDCall(arnoldi_cgs2(solver, pc, A, j, &wnorm));
             Hcol = gmres->H + (size_t)j * ld;
 
             /* Givens rotation */
@@ -122,7 +123,6 @@ static ucfd_status_t GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, 
         /* Update residual */
         solver->ops->dcopy(n, gmres->r, b);
         UCFDCall(UCFDSpMV(-1.0, A, x, 1.0, gmres->r));
-        beta = solver->ops->dnorm2(n, b);
 
         iter++;
     }
@@ -162,7 +162,6 @@ ucfd_status_t UCFDCreateGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxi
     Solver_GMRES *gmres = (Solver_GMRES *)calloc(1, sizeof(*gmres));
     UCFDCheckNull(gmres, "GMRES solver allocation failed\n");
 
-    gmres->restart = m;
     /* Allocate working arrays */
     gmres->H = (UCFDReal *)calloc((size_t)(m+1)*m, sizeof(UCFDReal));
     gmres->V = (UCFDReal *)calloc((size_t)n*(m+1), sizeof(UCFDReal));
@@ -173,10 +172,11 @@ ucfd_status_t UCFDCreateGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxi
     gmres->htmp = (UCFDReal *)calloc((size_t)(m+1), sizeof(UCFDReal));
     gmres->r = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
 
-    s->tol = tol;
-    s->maxiter = maxiter;
-    s->data = gmres;
-    s->ops[0] = GMRESOps;
+    gmres->restart  = m;
+    s->tol          = tol;
+    s->maxiter      = maxiter;
+    s->data         = gmres;
+    s->ops[0]       = GMRESOps;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

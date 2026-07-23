@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mkl.h>
 #include "ucfd_types.h"
 
 

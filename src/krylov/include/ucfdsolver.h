@@ -10,6 +10,9 @@ typedef const char *SolverType;
 #define BICGSTAB        "bicgstab"
 
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 UCFD_EXTERN ucfd_status_t UCFDSolverInit(Solver*);
 UCFD_EXTERN ucfd_status_t UCFDSolverDestroy(Solver*);
@@ -18,5 +21,10 @@ UCFD_EXTERN ucfd_status_t UCFDGetSolveResult(Solver, UCFDInt*, UCFDReal*);
 
 UCFD_EXTERN ucfd_status_t UCFDCreateGMRES(Solver*, UCFDInt, UCFDInt, UCFDInt, UCFDReal);
 UCFD_EXTERN ucfd_status_t UCFDCreateBICGSTAB(Solver*, UCFDInt, UCFDInt, UCFDReal);
+#if defined(USE_CUDA)
+UCFD_EXTERN ucfd_status_t UCFDCreateCUDAGMRES(Solver*, UCFDInt, UCFDInt, UCFDInt, UCFDReal);
+#endif
 
-
+#if defined(__cplusplus)
+}
+#endif
