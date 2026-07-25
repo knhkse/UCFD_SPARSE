@@ -1,7 +1,8 @@
 #pragma once
-
 #include "ucfdmatimpl.h"
 
+/* Empty kernel (do nothing) */
+static inline ucfd_status_t UCFDEmptyKernel(SpMat mat) {UCFDFunctionReturn(UCFD_SUCCESS);}
 
 /**
  * BSR matrix
@@ -11,14 +12,12 @@ typedef struct {
     UCFDInt block;
 } SpMat_BSR;
 
-
 /**
  * CSR matrix
  */
 typedef struct {
     char dummy;     /* Dummy component */
 } SpMat_CSR;
-
 
 /**
  * MKL matrix format
@@ -40,7 +39,9 @@ typedef struct {
 } SpMat_MKLBSR;
 #endif
 
-
+/**
+ * cuSPARSE matrix format
+ */
 #if defined(USE_CUSPARSE)
 typedef struct {
     cusparseHandle_t handle;

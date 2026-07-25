@@ -4,7 +4,7 @@
 void basedaxpy(UCFDInt n, UCFDReal alpha, UCFDReal *x, UCFDReal *y)
 {
     UCFDInt i;
-    OMPWrapper()
+    OMPFOR
     for (i=0; i<n; i++) y[i] += alpha*x[i];
 }
 
@@ -30,7 +30,7 @@ UCFDReal baseddot(UCFDInt n, UCFDReal *x, UCFDReal *y)
 void basedscal(UCFDInt n, UCFDReal alpha, UCFDReal *arr)
 {
     UCFDInt i;
-    OMPWrapper()
+    OMPFOR
     for (i=0; i<n; i++) arr[i] = alpha*arr[i];
 }
 

@@ -4,8 +4,6 @@
 #include "sparseformat.h"
 
 
-static inline ucfd_status_t UCFDEmptyKernel(SpMat mat) {UCFDFunctionReturn(UCFD_SUCCESS);}
-
 /**
  * CSR Matrix Format
  */

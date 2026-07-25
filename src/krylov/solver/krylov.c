@@ -39,10 +39,11 @@ ucfd_status_t UCFDSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDSolverGetResult(Solver solver, UCFDInt *iter, UCFDReal *residual)
+ucfd_status_t UCFDSolverGetResult(Solver solver, UCFDInt *stat, UCFDInt *iter, UCFDReal *residual)
 {
-    *iter = solver->itnum;
-    *residual = solver->residual;
+    *stat       = solver->stat;
+    *iter       = solver->itnum;
+    *residual   = solver->residual;
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 

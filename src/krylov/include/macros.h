@@ -14,14 +14,17 @@
 #define UCFDFunctionReturn(...) return __VA_ARGS__
 #define UCFD_EXTERN extern __attribute__((visibility("default")))
 #define UCFD_INTERN extern __attribute__((visibility("hidden")))
+#define MAYBE_UNUSED __attribute__((unused))
 
 #if defined(USE_OMP)
     #define pragma_indvars(x) _Pragma(#x)
     #define OMPWrapper(...) pragma_indvars(omp parallel for private(__VA_ARGS__))
     #define OMPSumReduction(...) pragma_indvars(omp parallel for reduction(+:__VA_ARGS__))
+    #define OMPFOR pragma_indvars(omp parallel for)
 #else
     #define OMPWrapper(...)
     #define OMPSumReduction(...)
+    #define OMPFOR
 #endif
 
 #define UCFDWarning(msg) fprintf(stderr, "%s", msg);

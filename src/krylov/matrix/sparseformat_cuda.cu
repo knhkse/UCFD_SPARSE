@@ -37,8 +37,6 @@ SpMV_CUDACSR(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal beta, UCFDReal *y)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static inline ucfd_status_t UCFDEmptyKernel(SpMat mat) {UCFDFunctionReturn(UCFD_SUCCESS);}
-
 extern "C" ucfd_status_t
 MatCreateCUDACSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {

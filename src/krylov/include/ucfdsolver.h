@@ -18,7 +18,7 @@ UCFD_EXTERN ucfd_status_t UCFDSolverInit(Solver*);
 UCFD_EXTERN ucfd_status_t UCFDSolverDestroy(Solver*);
 UCFD_EXTERN ucfd_status_t UCFDSolve(Solver, Precon, SpMat, UCFDReal*, UCFDReal*);
 
-UCFD_EXTERN ucfd_status_t UCFDSolverGetResult(Solver, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDSolverGetResult(Solver, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDSolverTraceResidualHistory(Solver);
 UCFD_EXTERN ucfd_status_t UCFDSolverGetResidualHistory(Solver, UCFDReal*);
 
