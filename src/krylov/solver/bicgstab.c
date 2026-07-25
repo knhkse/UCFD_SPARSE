@@ -8,7 +8,8 @@ static ucfd_status_t fused_reduction(UCFDReal *rt, UCFDReal *s, UCFDReal *t,
 {
     UCFDInt k;
     UCFDReal a = 0.0, b = 0.0, c = 0.0, d = 0.0, e = 0.0;
-    #pragma omp parallel for schedule(static) reduction(+:a,b,c,d,e)
+    /* TODO : Revision needed */
+    // #pragma omp parallel for schedule(static) reduction(+:a,b,c,d,e)
     for (k=0; k<n; k++) {
         UCFDReal sk=s[k], tk=t[k], rk=rt[k];
         a += rk * sk;   /* phi = (r~, s) */
@@ -103,6 +104,7 @@ static ucfd_status_t BICGSTABSolve(Solver solver, Precon pc, SpMat A, UCFDReal *
 
         rho_new = phi - omega*rtt;
         resnorm = sqrt(fabs(ss - 2.0*omega*ts + omega*omega*tt));
+        solver->ops->record(solver, iter, resnorm);
 
         if (resnorm < solver->tol) {
             solver->stat = CONVERGED;
@@ -116,7 +118,7 @@ static ucfd_status_t BICGSTABSolve(Solver solver, Precon pc, SpMat A, UCFDReal *
     }
 done:
     if (iter == solver->maxiter) solver->stat = REACH_ITERMAX;
-    solver->subiter = iter;
+    solver->itnum = iter;
     solver->residual = resnorm;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -141,7 +143,8 @@ static ucfd_status_t UCFDDestroyBICGSTAB(Solver solver)
 static struct _SolverOps BICGSTABOps = {
     BICGSTABSolve,
     UCFDDestroyBICGSTAB,
-    BLASFUNCS
+    BLASFUNCS,
+    UCFDEmptyKernel
 };
 
 ucfd_status_t UCFDCreateBICGSTAB(Solver *solver, UCFDInt n, UCFDInt maxiter, UCFDReal tol)

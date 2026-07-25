@@ -83,6 +83,7 @@ GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
     {
         /* Convergence check */
         CUBLASCall(cublasDnrm2(gmres->handle, n, gmres->d_r, 1, &abeta));
+        solver->ops->record(solver, iter, abeta);
         if (abeta <= solver->tol) {
             solver->stat = CONVERGED;
             break;
@@ -161,7 +162,7 @@ GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
     }
     if (iter == solver->maxiter) solver->stat = REACH_ITERMAX;
     solver->residual    = abeta;
-    solver->subiter     = iter;
+    solver->itnum     = iter;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

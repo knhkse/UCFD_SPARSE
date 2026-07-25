@@ -66,6 +66,7 @@ static ucfd_status_t GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, 
     {
         /* Convergence check */
         abeta = solver->ops->dnorm2(n, gmres->r);
+        solver->ops->record(solver, iter, abeta);
         if (abeta <= solver->tol) {
             solver->stat = CONVERGED;
             break;
@@ -128,7 +129,7 @@ static ucfd_status_t GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, 
     }
     if (iter == solver->maxiter) solver->stat = REACH_ITERMAX;
     solver->residual = abeta;
-    solver->subiter = iter;
+    solver->itnum = iter;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -151,7 +152,8 @@ static ucfd_status_t UCFDDestroyGMRES(Solver solver)
 static struct _SolverOps GMRESOps = {
     GMRESSolve,
     UCFDDestroyGMRES,
-    BLASFUNCS
+    BLASFUNCS,
+    UCFDEmptyKernel
 };
 
 ucfd_status_t UCFDCreateGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxiter, UCFDReal tol)
