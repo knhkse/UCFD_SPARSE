@@ -40,6 +40,9 @@ struct _SolverOps {
     void (*dscal)(UCFDInt, UCFDReal, UCFDReal*);
     void (*dgemvcol)(UCFDInt, UCFDInt, UCFDInt, UCFDReal, UCFDReal*, UCFDReal*, UCFDReal, UCFDReal*);
     void (*dgemvcoltrans)(UCFDInt, UCFDInt, UCFDInt, UCFDReal, UCFDReal*, UCFDReal*, UCFDReal, UCFDReal*);
+
+    /* et cetera... */
+    ucfd_status_t (*record)(Solver, UCFDInt, UCFDReal);
 };
 
 struct _Solver {
@@ -47,9 +50,10 @@ struct _Solver {
     UCFDReal tol;
     UCFDReal haptol;
     UCFDInt maxiter;
-    UCFDInt subiter;
+    UCFDInt itnum;
     UCFDReal residual;
     ucfd_solver_t stat;
+    UCFDReal *hist_residual;
     void *data;
     struct _SolverOps ops[1];
 };
@@ -68,3 +72,5 @@ static inline ucfd_status_t UCFDSpMV(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDR
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+static inline ucfd_status_t UCFDEmptyKernel(Solver solver, UCFDInt iter, UCFDReal res)
+{UCFDFunctionReturn(UCFD_SUCCESS);}
