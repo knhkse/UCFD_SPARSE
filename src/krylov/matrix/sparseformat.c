@@ -25,7 +25,7 @@ static ucfd_status_t SpMV_CSR(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal bet
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t MatCreateCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+ucfd_status_t UCFDMatCreateCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
     UCFDCall(UCFDMatInit(mat));
     SpMat m = *mat;
@@ -97,7 +97,7 @@ static ucfd_status_t SpMV_BSR(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal bet
 }
 
 
-ucfd_status_t MatCreateBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+ucfd_status_t UCFDMatCreateBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
     UCFDCall(UCFDMatInit(mat));
     SpMat m = *mat;
@@ -141,7 +141,7 @@ static ucfd_status_t Destroy_MKL(SpMat mat)
     UCFDFunctionReturn(UCFD_SUCCESS);    
 }
 
-ucfd_status_t MatCreateMKLBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+ucfd_status_t UCFDMatCreateMKLBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
     UCFDCall(UCFDMatInit(mat));
     SpMat m = *mat;
@@ -183,7 +183,7 @@ ucfd_status_t MatCreateMKLBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowp
 }
 
 
-ucfd_status_t MatCreateMKLCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+ucfd_status_t UCFDMatCreateMKLCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
     UCFDCall(UCFDMatInit(mat));
     SpMat m = *mat;

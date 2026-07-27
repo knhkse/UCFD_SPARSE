@@ -156,7 +156,7 @@ static struct _SolverOps GMRESOps = {
     UCFDEmptyKernel
 };
 
-ucfd_status_t UCFDCreateGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxiter, UCFDReal tol)
+ucfd_status_t UCFDSolverCreateGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxiter, UCFDReal tol)
 {
     UCFDCall(UCFDSolverInit(solver));
     Solver s = *solver;

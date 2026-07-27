@@ -22,10 +22,10 @@ UCFD_EXTERN ucfd_status_t UCFDSolverGetResult(Solver, UCFDInt*, UCFDInt*, UCFDRe
 UCFD_EXTERN ucfd_status_t UCFDSolverTraceResidualHistory(Solver);
 UCFD_EXTERN ucfd_status_t UCFDSolverGetResidualHistory(Solver, UCFDReal*);
 
-UCFD_EXTERN ucfd_status_t UCFDCreateGMRES(Solver*, UCFDInt, UCFDInt, UCFDInt, UCFDReal);
-UCFD_EXTERN ucfd_status_t UCFDCreateBICGSTAB(Solver*, UCFDInt, UCFDInt, UCFDReal);
+UCFD_EXTERN ucfd_status_t UCFDSolverCreateGMRES(Solver*, UCFDInt, UCFDInt, UCFDInt, UCFDReal);
+UCFD_EXTERN ucfd_status_t UCFDSolverCreateBICGSTAB(Solver*, UCFDInt, UCFDInt, UCFDReal);
 #if defined(USE_CUDA)
-UCFD_EXTERN ucfd_status_t UCFDCreateCUDAGMRES(Solver*, UCFDInt, UCFDInt, UCFDInt, UCFDReal);
+UCFD_EXTERN ucfd_status_t UCFDSolverCreateCUDAGMRES(Solver*, UCFDInt, UCFDInt, UCFDInt, UCFDReal);
 #endif
 
 #if defined(__cplusplus)

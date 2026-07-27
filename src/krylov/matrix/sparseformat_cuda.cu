@@ -38,7 +38,7 @@ SpMV_CUDACSR(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 }
 
 extern "C" ucfd_status_t
-MatCreateCUDACSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+UCFDMatCreateCUDACSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
     UCFDCall(UCFDMatInit(mat));
     SpMat m = *mat;
@@ -131,7 +131,7 @@ SpMV_CUDABSR(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 }
 
 extern "C" ucfd_status_t
-MatCreateCUDABSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+UCFDMatCreateCUDABSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
     UCFDCall(UCFDMatInit(mat));
     SpMat m = *mat;
@@ -217,7 +217,7 @@ SpMV_CUSPARSE_BSR(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal beta, UCFDReal 
 
 
 extern "C" ucfd_status_t
-MatCreateCUSPARSECSR(SpMat *mat, UCFDInt n, UCFDInt nnz, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+UCFDMatCreateCUSPCSR(SpMat *mat, UCFDInt n, UCFDInt nnz, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
     /* Check if input arrays are allocated in device side */
     CheckCUDAPointer(rowptr);
@@ -272,7 +272,7 @@ MatCreateCUSPARSECSR(SpMat *mat, UCFDInt n, UCFDInt nnz, UCFDInt *rowptr, UCFDIn
 
 
 extern "C" ucfd_status_t
-MatCreateCUSPARSEBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt bnnz, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+UCFDMatCreateCUSPBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt bnnz, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
     /* Check if input arrays are allocated in device side */
     CheckCUDAPointer(rowptr);

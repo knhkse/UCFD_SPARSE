@@ -146,7 +146,7 @@ static struct _SolverOps BICGSTABOps = {
     UCFDEmptyKernel
 };
 
-ucfd_status_t UCFDCreateBICGSTAB(Solver *solver, UCFDInt n, UCFDInt maxiter, UCFDReal tol)
+ucfd_status_t UCFDSolverCreateBICGSTAB(Solver *solver, UCFDInt n, UCFDInt maxiter, UCFDReal tol)
 {
     UCFDCall(UCFDSolverInit(solver));
     Solver s = *solver;

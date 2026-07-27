@@ -194,7 +194,7 @@ static inline UCFDInt pad_to_16B(UCFDInt n, size_t elem_bytes)
 }
 
 extern "C" ucfd_status_t
-UCFDCreateCUDAGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxiter, UCFDReal tol)
+UCFDSolverCreateCUDAGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxiter, UCFDReal tol)
 {
     UCFDCall(UCFDSolverInit(solver));
     Solver s = *solver;
