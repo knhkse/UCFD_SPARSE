@@ -8,8 +8,7 @@ static ucfd_status_t fused_reduction(UCFDReal *rt, UCFDReal *s, UCFDReal *t,
 {
     UCFDInt k;
     UCFDReal a = 0.0, b = 0.0, c = 0.0, d = 0.0, e = 0.0;
-    /* TODO : Revision needed */
-    // #pragma omp parallel for schedule(static) reduction(+:a,b,c,d,e)
+    OMPScheduleStaticSumReduction(a, b, c, d, e)
     for (k=0; k<n; k++) {
         UCFDReal sk=s[k], tk=t[k], rk=rt[k];
         a += rk * sk;   /* phi = (r~, s) */

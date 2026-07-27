@@ -21,10 +21,12 @@
     #define OMPWrapper(...) pragma_indvars(omp parallel for private(__VA_ARGS__))
     #define OMPSumReduction(...) pragma_indvars(omp parallel for reduction(+:__VA_ARGS__))
     #define OMPFOR pragma_indvars(omp parallel for)
+    #define OMPScheduleStaticSumReduction(...) pragma_indvars(omp parallel for schedule(static) reduction(+:__VA_ARGS__))
 #else
     #define OMPWrapper(...)
     #define OMPSumReduction(...)
     #define OMPFOR
+    #define OMPScheduleStaticSumReduction(...)
 #endif
 
 #define UCFDWarning(msg) fprintf(stderr, "%s", msg);
