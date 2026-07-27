@@ -1,4 +1,4 @@
-#include "bilu.h"
+#include "ilu.h"
 #include "inverse.h"
 
 
@@ -129,14 +129,6 @@ static ucfd_status_t BILUPreconApply(Precon precon, UCFDReal *b)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t BILUPreconDestroy(Precon precon)
-{
-    if (!precon) UCFDFunctionReturn(UCFD_SUCCESS);
-    Precon_BILU *bilu = (Precon_BILU *)precon->data;
-    free(bilu->iw);
-    UCFDFunctionReturn(UCFD_SUCCESS);
-}
-
 ucfd_status_t UCFDPreconSetBILU(Precon *precon, UCFDInt bn, UCFDInt block)
 {
     Precon pc = *precon;
@@ -154,7 +146,7 @@ ucfd_status_t UCFDPreconSetBILU(Precon *precon, UCFDInt bn, UCFDInt block)
     pc->data            = bilu;
     pc->ops->prepare    = BILUPreconPrepare;
     pc->ops->apply      = BILUPreconApply;
-    pc->ops->destroy    = BILUPreconDestroy;
+    pc->ops->destroy    = ILUPreconDestroy;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

@@ -1,4 +1,4 @@
-#include "bilu.h"
+#include "ilu.h"
 #include "inverse.h"
 
 
@@ -191,7 +191,7 @@ ucfd_status_t UCFDPreconSetPBILU(Precon *precon, UCFDInt bn, UCFDInt block, UCFD
     pc->data                            = pbilu;
     pc->ops->prepare                    = PBILUPreconPrepare;
     pc->ops->apply                      = PBILUPreconApply;
-    pc->ops->destroy                    = BILUPreconDestroy;
+    pc->ops->destroy                    = ILUPreconDestroy;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

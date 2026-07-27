@@ -2,7 +2,7 @@
 #include <thrust/device_ptr.h>
 #include <thrust/fill.h>
 
-#include "bilu.h"
+#include "ilu.h"
 #include "inverse_cuda.cuh"
 
 
@@ -222,6 +222,7 @@ CUDABILUPreconApply(Precon precon, UCFDReal *b)
 
     switch (pbilu->base.block) {
         case 1:
+            UCFDWarning("Single block size(block=1)::Use ILU preconditioner")
             for (i=0; i<pbilu->ncolors; i++)
                 CUDABILUPreconLowerApply<1><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
@@ -232,7 +233,7 @@ CUDABILUPreconApply(Precon precon, UCFDReal *b)
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-                break;
+            break;
         case 2:
             for (i=0; i<pbilu->ncolors; i++)
                 CUDABILUPreconLowerApply<2><<<bpg, TPB>>>(
@@ -244,7 +245,7 @@ CUDABILUPreconApply(Precon precon, UCFDReal *b)
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-                break;
+            break;
         case 3:
             for (i=0; i<pbilu->ncolors; i++)
                 CUDABILUPreconLowerApply<3><<<bpg, TPB>>>(
@@ -256,7 +257,7 @@ CUDABILUPreconApply(Precon precon, UCFDReal *b)
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-                break;
+            break;
         case 4:
             for (i=0; i<pbilu->ncolors; i++)
                 CUDABILUPreconLowerApply<4><<<bpg, TPB>>>(
@@ -268,7 +269,7 @@ CUDABILUPreconApply(Precon precon, UCFDReal *b)
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-                break;
+            break;
         case 5:
             for (i=0; i<pbilu->ncolors; i++)
                 CUDABILUPreconLowerApply<5><<<bpg, TPB>>>(
@@ -280,7 +281,7 @@ CUDABILUPreconApply(Precon precon, UCFDReal *b)
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-                break;
+            break;
         case 6:
             for (i=0; i<pbilu->ncolors; i++)
                 CUDABILUPreconLowerApply<6><<<bpg, TPB>>>(
@@ -292,7 +293,7 @@ CUDABILUPreconApply(Precon precon, UCFDReal *b)
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-                break;
+            break;
         case 7:
             for (i=0; i<pbilu->ncolors; i++)
                 CUDABILUPreconLowerApply<7><<<bpg, TPB>>>(
@@ -304,7 +305,7 @@ CUDABILUPreconApply(Precon precon, UCFDReal *b)
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-                break;
+            break;
         default: fprintf(stderr, "Unsupported block size\n"); UCFDFunctionReturn(UCFD_FAILED);
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -330,7 +331,7 @@ UCFDPreconSetCUDABILU(Precon *precon, UCFDInt bn, UCFDInt block, UCFDInt ncolors
     CheckCUDAPointer(pc->diagslots);
 
     Precon_PBILU *cudabilu = (Precon_PBILU *)calloc(1, sizeof(*cudabilu));
-    UCFDCheckNull(cudabilu, "PBILU precon allocation failed\n");
+    UCFDCheckNull(cudabilu, "CUDA BILU precon allocation failed\n");
 
     /* Initialize working array */
     CUDACall(cudaMalloc((void**)&((Precon_BILU *)cudabilu)->iw, (size_t)bn*sizeof(UCFDInt)));

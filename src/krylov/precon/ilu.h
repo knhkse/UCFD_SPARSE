@@ -3,9 +3,14 @@
 #include "ucfdpcimpl.h"
 
 typedef struct {
+    UCFDInt *iw;
+    UCFDInt n;
+} Precon_ILU;
+
+typedef struct {
+    UCFDInt *iw;
     UCFDInt bn;
     UCFDInt block;
-    UCFDInt *iw;
 } Precon_BILU;
 
 
@@ -15,5 +20,5 @@ typedef struct {
     UCFDInt *icolors;
 } Precon_PBILU;
 
-
-UCFD_INTERN ucfd_status_t BILUPreconDestroy(Precon precon);
+/* Destroy inner structure */
+UCFD_INTERN ucfd_status_t ILUPreconDestroy(Precon precon);
