@@ -7,7 +7,8 @@ arnoldi_cgs2(Solver solver, Precon pc, SpMat A, UCFDInt j, UCFDReal *wnorm)
 {
     Solver_CUDAGMRES *ctx = (Solver_CUDAGMRES *)solver->data;
     const UCFDInt k = j + 1;
-    UCFDInt n = A->n, m = ctx->restart, ldv = ctx->ldv;
+    const UCFDInt n = ctx->n;
+    const UCFDInt m = ctx->restart, ldv = ctx->ldv;
     UCFDReal one=1.0, zero=0.0, neg=-1.0;
     UCFDReal inv;
 
@@ -68,7 +69,8 @@ GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
     Solver_CUDAGMRES *gmres = (Solver_CUDAGMRES *)solver->data;
     CUBLASCall(cublasSetPointerMode(gmres->handle, CUBLAS_POINTER_MODE_HOST));
 
-    const UCFDInt n = A->n, m = gmres->restart, ldv = gmres->ldv;
+    const UCFDInt n = gmres->n;
+    const UCFDInt m = gmres->restart, ldv = gmres->ldv;
     const UCFDInt ld = m + 1;
     UCFDInt iter = 0, i, j, jj, k;
     UCFDReal wnorm, beta, rr, h1, h2, sum, inv, c, s, yj;
@@ -221,22 +223,23 @@ UCFDSolverCreateCUDAGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxiter,
     CUDACall(cudaMalloc((void**)&gmres->d_r, (size_t)n*sizeof(UCFDReal)));
     CUDACall(cudaMalloc((void**)&gmres->d_proj, (size_t)(2*(m+1)+1)*sizeof(UCFDReal)));
 
-    gmres->restart      = m;
-    gmres->ldv          = ldv;
-    s->tol              = tol;
-    s->maxiter          = maxiter;
-    s->data             = gmres;
-    s->ops->solve       = GMRESSolve;
-    s->ops->destroy     = UCFDDestroyGMRES;
+    gmres->n                = n;
+    gmres->restart          = m;
+    gmres->ldv              = ldv;
+    s->tol                  = tol;
+    s->maxiter              = maxiter;
+    s->data                 = gmres;
+    s->ops->solve           = GMRESSolve;
+    s->ops->destroy         = UCFDDestroyGMRES;
 
     // ! Currently, cuBLAS functions are used in default
-    s->ops->dcopy          = NULL;
-    s->ops->daxpy          = NULL;
-    s->ops->dnorm2         = NULL;
-    s->ops->ddot           = NULL;
-    s->ops->dscal          = NULL;
-    s->ops->dgemvcol       = NULL;
-    s->ops->dgemvcoltrans  = NULL;
+    s->ops->dcopy           = NULL;
+    s->ops->daxpy           = NULL;
+    s->ops->dnorm2          = NULL;
+    s->ops->ddot            = NULL;
+    s->ops->dscal           = NULL;
+    s->ops->dgemvcol        = NULL;
+    s->ops->dgemvcoltrans   = NULL;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

@@ -8,12 +8,12 @@ typedef struct _SpMat *SpMat;
 typedef const char *SpMatType;
 #define CSR             "csr"
 #define BSR             "bsr"
-#define MKLCSR          "mklcsr"
-#define MKLBSR          "mklbsr"
-#define CUDACSR         "cudacsr"
-#define CUSPCSR         "cusparsecsr"
-#define CUDABSR         "cudabsr"
-#define CUSPBSR         "cusparsebsr"
+#define CSRMKL          "mklcsr"
+#define BSRMKL          "mklbsr"
+#define CSRCUDA         "cudacsr"
+#define CSRCUSPARSE     "cusparsecsr"
+#define BSRCUDA         "cudabsr"
+#define BSRCUSPARSE     "cusparsebsr"
 
 
 #if defined(__cplusplus)

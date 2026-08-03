@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ucfdmat.h"
+#include "mpicontext.h"
 
 
 typedef struct _SpMatOps *SpMatOps;
@@ -12,16 +13,10 @@ struct _SpMatOps {
 
 
 struct _SpMat {
-    SpMatType   type_name;
-
-    /* Total matrix size to allocate working arrays */
-    UCFDInt     n;
-
-    /* Sparse arrays for CSR-based format */
-    UCFDInt     *rowptr;
-    UCFDInt     *colidx;
-    UCFDReal    *values;
-    void        *data;
-    struct _SpMatOps ops[1];
+    SpMatType           type_name;
+    void                *A;         // Main matrix
+    void                *B;         // Used for MPI communication
+    MPIContext          ctx;
+    struct _SpMatOps    ops[1];
 };
 

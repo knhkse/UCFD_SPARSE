@@ -20,7 +20,6 @@ extern "C" {
 #endif
 
 /* General functions */
-UCFD_EXTERN ucfd_status_t UCFDPreconCreatefromMatrix(Precon*, SpMat, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDPreconCreatefromArrays(Precon*, UCFDInt*, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDPreconCreateNone(Precon*);
 UCFD_EXTERN ucfd_status_t UCFDPreconPrepare(Precon);

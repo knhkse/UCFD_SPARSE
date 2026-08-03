@@ -7,10 +7,11 @@
 /**
  * CSR Matrix Format
  */
-static ucfd_status_t SpMV_CSR(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal beta, UCFDReal *y)
+static ucfd_status_t SpMV_CSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
     UCFDInt i, rs, ed, j;
     UCFDReal s;
+    BaseCSR *A = (BaseCSR *)mat->A;
 
     OMPWrapper(rs, ed, j, s)
     for (i=0; i<A->n; i++) {
@@ -31,16 +32,14 @@ ucfd_status_t UCFDMatCreateCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *
     SpMat m = *mat;
     m->type_name = CSR;
 
-    SpMat_CSR *csr = (SpMat_CSR *)calloc(1, sizeof(*csr));
+    BaseCSR *csr = (BaseCSR *)calloc(1, sizeof(*csr));
     UCFDCheckNull(csr, "CSR matrix creation failed\n");
-
-    csr->dummy          = 'c';
     
-    m->n                = n;
-    m->rowptr           = rowptr;
-    m->colidx           = colidx;
-    m->values           = values;
-    m->data             = csr;
+    csr->n              = n;
+    csr->rowptr         = rowptr;
+    csr->colidx         = colidx;
+    csr->values         = values;
+    m->A                = csr;
     m->ops->spmv        = SpMV_CSR;
     m->ops->destroy     = UCFDEmptyKernel;
 
@@ -52,17 +51,18 @@ ucfd_status_t UCFDMatCreateCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *
 /** 
  * BSR Matrix format
  */
-static ucfd_status_t SpMV_BSR(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal beta, UCFDReal *y)
+static ucfd_status_t SpMV_BSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
-    SpMat_BSR *a = (SpMat_BSR *)A->data;
-    UCFDInt bn = a->bn;
-    UCFDInt blk = a->block;
+    BaseBSR *bsr = (BaseBSR *)mat->A;
+    BaseCSR *A = (BaseCSR *)mat->A;
+    UCFDInt bn = bsr->bn;
+    UCFDInt blk = bsr->block;
 
     UCFDInt idx, jdx, kdx, row, col, st, ed;
-    UCFDReal v, mat[blk*blk], arr[blk], xprt[blk];
+    UCFDReal v, submat[blk*blk], arr[blk], xprt[blk];
     UCFDInt blk2 = blk*blk;
 
-    OMPWrapper(jdx, kdx, row, col, st, ed, v, mat, arr, xprt)
+    OMPWrapper(jdx, kdx, row, col, st, ed, v, submat, arr, xprt)
     for (idx=0; idx<bn; idx++)
     {
         // Initialize
@@ -77,7 +77,7 @@ static ucfd_status_t SpMV_BSR(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal bet
 
             for (row=0; row<blk; row++) {
                 for (col=0; col<blk; col++) {
-                    mat[row*blk+col] = A->values[jdx*blk2 + row*blk + col];
+                    submat[row*blk+col] = A->values[jdx*blk2 + row*blk + col];
                 }
                 xprt[row] = x[kdx*blk+row];
             }
@@ -85,7 +85,7 @@ static ucfd_status_t SpMV_BSR(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal bet
             for (row=0; row<blk; row++) {
                 v = 0.0;
                 for (col=0; col<blk; col++)
-                    v += mat[row*blk+col] * xprt[col];
+                    v += submat[row*blk+col] * xprt[col];
                 arr[row] += v;
             }
         }
@@ -103,31 +103,31 @@ ucfd_status_t UCFDMatCreateBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *row
     SpMat m = *mat;
     m->type_name = BSR;
 
-    SpMat_BSR *bsr = (SpMat_BSR *)calloc(1, sizeof(*bsr));
+    BaseBSR *bsr = (BaseBSR *)calloc(1, sizeof(*bsr));
     UCFDCheckNull(bsr, "BSR matrix creation failed\n");
 
     bsr->bn             = bn;
     bsr->block          = blk;
 
-    m->n                = (UCFDInt)(bn*blk);
-    m->rowptr           = rowptr;
-    m->colidx           = colidx;
-    m->values           = values;
-    m->data             = bsr;
-    m->ops->spmv        = SpMV_BSR;
-    m->ops->destroy     = UCFDEmptyKernel;
+    ((BaseCSR *)bsr)->n         = (UCFDInt)(bn*blk);
+    ((BaseCSR *)bsr)->rowptr    = rowptr;
+    ((BaseCSR *)bsr)->colidx    = colidx;
+    ((BaseCSR *)bsr)->values    = values;
+    m->A                        = bsr;
+    m->ops->spmv                = SpMV_BSR;
+    m->ops->destroy             = UCFDEmptyKernel;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 
 #if defined(USE_MKL)
-static ucfd_status_t SpMV_MKL(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal beta, UCFDReal *y)
+static ucfd_status_t SpMV_MKL(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
-    MKLWrapper *a = (MKLWrapper *)A->data;
+    MKLWrapper *mkl = (MKLWrapper *)mat->A;
     MKLCall(mkl_spmv(
         SPARSE_OPERATION_NON_TRANSPOSE,
-        alpha, a->op, a->desc, x, beta, y
+        alpha, mkl->op, mkl->desc, x, beta, y
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -135,7 +135,7 @@ static ucfd_status_t SpMV_MKL(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal bet
 static ucfd_status_t Destroy_MKL(SpMat mat)
 {
     if (!mat) UCFDFunctionReturn(UCFD_SUCCESS);
-    MKLWrapper *handle = (MKLWrapper *)mat->data;
+    MKLWrapper *handle = (MKLWrapper *)mat->A;
     MKLCall(mkl_sparse_destroy(handle->op));
 
     UCFDFunctionReturn(UCFD_SUCCESS);    
@@ -145,13 +145,13 @@ ucfd_status_t UCFDMatCreateMKLBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *
 {
     UCFDCall(UCFDMatInit(mat));
     SpMat m = *mat;
-    m->type_name = MKLBSR;
+    m->type_name = BSRMKL;
 
-    SpMat_MKLBSR *bsr = (SpMat_MKLBSR *)calloc(1, sizeof(*bsr));
+    MKLBSR *bsr = (MKLBSR *)calloc(1, sizeof(*bsr));
     UCFDCheckNull(bsr, "MKL BSR matrix creation failed\n");
 
-    bsr->bn                    = bn;
-    bsr->block                 = blk;
+    ((BaseBSR *)bsr)->bn       = bn;
+    ((BaseBSR *)bsr)->block    = blk;
     bsr->handle.desc.type      = SPARSE_MATRIX_TYPE_GENERAL;
     bsr->handle.desc.mode      = 0;
     bsr->handle.desc.diag      = 0;
@@ -171,13 +171,13 @@ ucfd_status_t UCFDMatCreateMKLBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *
     
     MKLCall(mkl_sparse_optimize(bsr->handle.op));
 
-    m->n              = (UCFDInt)(bn*blk);
-    m->rowptr         = rowptr;
-    m->colidx         = colidx;
-    m->values         = values;
-    m->data           = bsr;
-    m->ops->spmv      = SpMV_MKL;
-    m->ops->destroy   = Destroy_MKL;
+    ((BaseCSR *)bsr)->n         = (UCFDInt)(bn*blk);
+    ((BaseCSR *)bsr)->rowptr    = rowptr;
+    ((BaseCSR *)bsr)->colidx    = colidx;
+    ((BaseCSR *)bsr)->values    = values;
+    m->A                        = bsr;
+    m->ops->spmv                = SpMV_MKL;
+    m->ops->destroy             = Destroy_MKL;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -187,9 +187,9 @@ ucfd_status_t UCFDMatCreateMKLCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDIn
 {
     UCFDCall(UCFDMatInit(mat));
     SpMat m = *mat;
-    m->type_name = MKLCSR;
+    m->type_name = CSRMKL;
 
-    SpMat_MKLCSR *csr = (SpMat_MKLCSR *)calloc(1, sizeof(*csr));
+    MKLCSR *csr = (MKLCSR *)calloc(1, sizeof(*csr));
     UCFDCheckNull(csr, "MKL CSR matrix creation failed\n");
 
     csr->handle.desc.type      = SPARSE_MATRIX_TYPE_GENERAL;
@@ -210,13 +210,13 @@ ucfd_status_t UCFDMatCreateMKLCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDIn
 
     MKLCall(mkl_sparse_optimize(csr->handle.op));
 
-    m->n              = n;
-    m->rowptr         = rowptr;
-    m->colidx         = colidx;
-    m->values         = values;
-    m->data           = csr;
-    m->ops->spmv      = SpMV_MKL;
-    m->ops->destroy   = Destroy_MKL;
+    ((BaseCSR *)csr)->n         = n;
+    ((BaseCSR *)csr)->rowptr    = rowptr;
+    ((BaseCSR *)csr)->colidx    = colidx;
+    ((BaseCSR *)csr)->values    = values;
+    m->A                        = csr;
+    m->ops->spmv                = SpMV_MKL;
+    m->ops->destroy             = Destroy_MKL;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

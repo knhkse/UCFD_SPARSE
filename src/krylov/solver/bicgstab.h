@@ -4,5 +4,6 @@
 
 
 typedef struct {
-    UCFDReal *r, *rt, *p, *pt, *v, *s, *shat, *t;
+    UCFDInt     n;
+    UCFDReal    *r, *rt, *p, *pt, *v, *s, *shat, *t;
 } Solver_BICGSTAB;

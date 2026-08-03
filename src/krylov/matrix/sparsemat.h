@@ -2,50 +2,36 @@
 #include "ucfdmatimpl.h"
 
 
-/**
- * BSR matrix
- */
 typedef struct {
-    UCFDInt bn;
-    UCFDInt block;
-} SpMat_BSR;
+    UCFDInt     n;
+    UCFDInt     *rowptr;
+    UCFDInt     *colidx;
+    UCFDReal    *values;
+} BaseCSR;
 
-
-
-/**
- * CSR matrix
- */
 typedef struct {
-    char dummy;     /* Dummy component */
-} SpMat_CSR;
+    BaseCSR    basemat;
+    UCFDInt     bn;
+    UCFDInt     block;
+} BaseBSR;
 
 
-
-
-
-
-
-
-
-
-/**
- * MKL matrix format
- */
+/* MKL matrix */
 #if defined(USE_MKL)
 typedef struct {
-    sparse_matrix_t op;
+    sparse_matrix_t     op;
     struct matrix_descr desc;
 } MKLWrapper;
 
 typedef struct {
-    MKLWrapper handle;
-} SpMat_MKLCSR;
+    BaseCSR        mat;
+    MKLWrapper     handle;
+} MKLCSR;
 
 typedef struct {
-    MKLWrapper handle;
-    UCFDInt bn;
-    UCFDInt block;
-} SpMat_MKLBSR;
+    BaseBSR        mat;
+    MKLWrapper     handle;
+} MKLBSR;
 #endif
 
 /**
@@ -53,35 +39,36 @@ typedef struct {
  */
 #if defined(USE_CUSPARSE)
 typedef struct {
-    cusparseHandle_t handle;
-    cusparseSpMatDescr_t op;
-    cusparseDnVecDescr_t vecX, vecY;
-    void *buffer;
-    size_t buffersize;
-    UCFDReal *tmp;
+    cusparseHandle_t        handle;
+    cusparseSpMatDescr_t    op;
+    cusparseDnVecDescr_t    vecX, vecY;
+    void                    *buffer;    
+    size_t                  buffersize;
+    UCFDReal                *tmp;
 } cuSPARSEContext;
 
 typedef struct {
-    cusparseHandle_t handle;
-    cusparseMatDescr_t descr;
+    cusparseHandle_t    handle;
+    cusparseMatDescr_t  descr;
 } cuSPARSEContext_legacy;
 
 
 typedef struct {
+    BaseCSR        mat;
     cuSPARSEContext ctx;
-} SpMat_CUSPARSECSR;
+} CUSPARSE_CSR;
 
 typedef struct {
+    BaseBSR        mat;
 #if CUSPARSE_VER_MAJOR >= 13
     cuSPARSEContext ctx;
 #else
     cuSPARSEContext_legacy ctx;
 #endif
-    UCFDInt bn;
-    UCFDInt block;
     UCFDInt bnnz;
-} SpMat_CUSPARSEBSR;
+} CUSPARSE_BSR;
 #endif
+
 
 /* Empty kernel (do nothing) */
 static inline ucfd_status_t UCFDEmptyKernel(SpMat mat) {UCFDFunctionReturn(UCFD_SUCCESS);}

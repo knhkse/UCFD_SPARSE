@@ -1,11 +1,10 @@
 #include "gmres.h"
 
 
-static ucfd_status_t arnoldi_cgs2(Solver solver, Precon pc, SpMat A, UCFDInt j, UCFDReal *wnorm)
+static ucfd_status_t arnoldi_cgs2(UCFDInt n, Solver solver, Precon pc, SpMat A, UCFDInt j, UCFDReal *wnorm)
 {
     Solver_GMRES *gmres = (Solver_GMRES *)solver->data;
     const UCFDInt k = j + 1;
-    UCFDInt n = A->n;
     UCFDReal hsub;
 
     UCFDReal *Vj = gmres->V;
@@ -45,9 +44,9 @@ static ucfd_status_t GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, 
     UCFDCheckNull(solver->type_name, "Solver must be initialized\n");
     UCFDCheckNull(pc->type_name, "Preconditioner must be initialized\n");
     UCFDCheckNull(A->type_name, "Matrix must be constructed\n");
-    Solver_GMRES *gmres = (Solver_GMRES *)solver->data;
-    UCFDInt n = A->n;
 
+    Solver_GMRES *gmres = (Solver_GMRES *)solver->data;
+    const UCFDInt n = gmres->n;
     const UCFDInt m = gmres->restart;
     const UCFDInt ld = m + 1;
     UCFDInt iter = 0, i, j, jj, k;
@@ -82,7 +81,7 @@ static ucfd_status_t GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, 
         for (j=0; j<m; j++)
         {
             /* Arnoldi iteration */
-            UCFDCall(arnoldi_cgs2(solver, pc, A, j, &wnorm));
+            UCFDCall(arnoldi_cgs2(n, solver, pc, A, j, &wnorm));
             Hcol = gmres->H + (size_t)j * ld;
 
             /* Givens rotation */
@@ -159,22 +158,23 @@ static struct _SolverOps GMRESOps = {
 ucfd_status_t UCFDSolverCreateGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxiter, UCFDReal tol)
 {
     UCFDCall(UCFDSolverInit(solver));
-    Solver s = *solver;
-    s->type_name = GMRES;
+    Solver s            = *solver;
+    s->type_name        = GMRES;
     Solver_GMRES *gmres = (Solver_GMRES *)calloc(1, sizeof(*gmres));
     UCFDCheckNull(gmres, "GMRES solver allocation failed\n");
 
     /* Allocate working arrays */
-    gmres->H = (UCFDReal *)calloc((size_t)(m+1)*m, sizeof(UCFDReal));
-    gmres->V = (UCFDReal *)calloc((size_t)n*(m+1), sizeof(UCFDReal));
-    gmres->y = (UCFDReal *)calloc((size_t)(m+1), sizeof(UCFDReal));
-    gmres->w = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
-    gmres->sn = (UCFDReal *)calloc((size_t)(m+1), sizeof(UCFDReal));
-    gmres->cs = (UCFDReal *)calloc((size_t)(m+1), sizeof(UCFDReal));
-    gmres->htmp = (UCFDReal *)calloc((size_t)(m+1), sizeof(UCFDReal));
-    gmres->r = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
-
+    gmres->H        = (UCFDReal *)calloc((size_t)(m+1)*m, sizeof(UCFDReal));
+    gmres->V        = (UCFDReal *)calloc((size_t)n*(m+1), sizeof(UCFDReal));
+    gmres->y        = (UCFDReal *)calloc((size_t)(m+1), sizeof(UCFDReal));
+    gmres->w        = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
+    gmres->sn       = (UCFDReal *)calloc((size_t)(m+1), sizeof(UCFDReal));
+    gmres->cs       = (UCFDReal *)calloc((size_t)(m+1), sizeof(UCFDReal));
+    gmres->htmp     = (UCFDReal *)calloc((size_t)(m+1), sizeof(UCFDReal));
+    gmres->r        = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
+    gmres->n        = n;
     gmres->restart  = m;
+
     s->tol          = tol;
     s->maxiter      = maxiter;
     s->data         = gmres;

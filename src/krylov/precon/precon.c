@@ -10,25 +10,6 @@ char preconwarning[] =  "Preconditioner warning :\n"
                         "Same pointer address is indicated in both system matrix and preconditioner matrix.\n"
                         "If ILU-type preconditioner is used, incorrect result can be occurred.\n";
 
-
-ucfd_status_t UCFDPreconCreatefromMatrix(Precon *precon, SpMat sysmat, UCFDInt *diagslots, UCFDReal *values)
-{
-    UCFDCheckNull(sysmat->type_name, "Input matrix is empty\n");
-    Precon pc = (Precon)calloc(1, sizeof(*pc));
-    UCFDCheckNull(pc, "Precon allocation failed\n");
-
-    pc->type_name   = NULL;
-    pc->rowptr      = sysmat->rowptr;
-    pc->colidx      = sysmat->colidx;
-    pc->diagslots   = diagslots;
-    pc->values      = values;
-    pc->data        = NULL;
-    *precon         = pc;
-
-    if (sysmat->values == values) UCFDWarning(preconwarning);
-    UCFDFunctionReturn(UCFD_SUCCESS);
-}
-
 ucfd_status_t UCFDPreconCreatefromArrays(Precon *precon, UCFDInt *rowptr, UCFDInt *colidx, UCFDInt *diagslots, UCFDReal *values)
 {
     Precon pc = (Precon)calloc(1, sizeof(*pc));

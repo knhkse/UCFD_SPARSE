@@ -2,8 +2,8 @@
 #include "bicgstab.h"
 
 
-static ucfd_status_t fused_reduction(UCFDReal *rt, UCFDReal *s, UCFDReal *t,
-                                     UCFDInt n, UCFDReal *phi, UCFDReal *rtt,
+static ucfd_status_t fused_reduction(UCFDInt n, UCFDReal *rt, UCFDReal *s,
+                                     UCFDReal *t, UCFDReal *phi, UCFDReal *rtt,
                                      UCFDReal *ts, UCFDReal *tt, UCFDReal *ss)
 {
     UCFDInt k;
@@ -26,7 +26,7 @@ static ucfd_status_t BICGSTABSolve(Solver solver, Precon pc, SpMat A, UCFDReal *
     UCFDCheckNull(solver->type_name, "Solver must be initialized\n");
     UCFDCheckNull(A->type_name, "Matrix must be constructed\n");
     Solver_BICGSTAB *bcs = (Solver_BICGSTAB *)solver->data;
-    UCFDInt n = A->n;
+    UCFDInt n = ((Solver_BICGSTAB *)solver->data)->n;
     UCFDInt iter = 0;
     UCFDReal rho, rhoprev, alpha, beta, omega;
     UCFDReal pi, phi, rtt, ts, tt, ss, rho_new, resnorm=0.0;
@@ -89,7 +89,7 @@ static ucfd_status_t BICGSTABSolve(Solver solver, Precon pc, SpMat A, UCFDReal *
 
         /* Sync 2 : single fused length-5 reduction */
         UCFDCall(fused_reduction(
-            bcs->rt, bcs->s, bcs->t, n, &phi, &rtt, &ts, &tt, &ss
+            n, bcs->rt, bcs->s, bcs->t, &phi, &rtt, &ts, &tt, &ss
         ));
         omega = ts/tt;
 
@@ -162,6 +162,7 @@ ucfd_status_t UCFDSolverCreateBICGSTAB(Solver *solver, UCFDInt n, UCFDInt maxite
     bcs->s          = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
     bcs->shat       = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
     bcs->t          = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
+    bcs->n          = n;
 
     s->tol          = tol;
     s->maxiter      = maxiter;
