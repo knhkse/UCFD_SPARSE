@@ -1,5 +1,5 @@
 /**
- * @file        ucfd_types.h
+ * @file        ucfdtypes.h
  * @brief       Header file for UCFD_SPRASE Library types
  */
 #pragma once

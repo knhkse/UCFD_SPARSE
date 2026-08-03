@@ -5,7 +5,7 @@
 
 /**
  * Vendor headers (mkl.h, cuda_runtime.h, cublas_v2.h, cusparse.h) are owned
- * by config.h. This file must be reachable only through ucfd_types.h (which
+ * by config.h. This file must be reachable only through ucfdtypes.h (which
  * includes config.h first), never included on its own or before config.h -
  * otherwise the *Call macros below reference vendor status types that don't
  * exist yet.

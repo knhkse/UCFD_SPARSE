@@ -5,7 +5,7 @@
  */
 #ifndef FLUX_H
 #define FLUX_H
-#include "ucfd_types.h"
+#include "ucfdtypes.h"
 #include "config.h"
 
 // Single precision

@@ -1,8 +1,6 @@
 #pragma once
 #include "ucfdmatimpl.h"
 
-/* Empty kernel (do nothing) */
-static inline ucfd_status_t UCFDEmptyKernel(SpMat mat) {UCFDFunctionReturn(UCFD_SUCCESS);}
 
 /**
  * BSR matrix
@@ -12,12 +10,23 @@ typedef struct {
     UCFDInt block;
 } SpMat_BSR;
 
+
+
 /**
  * CSR matrix
  */
 typedef struct {
     char dummy;     /* Dummy component */
 } SpMat_CSR;
+
+
+
+
+
+
+
+
+
 
 /**
  * MKL matrix format
@@ -73,3 +82,6 @@ typedef struct {
     UCFDInt bnnz;
 } SpMat_CUSPARSEBSR;
 #endif
+
+/* Empty kernel (do nothing) */
+static inline ucfd_status_t UCFDEmptyKernel(SpMat mat) {UCFDFunctionReturn(UCFD_SUCCESS);}

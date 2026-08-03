@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ucfd_types.h"
+#include "ucfdtypes.h"
 #include "ucfdmat.h"
 
 typedef struct _Precon *Precon;

@@ -2,7 +2,7 @@
 
 #include <string.h>
 #include <math.h>
-#include "ucfd_types.h"
+#include "ucfdtypes.h"
 
 static inline void basedcopy(UCFDInt n, UCFDReal *dest, UCFDReal *src)
 {

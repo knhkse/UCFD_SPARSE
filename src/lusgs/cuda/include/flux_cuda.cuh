@@ -18,7 +18,7 @@
  */
 #ifndef FLUX_CUDA_H
 #define FLUX_CUDA_H
-#include "ucfd_types.h"
+#include "ucfdtypes.h"
 #include "config.h"
 
 

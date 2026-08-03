@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <cuda_runtime.h>
 
-#include "sparseformat.h"
+#include "sparsemat.h"
 
 
 __global__ static void

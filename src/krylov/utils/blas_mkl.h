@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ucfd_types.h"
+#include "ucfdtypes.h"
 
 
 static inline void mkldcopy(UCFDInt n, UCFDReal *dest, UCFDReal *src)
