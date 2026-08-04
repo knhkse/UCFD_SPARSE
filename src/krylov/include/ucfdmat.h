@@ -14,6 +14,8 @@ typedef const char *SpMatType;
 #define CSRCUSPARSE     "cusparsecsr"
 #define BSRCUDA         "cudabsr"
 #define BSRCUSPARSE     "cusparsebsr"
+#define CSRMPI          "mpicsr"
+#define BSRMPI          "mpibsr"
 
 
 #if defined(__cplusplus)
@@ -28,6 +30,9 @@ UCFD_EXTERN ucfd_status_t UCFDMatMult(UCFDReal, SpMat, UCFDReal*, UCFDReal, UCFD
 /* Matrix Setting API */
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+#if defined(USE_MPI)
+UCFD_EXTERN ucfd_status_t UCFDMatCreateMPICSR(MPI_Fint, SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+#endif
 #if defined(USE_MKL)
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMKLCSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMKLBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);

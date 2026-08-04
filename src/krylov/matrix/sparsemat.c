@@ -11,7 +11,7 @@ static ucfd_status_t SpMV_CSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal b
 {
     UCFDInt i, rs, ed, j;
     UCFDReal s;
-    BaseCSR *A = (BaseCSR *)mat->A;
+    BaseCSR *A = (BaseCSR *)mat->data;
 
     OMPWrapper(rs, ed, j, s)
     for (i=0; i<A->n; i++) {
@@ -39,7 +39,7 @@ ucfd_status_t UCFDMatCreateCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *
     csr->rowptr         = rowptr;
     csr->colidx         = colidx;
     csr->values         = values;
-    m->A                = csr;
+    m->data             = csr;
     m->ops->spmv        = SpMV_CSR;
     m->ops->destroy     = UCFDEmptyKernel;
 
@@ -53,8 +53,8 @@ ucfd_status_t UCFDMatCreateCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *
  */
 static ucfd_status_t SpMV_BSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
-    BaseBSR *bsr = (BaseBSR *)mat->A;
-    BaseCSR *A = (BaseCSR *)mat->A;
+    BaseBSR *bsr = (BaseBSR *)mat->data;
+    BaseCSR *A = (BaseCSR *)mat->data;
     UCFDInt bn = bsr->bn;
     UCFDInt blk = bsr->block;
 
@@ -113,7 +113,7 @@ ucfd_status_t UCFDMatCreateBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *row
     ((BaseCSR *)bsr)->rowptr    = rowptr;
     ((BaseCSR *)bsr)->colidx    = colidx;
     ((BaseCSR *)bsr)->values    = values;
-    m->A                        = bsr;
+    m->data                     = bsr;
     m->ops->spmv                = SpMV_BSR;
     m->ops->destroy             = UCFDEmptyKernel;
 
@@ -124,7 +124,7 @@ ucfd_status_t UCFDMatCreateBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *row
 #if defined(USE_MKL)
 static ucfd_status_t SpMV_MKL(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
-    MKLWrapper *mkl = (MKLWrapper *)mat->A;
+    MKLWrapper *mkl = (MKLWrapper *)mat->data;
     MKLCall(mkl_spmv(
         SPARSE_OPERATION_NON_TRANSPOSE,
         alpha, mkl->op, mkl->desc, x, beta, y
@@ -135,7 +135,7 @@ static ucfd_status_t SpMV_MKL(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal b
 static ucfd_status_t Destroy_MKL(SpMat mat)
 {
     if (!mat) UCFDFunctionReturn(UCFD_SUCCESS);
-    MKLWrapper *handle = (MKLWrapper *)mat->A;
+    MKLWrapper *handle = (MKLWrapper *)mat->data;
     MKLCall(mkl_sparse_destroy(handle->op));
 
     UCFDFunctionReturn(UCFD_SUCCESS);    
@@ -175,7 +175,7 @@ ucfd_status_t UCFDMatCreateMKLBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *
     ((BaseCSR *)bsr)->rowptr    = rowptr;
     ((BaseCSR *)bsr)->colidx    = colidx;
     ((BaseCSR *)bsr)->values    = values;
-    m->A                        = bsr;
+    m->data                     = bsr;
     m->ops->spmv                = SpMV_MKL;
     m->ops->destroy             = Destroy_MKL;
 
@@ -214,13 +214,10 @@ ucfd_status_t UCFDMatCreateMKLCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDIn
     ((BaseCSR *)csr)->rowptr    = rowptr;
     ((BaseCSR *)csr)->colidx    = colidx;
     ((BaseCSR *)csr)->values    = values;
-    m->A                        = csr;
+    m->data                     = csr;
     m->ops->spmv                = SpMV_MKL;
     m->ops->destroy             = Destroy_MKL;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 #endif
-
-
-

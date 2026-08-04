@@ -39,9 +39,12 @@
         }                                                                   \
     } while (0)
 
-#define UCFDMatch(obj1, obj2, ...)                                          \
+#define UCFDCheckMatch(obj1, obj2, ...)                                     \
     do {                                                                    \
-        if (obj1 != obj2) fprintf(stderr, __VA_ARGS__);                     \
+        if (obj1 != obj2) {                                                 \
+            fprintf(stderr, __VA_ARGS__);                                   \
+            exit(EXIT_FAILURE);                                             \
+        }                                                                   \
     } while (0)
 
 

@@ -7,8 +7,7 @@ ucfd_status_t UCFDMatInit(SpMat *mat)
     UCFDCheckNull(m, "Matrix allocation failed\n");
 
     m->type_name    = NULL;
-    m->A            = NULL;
-    m->B            = NULL;
+    m->data         = NULL;
     *mat            = m;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -25,8 +24,7 @@ ucfd_status_t UCFDMatDestroy(SpMat *mat)
 {
     if (!mat || !*mat) UCFDFunctionReturn(UCFD_SUCCESS);
     UCFDCall((*mat)->ops->destroy(*mat));
-    free((*mat)->A);
-    free((*mat)->B);
+    free((*mat)->data);
     free(*mat);
     *mat = NULL;
 

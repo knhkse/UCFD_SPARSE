@@ -34,7 +34,7 @@ SpMV_CUDACSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
     CheckCUDAPointer(x);
     CheckCUDAPointer(y);
 #endif
-    BaseCSR *A = (BaseCSR *)mat->A;
+    BaseCSR *A = (BaseCSR *)mat->data;
     UCFDInt bpg = (A->n + TPB - 1)/TPB;
     _SpMV_CUDACSR<<<bpg, TPB>>>(alpha, A->n, A->rowptr, A->colidx, A->values, x, beta, y);
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -59,7 +59,7 @@ UCFDMatCreateCUDACSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UC
     csr->rowptr         = rowptr;
     csr->colidx         = colidx;
     csr->values         = values;
-    m->A                = csr;
+    m->data             = csr;
     m->ops->spmv        = SpMV_CUDACSR;
     m->ops->destroy     = UCFDEmptyKernel;
 
@@ -117,8 +117,8 @@ SpMV_CUDABSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
     CheckCUDAPointer(x);
     CheckCUDAPointer(y);
 #endif
-    BaseCSR *A = (BaseCSR *)mat->A;
-    BaseBSR *bsr = (BaseBSR *)mat->A;
+    BaseCSR *A = (BaseCSR *)mat->data;
+    BaseBSR *bsr = (BaseBSR *)mat->data;
     UCFDInt bpg = (bsr->bn + TPB - 1)/TPB;
 
     switch (bsr->block) {
@@ -152,11 +152,11 @@ UCFDMatCreateCUDABSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDI
     CheckCUDAPointer(colidx);
     CheckCUDAPointer(values);
 
-    ((BaseCSR *)bsr)->n        = (UCFDInt)(bn*blk);
-    ((BaseCSR *)bsr)->rowptr   = rowptr;
-    ((BaseCSR *)bsr)->colidx   = colidx;
-    ((BaseCSR *)bsr)->values   = values;
-    m->A                        = bsr;
+    ((BaseCSR *)bsr)->n         = (UCFDInt)(bn*blk);
+    ((BaseCSR *)bsr)->rowptr    = rowptr;
+    ((BaseCSR *)bsr)->colidx    = colidx;
+    ((BaseCSR *)bsr)->values    = values;
+    m->data                     = bsr;
     m->ops->spmv                = SpMV_CUDABSR;
     m->ops->destroy             = UCFDEmptyKernel;
 
@@ -175,7 +175,7 @@ static ucfd_status_t SpMV_CUSPARSE(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDR
     CheckCUDAPointer(y);
 #endif
     UCFDReal alpha_ = alpha, beta_ = beta;
-    cuSPARSEContext *ctx = (cuSPARSEContext *)mat->A;
+    cuSPARSEContext *ctx = (cuSPARSEContext *)mat->data;
     CUSPARSECall(cusparseDnVecSetValues(ctx->vecX, x));
     CUSPARSECall(cusparseDnVecSetValues(ctx->vecY, y));
     CUSPARSECall(cusparseSpMV(
@@ -189,7 +189,7 @@ static ucfd_status_t SpMV_CUSPARSE(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDR
 static ucfd_status_t Destroy_CUSPARSE(SpMat mat)
 {
     if (!mat) UCFDFunctionReturn(UCFD_SUCCESS);
-    cuSPARSEContext *cumat = (cuSPARSEContext *)mat->A;
+    cuSPARSEContext *cumat = (cuSPARSEContext *)mat->data;
 
     CUSPARSECall(cusparseDestroy(cumat->handle));
 
@@ -214,7 +214,7 @@ SpMV_CUSPARSE_BSR_Legacy(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, 
     CheckCUDAPointer(y);
 #endif
     UCFDReal alpha_ = alpha, beta_ = beta;
-    CUSPARSE_BSR *bsr = (CUSPARSE_BSR *)mat->A;
+    CUSPARSE_BSR *bsr = (CUSPARSE_BSR *)mat->data;
 
     CUSPARSECall(cusparseDbsrmv(
         bsr->ctx.handle, CUSPARSE_DIRECTION_ROW, CUSPARSE_OPERATION_NON_TRANSPOSE,
@@ -270,11 +270,11 @@ UCFDMatCreateCUSPCSR(SpMat *mat, UCFDInt n, UCFDInt nnz, UCFDInt *rowptr, UCFDIn
     ));
 #endif
 
-    ((BaseCSR *)csr)->n        = n;
-    ((BaseCSR *)csr)->rowptr   = rowptr;
-    ((BaseCSR *)csr)->colidx   = colidx;
-    ((BaseCSR *)csr)->values   = values;
-    m->A                        = csr;
+    ((BaseCSR *)csr)->n         = n;
+    ((BaseCSR *)csr)->rowptr    = rowptr;
+    ((BaseCSR *)csr)->colidx    = colidx;
+    ((BaseCSR *)csr)->values    = values;
+    m->data                     = csr;
     m->ops->spmv                = SpMV_CUSPARSE;
     m->ops->destroy             = Destroy_CUSPARSE;
 
@@ -340,17 +340,17 @@ UCFDMatCreateCUSPBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt bnnz, UCFDInt 
     CUSPARSECall(cusparseCreateMatDescr(&bsr->ctx.descr));
 #endif
 
-    ((BaseCSR *)bsr)->n        = n;
-    ((BaseCSR *)bsr)->rowptr   = rowptr;
-    ((BaseCSR *)bsr)->colidx   = colidx;
-    ((BaseCSR *)bsr)->values   = values;
-    m->A                        = bsr;
+    ((BaseCSR *)bsr)->n         = n;
+    ((BaseCSR *)bsr)->rowptr    = rowptr;
+    ((BaseCSR *)bsr)->colidx    = colidx;
+    ((BaseCSR *)bsr)->values    = values;
+    m->data                     = bsr;
 #if CUSPARSE_VER_MAJOR >= 13
-    m->ops->spmv        = SpMV_CUSPARSE;
+    m->ops->spmv                = SpMV_CUSPARSE;
 #else
-    m->ops->spmv        = SpMV_CUSPARSE_BSR_Legacy;
+    m->ops->spmv                = SpMV_CUSPARSE_BSR_Legacy;
 #endif
-    m->ops->destroy     = Destroy_CUSPARSE;
+    m->ops->destroy             = Destroy_CUSPARSE;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

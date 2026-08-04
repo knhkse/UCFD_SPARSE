@@ -82,3 +82,7 @@
         #define CUSPARSE_REALTYPE CUDA_R_64F
     #endif
 #endif
+
+#if defined(USE_MPI)
+    #include <mpi.h>
+#endif
