@@ -4,9 +4,6 @@
 
 #include "mpisparsemat.h"
 
-#define TAG_IDX 1234
-#define TAG_VAL 5678
-
 
 /**
  * Common helper functions
@@ -64,14 +61,12 @@ static void build_range(MPI_Comm comm, UCFDInt n_local, UCFDInt *range)
 }
 
 /* MPI Context initialization */
-static ucfd_status_t UCFDSetMPIContext(MPI_Comm comm,
-                                       const UCFDInt *range, const UCFDInt *garray,
-                                       UCFDInt n_ghost, UCFDMPIContext *c)
+static ucfd_status_t UCFDSetMPIContext(UCFDSpMVContext *c,
+                                       const UCFDInt *range,
+                                       const UCFDInt *garray,
+                                       UCFDInt n_ghost)
 {
     int size, err;
-
-    err = MPI_Comm_dup(comm, &c->comm);
-    if (err != MPI_SUCCESS) UCFDFunctionReturn(UCFD_FAILED);
     MPI_Comm_size(c->comm, &size);
     c->nghost = n_ghost;
 
@@ -152,7 +147,7 @@ static ucfd_status_t UCFDSetMPIContext(MPI_Comm comm,
                       c->send_count[j],
                       MPI_INT,
                       c->send_nei[j],
-                      TAG_IDX,
+                      c->tag,
                       c->comm,
                       &rq[r++]);
 
@@ -161,12 +156,11 @@ static ucfd_status_t UCFDSetMPIContext(MPI_Comm comm,
                       c->recv_count[j],
                       MPI_INT,
                       c->recv_nei[j],
-                      TAG_IDX,
+                      c->tag,
                       c->comm,
                       &rq[r++]);
 
-        if (r)
-            MPI_Waitall(r, rq, MPI_STATUSES_IGNORE);
+        if (r) MPI_Waitall(r, rq, MPI_STATUSES_IGNORE);
         free(rq);
     }
     free(req_local);
@@ -187,7 +181,7 @@ static ucfd_status_t UCFDSetMPIContext(MPI_Comm comm,
                       c->recv_count[j],
                       MPI_DOUBLE,
                       c->recv_nei[j],
-                      TAG_VAL,
+                      c->tag,
                       c->comm,
                       &c->reqs[j]);
 
@@ -196,7 +190,7 @@ static ucfd_status_t UCFDSetMPIContext(MPI_Comm comm,
                       c->send_count[j],
                       MPI_DOUBLE,
                       c->send_nei[j],
-                      TAG_VAL,
+                      c->tag,
                       c->comm,
                       &c->reqs[c->nrecv + j]);
 
@@ -205,7 +199,7 @@ static ucfd_status_t UCFDSetMPIContext(MPI_Comm comm,
 
 
 /* Destroy function */
-static ucfd_status_t UCFDMPIContextDestroy(UCFDMPIContext *c)
+static ucfd_status_t UCFDSpMVContextDestroy(UCFDSpMVContext *c)
 {
     for (int j = 0; j < c->nreq; ++j)
         MPI_Request_free(&c->reqs[j]);
@@ -220,12 +214,6 @@ static ucfd_status_t UCFDMPIContextDestroy(UCFDMPIContext *c)
     free(c->send_off);
     free(c->send_idx);
 
-    /* Free the private communication context after all requests using it. */
-    int finalized = 0;
-    MPI_Finalized(&finalized);
-    if (!finalized && c->comm != MPI_COMM_NULL)
-        MPI_Comm_free(&c->comm);
-
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
@@ -233,9 +221,9 @@ ucfd_status_t UCFDMPIMatDestroy(SpMat mat)
 {
     if (!mat) UCFDFunctionReturn(UCFD_SUCCESS);
     MPICSR *A = (MPICSR *)mat->data;
-    UCFDMPIContext ctx = A->ctx;
+    UCFDSpMVContext ctx = A->spmvctx;
 
-    UCFDCall(UCFDMPIContextDestroy(&ctx));
+    UCFDCall(UCFDSpMVContextDestroy(&ctx));
     free(A->garray);
     free(A->boundary_rows);
 
@@ -246,7 +234,7 @@ ucfd_status_t UCFDMPIMatDestroy(SpMat mat)
 /**
  * Halo exchange between processors
  */
-static inline void halo_start(UCFDMPIContext *c, const UCFDReal *restrict x_local)
+static inline void halo_start(UCFDSpMVContext *c, const UCFDReal *restrict x_local)
 {
     if (c->nrecv) MPI_Startall(c->nrecv, c->reqs);
     UCFDReal *restrict sbuf = c->sbuf;
@@ -256,7 +244,7 @@ static inline void halo_start(UCFDMPIContext *c, const UCFDReal *restrict x_loca
     if (c->nsend) MPI_Startall(c->nsend, c->reqs + c->nrecv);
 }
 
-static inline void halo_wait(UCFDMPIContext *c)
+static inline void halo_wait(UCFDSpMVContext *c)
 {
     if (c->nreq)
         MPI_Waitall(c->nreq, c->reqs, MPI_STATUSES_IGNORE);
@@ -318,11 +306,11 @@ static ucfd_status_t SpMV_MPICSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDRea
 {
     MPICSR *csr = (MPICSR *)mat->data;
 
-    halo_start(&csr->ctx, x);
+    halo_start(&csr->spmvctx, x);
     interior_spmv(alpha, &csr->A, x, beta, y);
-    halo_wait(&csr->ctx);
+    halo_wait(&csr->spmvctx);
     boundary_spmv(alpha, &csr->B, csr->boundary_rows, csr->n_boundary,
-                  csr->ctx.lvec, y);
+                  csr->spmvctx.lvec, y);
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
@@ -431,17 +419,9 @@ static ucfd_status_t UCFDSplitCSR(UCFDInt n, const UCFDInt *rp, const UCFDInt *c
 /**
  * CSR MPI Matrix
  */
-ucfd_status_t UCFDMatCreateMPICSR(MPI_Fint fcomm, SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+ucfd_status_t UCFDMatCreateMPICSR(Ctx *ctx, SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
-    /* Check MPI preparation */
-    int flag = 0;
-    MPI_Comm comm_in;
-
-    // TODO : Apply `mpi_spmv_ctypes.c` mechanism
-    MPI_Initialized(&flag);
-    if (!flag) UCFDFunctionReturn(UCFD_FAILED);
-    comm_in = MPI_Comm_f2c(fcomm);
-    if (comm_in == MPI_COMM_NULL) UCFDFunctionReturn(UCFD_FAILED);
+    Ctx c = *ctx;
 
     /* Initialize matrix object */
     UCFDCall(UCFDMatInit(mat));
@@ -451,22 +431,24 @@ ucfd_status_t UCFDMatCreateMPICSR(MPI_Fint fcomm, SpMat *mat, UCFDInt n, UCFDInt
     MPICSR *csr = (MPICSR *)calloc(1, sizeof(*csr));
     UCFDCheckNull(csr, "MPICSR matrix creation failed\n");
 
+    ContextNextTag(c, &csr->spmvctx.tag);
+    csr->spmvctx.comm = c->comm;
+
     /* Prepare : Get range */
     int size=0, rank=0;
-    MPI_Comm_size(comm_in, &size);
-    MPI_Comm_rank(comm_in, &rank);
+    MPI_Comm_size(c->comm, &size);
+    MPI_Comm_rank(c->comm, &rank);
     UCFDInt *range = malloc((size_t)(size + 1)*sizeof(*range));
 
     csr->n_local = n;
-    build_range(comm_in, n, range);
+    build_range(c->comm, n, range);
 
     /* Split matrix with interior/boundary region */
     UCFDCall(UCFDSplitCSR(
         n, rowptr, colidx, values,
         range[rank], range[rank+1], csr));
     UCFDCall(UCFDSetMPIContext(
-        comm_in, range,
-        csr->garray, csr->n_ghost, &csr->ctx
+        &csr->spmvctx, range, csr->garray, csr->n_ghost
     ));
 
     free(range);

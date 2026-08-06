@@ -31,6 +31,12 @@
 
 #define UCFDWarning(msg) fprintf(stderr, "%s", msg);
 
+#define UCFDRaiseError(stat, msg)                                           \
+    do {                                                                    \
+        fprintf(stderr, "Error code [%d] : %s", stat, msg);                 \
+        exit(EXIT_FAILURE);                                                 \
+    } while (0)
+
 #define UCFDCheckNull(obj, msg)                                             \
     do {                                                                    \
         if (!(obj)) {                                                       \
@@ -55,6 +61,16 @@
     do {                                                                    \
         ucfd_status_t st_ = (call);                                         \
         if (st_ != UCFD_SUCCESS) {                                          \
+            fprintf(stderr, "[UCFD] %s:%d  status %d\n",                    \
+                    __FILE__, __LINE__, (int)st_);                          \
+            exit(EXIT_FAILURE);                                             \
+        }                                                                   \
+    } while (0)
+
+#define UCFDMPICall(call)                                                   \
+    do {                                                                    \
+        ucfd_mpi_t st_ = (call);                                            \
+        if (st_ != UCFD_MPI_SUCCESS) {                                          \
             fprintf(stderr, "[UCFD] %s:%d  status %d\n",                    \
                     __FILE__, __LINE__, (int)st_);                          \
             exit(EXIT_FAILURE);                                             \

@@ -20,7 +20,6 @@ typedef enum
     UCFD_FAILED  = 1
 } ucfd_status_t;
 
-
 typedef enum
 {
     INITIALIZED      = -1,
@@ -31,12 +30,15 @@ typedef enum
     PIBREAKDOWN      = 4
 } ucfd_solver_t;
 
-
 typedef enum
 {
-    NONE = 0,
-    BILU = 1,
-    LUSGS = 2
-} ucfd_precon_type_t;
+    UCFD_MPI_SUCCESS            = 0,
+    UCFD_MPI_INVALID_ARGUMENT   = 1,
+    UCFD_MPI_NOT_ACTIVE         = 2,
+    UCFD_MPI_INVALID_COMM       = 3,
+    UCFD_MPI_ALLOCATION_FAILED  = 4,
+    UCFD_MPI_ERROR              = 5
+} ucfd_mpi_t;
+
 
 typedef bool UCFDBool;
