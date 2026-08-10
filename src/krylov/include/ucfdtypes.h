@@ -5,14 +5,14 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "config.h"
 #include "macros.h"
 
 #define UCFD_FALSE false
 #define UCFD_TRUE true
 
-#define INITFLAG 1234
-
+typedef int8_t UCFDInt8;
 
 typedef enum
 {
