@@ -174,6 +174,7 @@ static ucfd_status_t PBILUPreconApply(Precon precon, UCFDReal *b)
 
 ucfd_status_t UCFDPreconSetPBILU(Precon *precon, UCFDInt bn, UCFDInt block, UCFDInt ncolors, UCFDInt *icolors)
 {
+    UCFDCheckNull(*precon, "Preconditioner must be initialized\n");
     Precon pc = *precon;
     Precon_PBILU *pbilu = (Precon_PBILU *)calloc(1, sizeof(*pbilu));
     UCFDCheckNull(pbilu, "PBILU precon allocation failed\n");

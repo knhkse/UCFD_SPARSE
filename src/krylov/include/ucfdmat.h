@@ -1,8 +1,6 @@
 #pragma once
 
 #include "ucfdtypes.h"
-#include "ucfdmpi.h"
-
 
 typedef struct _SpMat *SpMat;
 

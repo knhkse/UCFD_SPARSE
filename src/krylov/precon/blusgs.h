@@ -13,3 +13,6 @@ typedef struct {
     UCFDInt ncolors;
     UCFDInt *icolors;
 } Precon_PBLUSGS;
+
+UCFD_INTERN ucfd_status_t BLUSGSPreconPrepare(Precon);
+UCFD_INTERN ucfd_status_t BLUSGSPreconDestroy(Precon);

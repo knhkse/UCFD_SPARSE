@@ -4,7 +4,7 @@
 #include "inverse.h"
 
 
-static ucfd_status_t BLUSGSPreconPrepare(Precon precon)
+ucfd_status_t BLUSGSPreconPrepare(Precon precon)
 {
     Precon_BLUSGS *blu = (Precon_BLUSGS *)precon->data;
     UCFDInt bn = blu->bn;
@@ -95,7 +95,7 @@ static ucfd_status_t BLUSGSPreconApply(Precon precon, UCFDReal *b)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static ucfd_status_t BLUSGSPreconDestroy(Precon precon)
+ucfd_status_t BLUSGSPreconDestroy(Precon precon)
 {
     if (!precon) UCFDFunctionReturn(UCFD_SUCCESS);
     Precon_BLUSGS *blu = (Precon_BLUSGS *)precon->data;

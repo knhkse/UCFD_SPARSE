@@ -11,6 +11,7 @@ typedef const char *PreconType;
 #define BILU        "bilu"
 #define BLUSGS      "blu-sgs"
 #define PBILU       "pbilu"
+#define PBLUSGS     "pblu-sgs"
 #define CUDABILU    "cudabilu"
 #define CUDABLUSGS  "cudablusgs"
 
