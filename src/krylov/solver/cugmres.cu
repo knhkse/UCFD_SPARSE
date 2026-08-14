@@ -7,8 +7,7 @@ arnoldi_cgs2(Solver solver, Precon pc, SpMat A, UCFDInt j, UCFDReal *wnorm)
 {
     Solver_CUDAGMRES *ctx = (Solver_CUDAGMRES *)solver->data;
     const UCFDInt k = j + 1;
-    const UCFDInt n = ctx->n;
-    const UCFDInt m = ctx->restart, ldv = ctx->ldv;
+    const UCFDInt n = ctx->n, m = ctx->restart, ldv = ctx->ldv;
     UCFDReal one=1.0, zero=0.0, neg=-1.0;
     UCFDReal inv;
 
@@ -44,7 +43,7 @@ arnoldi_cgs2(Solver solver, Precon pc, SpMat A, UCFDInt j, UCFDReal *wnorm)
 
     /* ---- assemble H column j on host:  H[i,j] = h[i] + h2[i] ---- */
     UCFDReal *Hcol = ctx->H + (size_t)j*(m+1);          /* col-major: j*(m+1) */
-    for(UCFDInt i=0; i<k; i++)
+    for(UCFDInt i=0; i<k; ++i)
         Hcol[i] = ctx->proj_host[i] + ctx->proj_host[(m+1)+i];
     *wnorm = ctx->proj_host[2*(m+1)];
     Hcol[k] = *wnorm;                                  /* H[j+1,j] = ||w||   */
@@ -57,41 +56,126 @@ arnoldi_cgs2(Solver solver, Precon pc, SpMat A, UCFDInt j, UCFDReal *wnorm)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+
+static void
+apply_prev_givens(const UCFDInt m, const UCFDInt j,
+                  const UCFDReal *__restrict__ g,
+                  UCFDReal *__restrict__ H)
+{
+    const size_t offset = (size_t)j*(m+1);
+    UCFDInt i;
+    UCFDReal c, s, h1, h2;
+    for (i=0; i<j; ++i)
+    {
+        c = g[i*2]; s = g[i*2+1];
+        h1 = H[i + offset];
+        h2 = H[i+1 + offset];
+        H[i + offset] = c*h1 + s*h2;
+        H[i+1 + offset] = -s*h2 + c*h2;
+    }
+}
+
+static void
+generate_givens(const UCFDInt m, const UCFDInt j,
+                UCFDReal *__restrict__ g,
+                UCFDReal *__restrict__ H)
+{
+    const size_t offset = (size_t)j*(m+1);
+    UCFDReal h1 = H[j + offset], h2 = H[j+1 + offset];
+    UCFDReal rr = hypot(h1, h2);
+    UCFDReal c, s;
+    if (rr == 0.0) { c = 1.0; s = 0.0; }    /* Degenerate guard */
+    else { c = h1/rr; s = h2/rr; }
+    g[j*2] = c; g[j*2 + 1] = s;
+    H[j + offset] = rr; H[j+1 + offset] = 0.0;
+}
+
+static void
+update_rhs(const UCFDInt j,
+           const UCFDReal *__restrict__ g,
+           UCFDReal *__restrict__ y)
+{
+    const UCFDReal yj = y[j];
+    const UCFDReal c = g[j*2], s = g[j*2 + 1];
+    y[j] = c*yj;
+    y[j+1] = -s*yj;
+}
+
+static void
+back_substitute(const UCFDInt m, const UCFDInt k,
+                const UCFDReal *__restrict__ H,
+                UCFDReal *__restrict__ y)
+{
+    UCFDInt idx, jdx;
+    for (idx=k-1; idx>=0; --idx)
+    {
+        UCFDReal sum = y[idx];
+        for (jdx=idx+1; jdx<k; ++jdx)
+            sum -= H[idx + (size_t)jdx*(m+1)] * y[jdx];
+        y[idx] = sum/H[idx + (size_t)idx*(m+1)];
+    }
+}
+
+static ucfd_status_t
+update_solution(const UCFDInt n, const UCFDInt k,
+                Solver_CUDAGMRES *gmres,
+                UCFDReal *x)
+{
+    UCFDReal one = 1.0;
+
+    /* Copy y -> d_y */
+    CUDACall(cudaMemcpy(
+        gmres->d_y, gmres->y, (size_t)k*sizeof(UCFDReal), cudaMemcpyHostToDevice
+    ));
+
+    /* x += Vy */
+    CUBLASCall(cublasDgemv(
+        gmres->handle, CUBLAS_OP_N, n, k, &one,
+        gmres->d_V, ldv, gmres->d_y, 1, &one, x, 1
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
 static ucfd_status_t
 GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
 {
+#if defined(DEBUG)
     CheckCUDAPointer(x);
     CheckCUDAPointer(b);
-
+#endif
     UCFDCheckNull(solver->type_name, "Solver must be initialized\n");
     UCFDCheckNull(pc->type_name, "Preconditioner must be initialized\n");
     UCFDCheckNull(A->type_name, "Matrix must be constructed\n");
+
     Solver_CUDAGMRES *gmres = (Solver_CUDAGMRES *)solver->data;
     CUBLASCall(cublasSetPointerMode(gmres->handle, CUBLAS_POINTER_MODE_HOST));
 
-    const UCFDInt n = gmres->n;
-    const UCFDInt m = gmres->restart, ldv = gmres->ldv;
+    const UCFDInt maxiter = solver->maxiter;
+    const UCFDReal tol = solver->tol, haptol = solver->haptol;
+    const UCFDInt n = gmres->n, m = gmres->restart, ldv = gmres->ldv;
+    UCFDReal *H = gmres->H, *g = gmres->g, *y = gmres->y;
+
     const UCFDInt ld = m + 1;
-    UCFDInt iter = 0, i, j, jj, k;
-    UCFDReal wnorm, beta, rr, h1, h2, sum, inv, c, s, yj;
-    UCFDReal abeta = 0.0, one=1.0;
+    UCFDInt iter = 0, j, k;
+    UCFDReal wnorm, beta, inv, abeta = 0.0;
     size_t offset;
 
-    /* Initial residual */
-    CUBLASCall(cublasDcopy(gmres->handle, n, b, 1, gmres->d_r, 1));
-    UCFDCall(UCFDSpMV(-1.0, A, x, 1.0, gmres->d_r));
-
-    while (iter < solver->maxiter)
+    while (iter < maxiter)
     {
+        /* Compute residual */
+        CUBLASCall(cublasDcopy(gmres->handle, n, b, 1, gmres->d_r, 1));
+        UCFDCall(UCFDSpMV(-1.0, A, x, 1.0, gmres->d_r));
+
         /* Convergence check */
         CUBLASCall(cublasDnrm2(gmres->handle, n, gmres->d_r, 1, &abeta));
         solver->ops->record(solver, iter, abeta);
-        if (abeta <= solver->tol) {
+        if (abeta <= tol) {
             solver->stat = CONVERGED;
             break;
         }
 
-        /* GMRES step */
+        /* Start cycle */
         UCFDCall(UCFDPreconApply(pc, gmres->d_r));
         CUBLASCall(cublasDnrm2(gmres->handle, n, gmres->d_r, 1, &beta));
         gmres->y[0] = beta;
@@ -99,8 +183,8 @@ GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
         CUBLASCall(cublasDcopy(gmres->handle, n, gmres->d_r, 1, gmres->d_V, 1));
         CUBLASCall(cublasDscal(gmres->handle, n, &inv, gmres->d_V, 1));
 
-        k = 0;
-        for (j=0; j<m; j++)
+        k = m;
+        for (j=0; j<m; ++j)
         {
             /* Arnoldi iteration */
             UCFDCall(arnoldi_cgs2(solver, pc, A, j, &wnorm));
@@ -109,62 +193,33 @@ GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
             offset = (size_t)j*ld;
 
             /* Apply previous givens */
-            for (i=0; i<j; i++) {
-                c = gmres->g[i*2];
-                s = gmres->g[i*2+1];
-                h1 = gmres->H[i + offset];
-                h2 = gmres->H[i+1 + offset];
-                gmres->H[i + offset] = c*h1 + s*h2;
-                gmres->H[i+1 + offset] = -s*h1 + c*h2;
-            }
+            apply_prev_givens(m, j, g, H);
 
             /* Generate givens */
-            h1 = gmres->H[j + offset];
-            h2 = gmres->H[j+1 + offset];
-            rr = hypot(h1, h2);
-            c = h1/rr; s = h2/rr;
-            gmres->g[j*2] = c; gmres->g[j*2+1] = s;
-            gmres->H[j + offset] = rr;
-            gmres->H[j+1 + offset] = 0.0;
+            generate_givens(m, j, g, H);
 
             /* Update rhs */
-            yj = gmres->y[j];
-            gmres->y[j] = c*yj;
-            gmres->y[j+1] = -s*yj;
+            update_rhs(j, g, y);
 
-            k = j + 1;
-            if (wnorm < solver->haptol * beta) {
+            /* Check convergence */
+            if (wnorm < haptol * beta) {
+                k = j + 1;
                 solver->stat = HAPPYBREAKDOWN;
                 break;
             }
         }
 
         /* Back substitution */
-        for (i=k-1; i>=0; --i) {
-            sum = gmres->y[i];
-            for (jj=i+1; jj<k; ++jj)
-                sum -= gmres->H[i + (size_t)jj*ld] * gmres->y[jj];
-            gmres->y[i] = sum / gmres->H[i + (size_t)i*ld];
-        }
+        back_substitute(m, k, H, y);
 
         /* Update solution */
-        CUDACall(cudaMemcpy(
-            gmres->d_y, gmres->y, (size_t)k*sizeof(UCFDReal), cudaMemcpyHostToDevice
-        ));
-        CUBLASCall(cublasDgemv(
-            gmres->handle, CUBLAS_OP_N, n, k, &one,
-            gmres->d_V, ldv, gmres->d_y, 1, &one, x, 1
-        ));
-
-        /* Update residual */
-        CUBLASCall(cublasDcopy(gmres->handle, n, b, 1, gmres->d_r, 1));
-        UCFDCall(UCFDSpMV(-1.0, A, x, 1.0, gmres->d_r));
+        UCFDCall(update_solution(n, k, gmres, x));
 
         iter++;
     }
-    if (iter == solver->maxiter) solver->stat = REACH_ITERMAX;
-    solver->residual    = abeta;
-    solver->itnum     = iter;
+    if (iter == maxiter) solver->stat = REACH_ITERMAX;
+    solver->residual     = abeta;
+    solver->itnum        = iter;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

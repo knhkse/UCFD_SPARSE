@@ -4,40 +4,44 @@
 static ucfd_status_t ILUPreconPrepare(Precon precon)
 {
     Precon_ILU *ilu = (Precon_ILU *)precon->data;
-    UCFDInt n = ilu->n;
+    const UCFDInt n = ilu->n;
+    const UCFDInt *restrict rowptr = precon->rowptr, *restrict colidx = precon->colidx, \
+                  *restrict diagslots = precon->diagslots;
+    UCFDInt *restrict iw = ilu->iw;
+    UCFDReal *restrict values = precon->values;
     UCFDInt idx, kdx, ck;
-    UCFDInt st, ed, jed, kk, kst, ked, jj, iwj;
+    UCFDInt kk, kst, ked, jj, iwj;
     UCFDReal Aik;
 
-    for (idx=0; idx<n; idx++)
+    for (idx=0; idx<n; ++idx)
     {
-        st = precon->rowptr[idx];
-        ed = precon->diagslots[idx];
-        jed = precon->rowptr[idx+1];
+        const UCFDInt st = rowptr[idx];
+        const UCFDInt ed = diagslots[idx];
+        const UCFDInt jed = rowptr[idx+1];
 
-        for (kdx=st; kdx<ed; kdx++)
+        for (kdx=st; kdx<ed; ++kdx)
         {
-            ck = precon -> colidx[kdx];
-            kk = precon -> diagslots[ck];
-            kst = precon -> rowptr[ck];
-            ked = precon -> rowptr[ck+1];
+            ck = colidx[kdx];
+            kk = diagslots[ck];
+            kst = rowptr[ck];
+            ked = rowptr[ck+1];
             
             /* A[i,k] := A[i,k] / A[k,k] */
-            precon->values[kdx] /= precon->values[kk];
-            Aik = precon->values[kdx];
+            values[kdx] /= values[kk];
+            Aik = values[kdx];
 
             /* Prepare iw */
-            for (jj = kst; jj < ked; jj++) ilu->iw[precon->colidx[jj]] = jj;
+            for (jj = kst; jj < ked; ++jj) iw[colidx[jj]] = jj;
 
             /* j iteration */
             /* A[i,j] -= A[i,k]*A[k,k] */
-            for (jj=kdx+1; jj<jed; jj++) {
-                iwj = ilu->iw[precon->colidx[jj]];
-                if (iwj != -1) precon->values[jj] -= Aik*precon->values[iwj];
+            for (jj=kdx+1; jj<jed; ++jj) {
+                iwj = iw[colidx[jj]];
+                if (iwj != -1) values[jj] -= Aik*values[iwj];
             }
 
             /* Clean iw */
-            for (jj=kst; jj<ked; jj++) ilu->iw[precon->colidx[jj]] = -1;
+            for (jj=kst; jj<ked; ++jj) iw[colidx[jj]] = -1;
         }
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -46,38 +50,40 @@ static ucfd_status_t ILUPreconPrepare(Precon precon)
 static ucfd_status_t ILUPreconApply(Precon precon, UCFDReal *b)
 {
     Precon_ILU *ilu = (Precon_ILU *)precon->data;
-    UCFDInt n = ilu->n;
-    UCFDInt idx, jdx, dd, st, ed, cind;
-    UCFDReal v;
+    const UCFDInt n = ilu->n;
+    const UCFDInt *restrict rowptr = precon->rowptr, *restrict colidx = precon->colidx, \
+                  *restrict diagslots = precon->diagslots;
+    const UCFDReal *restrict values = precon->values;
+    UCFDInt idx, jdx, cind;
 
     /* Forward sweep */
-    for (idx=0; idx<n; idx++)
+    for (idx=0; idx<n; ++idx)
     {
-        dd = precon->diagslots[idx];
-        st = precon->rowptr[idx];
+        const UCFDInt dd = diagslots[idx];
+        const UCFDInt st = rowptr[idx];
+        UCFDReal v = b[idx];
 
-        v = b[idx];
-        for (jdx=st; jdx<dd; jdx++)
+        for (jdx=st; jdx<dd; ++jdx)
         {
-            cind = precon->colidx[jdx];
-            v -= precon->values[jdx] * b[cind];
+            cind = colidx[jdx];
+            v -= values[jdx] * b[cind];
         }
         b[idx] = v;
     }
 
     /* Backward sweep */
-    for (idx=n-1; idx>-1; idx--)
+    for (idx=n-1; idx>-1; --idx)
     {
-        dd = precon->diagslots[idx];
-        ed = precon->rowptr[idx+1];
-        v = b[idx];
+        const UCFDInt dd = diagslots[idx];
+        const UCFDInt ed = rowptr[idx+1];
+        UCFDReal v = b[idx];
 
-        for (jdx=dd; jdx<ed; jdx++)
+        for (jdx=dd; jdx<ed; ++jdx)
         {
-            cind = precon->colidx[jdx];
-            v -= precon->values[jdx] * b[cind];
+            cind = colidx[jdx];
+            v -= values[jdx] * b[cind];
         }
-        b[idx] = v/precon->values[dd];
+        b[idx] = v/values[dd];
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -100,7 +106,7 @@ ucfd_status_t UCFDPreconSetILU(Precon *precon, UCFDInt n)
     ilu->iw     = (UCFDInt *)malloc((size_t)n*sizeof(UCFDInt));
 
     /* Initialize */
-    for (UCFDInt i=0; i<n; i++) ilu->iw[i] = -1;
+    for (UCFDInt i=0; i<n; ++i) ilu->iw[i] = -1;
 
     pc->type_name       = ILU;
     pc->data            = ilu;

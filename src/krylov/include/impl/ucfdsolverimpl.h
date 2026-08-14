@@ -72,5 +72,13 @@ static inline ucfd_status_t UCFDSpMV(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDR
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+/* Computes r := b - A@x */
+static inline ucfd_status_t UCFDCalcResidual(Solver s, SpMat A, UCFDInt n, UCFDReal *x, UCFDReal *b, UCFDReal *r)
+{
+    s->ops->dcopy(n, r, b);
+    UCFDCall(UCFDSpMV(-1.0, A, x, 1.0, r));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
 static inline ucfd_status_t UCFDEmptyKernel(Solver solver, UCFDInt iter, UCFDReal res)
 {UCFDFunctionReturn(UCFD_SUCCESS);}

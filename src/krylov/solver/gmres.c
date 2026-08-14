@@ -7,11 +7,11 @@ static ucfd_status_t arnoldi_cgs2(UCFDInt n, Solver solver, Precon pc, SpMat A, 
     const UCFDInt k = j + 1;
     UCFDReal hsub;
 
-    UCFDReal *Vj = gmres->V;
-    UCFDReal *vj = gmres->V + (size_t)j * n;
-    UCFDReal *w = gmres->w;
-    UCFDReal *Hcol = gmres->H + (size_t)j * (gmres->restart + 1);
-    UCFDReal *h2 = gmres->htmp;
+    UCFDReal *restrict Vj = gmres->V;
+    UCFDReal *restrict vj = gmres->V + (size_t)j * n;
+    UCFDReal *restrict w = gmres->w;
+    UCFDReal *restrict Hcol = gmres->H + (size_t)j * (gmres->restart + 1);
+    UCFDReal *restrict h2 = gmres->htmp;
 
     /* w = inv(M) @ A @ V_j */
     UCFDCall(UCFDSpMV(1.0, A, vj, 0.0, w));
@@ -46,87 +46,82 @@ static ucfd_status_t GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, 
     UCFDCheckNull(A->type_name, "Matrix must be constructed\n");
 
     Solver_GMRES *gmres = (Solver_GMRES *)solver->data;
-    const UCFDInt n = gmres->n;
-    const UCFDInt m = gmres->restart;
+    const UCFDInt maxiter = solver->maxiter;
+    const UCFDReal tol = solver->tol, haptol = solver->haptol;
+    const UCFDInt n = gmres->n, m = gmres->restart;
+    UCFDReal *restrict r = gmres->r, *restrict V = gmres->V, *restrict y = gmres->y, \
+             *restrict cs = gmres->cs, *restrict sn = gmres->sn, *restrict H = gmres->H;
+
     const UCFDInt ld = m + 1;
     UCFDInt iter = 0, i, j, jj, k;
     UCFDReal wnorm, beta, *Hcol, t, rr, h1, h2, sum, s, c;
     UCFDReal abeta = 0.0; /* Absolute residual */
-    
-    /**
-     * Initial residual 
-     * 1) r := b
-     * 2) r := -A@x + r (b-A@x)
-     */
-    solver->ops->dcopy(n, gmres->r, b);
-    UCFDCall(UCFDSpMV(-1.0, A, x, 1.0, gmres->r));
 
-    while (iter < solver->maxiter)
+    while (iter < maxiter)
     {
+        /* Compute residual */
+        UCFDCall(UCFDCalcResidual(solver, A, n, x, b, r));
+
         /* Convergence check */
-        abeta = solver->ops->dnorm2(n, gmres->r);
-        solver->ops->record(solver, iter, abeta);
-        if (abeta <= solver->tol) {
+        abeta = solver->ops->dnorm2(n, r);
+        solver->ops->record(solver, iter, abeta);       /* TODO : MPI communication consideration */
+        if (abeta <= tol) {
             solver->stat = CONVERGED;
             break;
         }
 
-        UCFDCall(UCFDPreconApply(pc, gmres->r));
-        beta = solver->ops->dnorm2(n, gmres->r);
-        gmres->y[0] = beta;
-        solver->ops->dcopy(n, gmres->V, gmres->r);
-        solver->ops->dscal(n, 1.0/beta, gmres->V);
+        UCFDCall(UCFDPreconApply(pc, r));
+        beta = solver->ops->dnorm2(n, r);
+        y[0] = beta;
+        solver->ops->dcopy(n, V, r);
+        solver->ops->dscal(n, 1.0/beta, V);
 
         k = 0;
-        for (j=0; j<m; j++)
+        for (j=0; j<m; ++j)
         {
             /* Arnoldi iteration */
             UCFDCall(arnoldi_cgs2(n, solver, pc, A, j, &wnorm));
-            Hcol = gmres->H + (size_t)j * ld;
+            Hcol = H + (size_t)j * ld;
 
             /* Givens rotation */
-            for (i=0; i<j; i++)
+            for (i=0; i<j; ++i)
             {
-                c = gmres->cs[i];
-                s = gmres->sn[i];
+                c = cs[i];
+                s = sn[i];
                 t = c * Hcol[i] + s * Hcol[i+1];
                 Hcol[i+1] = -s * Hcol[i] + c * Hcol[i+1];
                 Hcol[i] = t;
             }
             h1 = Hcol[j]; h2 = Hcol[j+1];
             rr = hypot(h1, h2);
-            gmres->cs[j] = h1/rr; gmres->sn[j] = h2/rr;
-            Hcol[j] = gmres->cs[j] * Hcol[j] + gmres->sn[j] * Hcol[j+1];
+            cs[j] = h1/rr; sn[j] = h2/rr;
+            Hcol[j] = cs[j] * Hcol[j] + sn[j] * Hcol[j+1];
             Hcol[j+1] = 0.0;
 
-            gmres->y[j+1] = -gmres->sn[j] * gmres->y[j];
-            gmres->y[j] = gmres->cs[j] * gmres->y[j];
+            y[j+1] = -sn[j] * y[j];
+            y[j] = cs[j] * y[j];
 
             k = j + 1;
-            if (wnorm < solver->haptol * beta) {
+            if (wnorm < haptol * beta) {
                 solver->stat = HAPPYBREAKDOWN;
                 break;
             }
         }
-        
+
         /* Back substitution */
         for (i=k-1; i>=0; --i) {
-            sum = gmres->y[i];
+            sum = y[i];
             for (jj=i+1; jj<k; ++jj)
-                sum -= gmres->H[i+(size_t)jj*ld] * gmres->y[jj];
-            gmres->y[i] = sum/gmres->H[i+(size_t)i*ld];
+                sum -= H[i+(size_t)jj*ld] * y[jj];
+            y[i] = sum/H[i+(size_t)i*ld];
         }
-        
+
         /* Update solution */
-        solver->ops->dgemvcol(n, k, n, 1.0, gmres->V, gmres->y, 1.0, x);
-        
-        /* Update residual */
-        solver->ops->dcopy(n, gmres->r, b);
-        UCFDCall(UCFDSpMV(-1.0, A, x, 1.0, gmres->r));
+        solver->ops->dgemvcol(n, k, n, 1.0, V, y, 1.0, x);
 
         iter++;
     }
-    if (iter == solver->maxiter) solver->stat = REACH_ITERMAX;
+    if (iter == maxiter) solver->stat = REACH_ITERMAX;
     solver->residual = abeta;
     solver->itnum = iter;
 

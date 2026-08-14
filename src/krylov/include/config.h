@@ -86,3 +86,7 @@
 #if defined(USE_MPI)
     #include <mpi.h>
 #endif
+
+#if defined(DEBUG)
+    #include <assert.h>
+#endif

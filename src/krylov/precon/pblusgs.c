@@ -9,8 +9,9 @@ static ucfd_status_t PBLUSGSPreconLowerApply(UCFDInt nstart, UCFDInt nend, Preco
     Precon_BLUSGS *blu = (Precon_BLUSGS *)precon->data;
     const UCFDInt bn = blu->bn, block = blu->block;
     const UCFDInt blkdim = block*block;
-    const UCFDInt *rowptr = precon->rowptr, *colidx = precon->colidx, *diagslots = precon->diagslots;
-    const UCFDReal *values = precon->values, *diagvalues = blu->diagvalues;
+    const UCFDInt *restrict rowptr = precon->rowptr, *restrict colidx = precon->colidx, \
+                  *restrict diagslots = precon->diagslots;
+    const UCFDReal *restrict values = precon->values, *restrict diagvalues = blu->diagvalues;
 
     UCFDInt idx, jdx, kdx, row, col;
     UCFDInt dd, st, cind;
@@ -49,8 +50,9 @@ static ucfd_status_t PBLUSGSPreconUpperApply(UCFDInt nstart, UCFDInt nend, Preco
     Precon_BLUSGS *blu = (Precon_BLUSGS *)precon->data;
     const UCFDInt bn = blu->bn, block = blu->block;
     const UCFDInt blkdim = block*block;
-    const UCFDInt *rowptr = precon->rowptr, *colidx = precon->colidx, *diagslots = precon->diagslots;
-    const UCFDReal *values = precon->values, *diagvalues = blu->diagvalues;
+    const UCFDInt *restrict rowptr = precon->rowptr, *restrict colidx = precon->colidx, \
+                  *restrict diagslots = precon->diagslots;
+    const UCFDReal *restrict values = precon->values, *restrict diagvalues = blu->diagvalues;
 
     UCFDInt idx, jdx, kdx, row, col;
     UCFDInt dd, ed, cind;
@@ -123,9 +125,3 @@ ucfd_status_t UCFDPreconSetPBLUSGS(Precon *precon, UCFDInt bn, UCFDInt block, UC
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
-
-
-
-
-
-

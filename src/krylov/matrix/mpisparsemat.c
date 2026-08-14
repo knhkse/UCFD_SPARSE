@@ -262,16 +262,17 @@ static inline void interior_spmv(UCFDReal alpha,
     const UCFDInt *restrict rowptr = M->rowptr;
     const UCFDInt *restrict colidx = M->colidx;
     const UCFDReal *restrict val = M->values;
-    UCFDInt i, k, end;
-    UCFDReal sum;
+    const UCFDInt n = M->n;
+    UCFDInt i, k;
 
-    OMPWrapper(k, end, sum)
-    for (i=0; i<M->n; ++i)
+    OMPWrapper(k)
+    for (i=0; i<n; ++i)
     {
-        sum = 0.0;
-        end = rowptr[i + 1];
+        const UCFDInt st = rowptr[i];
+        const UCFDInt end = rowptr[i + 1];
+        UCFDReal sum = 0.0;
 
-        for (k = rowptr[i]; k < end; ++k)
+        for (k=st; k<end; ++k)
             sum += val[k] * x[colidx[k]];
         y[i] = alpha*sum + beta*y[i];
     }
@@ -287,16 +288,17 @@ static inline void boundary_spmv(UCFDReal alpha,
     const UCFDInt *restrict rowptr = M->rowptr;
     const UCFDInt *restrict colidx = M->colidx;
     const UCFDReal *restrict val = M->values;
-    UCFDInt q, i, k, end;
-    UCFDReal sum;
+    UCFDInt q, i, k;
 
+    OMPWrapper(i, k)
     for (q = 0; q < n_boundary; ++q)
     {
         i = boundary_rows[q];
-        sum = 0.0;
-        end = rowptr[i + 1];
+        const UCFDInt st = rowptr[i];
+        const UCFDInt end = rowptr[i + 1];
+        UCFDReal sum = 0.0;
 
-        for (k = rowptr[i]; k < end; ++k)
+        for (k=st; k<end; ++k)
             sum += val[k] * x[colidx[k]];
         y[i] += alpha*sum;
     }

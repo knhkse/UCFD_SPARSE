@@ -9,64 +9,64 @@
 template<UCFDInt block>
 __global__ static void
 CUDABILUPreconPreparePerColor(UCFDInt nstart, UCFDInt nend,
-                              UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values,
-                              UCFDInt *iw, UCFDInt *diagslots)
+                              const UCFDInt *__restrict__ rowptr,
+                              const UCFDInt *__restrict__ colidx,
+                              const UCFDInt *__restrict__ diagslots,
+                              UCFDReal *__restrict__ values,
+                              UCFDInt *__restrict__ iw)
 {
+    const UCFDInt _idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (_idx >= (nend-nstart)) return;
 
-    UCFDInt idx, kdx, ck, row, col, ele;
-    UCFDInt st, ed, jed, kk, kst, ked, jj, iwj;
+    const UCFDInt blkdim = block*block;
+    UCFDInt kdx, row, col, ele;
+    UCFDInt ck, kk, kst, ked, jj, iwj;
     UCFDReal v, Aik[block][block];
-    UCFDInt blkdim = block*block;
 
-    idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx < nend - nstart)
+    const UCFDInt idx = _idx + nstart;
+    const UCFDInt st = rowptr[idx];
+    const UCFDInt jed = rowptr[idx+1];
+    const UCFDInt ed = diagslots[idx];
+
+    for (kdx=st; kdx<ed; ++kdx)
     {
-        idx += nstart;
+        ck = colidx[kdx];
+        kk = diagslots[ck];
+        kst = rowptr[ck];
+        ked = rowptr[ck+1];
 
-        st = rowptr[idx];
-        jed = rowptr[idx+1];
-        ed = diagslots[idx];
+        // A[i,k] := A[i,k] @ inv(A[k,k])
+        lusubmattrans(block, &(values[kk*blkdim]), &(values[kdx*blkdim]));
+        // memcpy(Aik, &values[kdx*blkdim], sizeof(double)*block);
+        for (row=0; row<block; ++row) {
+            for (col=0; col<block; ++col)
+                Aik[row][col] = values[kdx*blkdim+row*block+col];
+        }
 
-        for (kdx=st; kdx<ed; kdx++)
-        {
-            ck = colidx[kdx];
-            kk = diagslots[ck];
-            kst = rowptr[ck];
-            ked = rowptr[ck+1];
+        // Prepare iw
+        for (jj=kst; jj<ked; ++jj) iw[colidx[jj]] = jj;
 
-            // A[i,k] := A[i,k] @ inv(A[k,k])
-            lusubmattrans(block, &(values[kk*blkdim]), &(values[kdx*blkdim]));
-            // memcpy(Aik, &values[kdx*blkdim], sizeof(double)*block);
-            for (row=0; row<block; row++) {
-                for (col=0; col<block; col++)
-                    Aik[row][col] = values[kdx*blkdim+row*block+col];
-            }
+        // j iteration
+        for (jj=kdx+1; jj<jed; ++jj) {
+            iwj = iw[colidx[jj]];
 
-            // Prepare iw
-            for (jj=kst; jj<ked; jj++) iw[colidx[jj]] = jj;
-
-            // j iteration
-            for (jj=kdx+1; jj<jed; jj++) {
-                iwj = iw[colidx[jj]];
-
-                if (iwj != -1) {
-                    // values[jj] -= Aik * values[iwj]
-                    for (row=0; row<block; row++) {
-                        for (col=0; col<block; col++) {
-                            v = 0.0;
-                            for (ele=0; ele<block; ele++)
-                                v += Aik[row][ele] * values[iwj*blkdim+ele*block+col];
-                            values[jj*blkdim+row*block+col] -= v;
-                        }
+            if (iwj != -1) {
+                // values[jj] -= Aik * values[iwj]
+                for (row=0; row<block; ++row) {
+                    for (col=0; col<block; ++col) {
+                        v = 0.0;
+                        for (ele=0; ele<block; ++ele)
+                            v += Aik[row][ele] * values[iwj*blkdim+ele*block+col];
+                        values[jj*blkdim+row*block+col] -= v;
                     }
                 }
             }
-            // Clean iw
-            for (jj=kst; jj<ked; jj++) iw[colidx[jj]] = -1;
         }
-        // LU decomposition of current row diagonal matrix
-        ludcmp(block, &(values[ed*blkdim]));
+        // Clean iw
+        for (jj=kst; jj<ked; ++jj) iw[colidx[jj]] = -1;
     }
+    // LU decomposition of current row diagonal matrix
+    ludcmp(block, &(values[ed*blkdim]));
 }
 
 static ucfd_status_t
@@ -78,52 +78,52 @@ CUDABILUPreconPrepare(Precon precon)
 
     switch (pbilu->base.block) {
         case 1:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconPreparePerColor<1><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
-                    precon->colidx, precon->values, pbilu->base.iw, precon->diagslots
+                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
                 );
                 break;
         case 2:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconPreparePerColor<2><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
-                    precon->colidx, precon->values, pbilu->base.iw, precon->diagslots
+                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
                 );
                 break;
         case 3:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconPreparePerColor<3><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
-                    precon->colidx, precon->values, pbilu->base.iw, precon->diagslots
+                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
                 );
                 break;
         case 4:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconPreparePerColor<4><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
-                    precon->colidx, precon->values, pbilu->base.iw, precon->diagslots
+                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
                 );
                 break;
         case 5:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconPreparePerColor<5><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
-                    precon->colidx, precon->values, pbilu->base.iw, precon->diagslots
+                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
                 );
                 break;
         case 6:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconPreparePerColor<6><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
-                    precon->colidx, precon->values, pbilu->base.iw, precon->diagslots
+                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
                 );
                 break;
         case 7:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconPreparePerColor<7><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
-                    precon->colidx, precon->values, pbilu->base.iw, precon->diagslots
+                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
                 );
                 break;
         default: fprintf(stderr, "Unsupported block size\n"); UCFDFunctionReturn(UCFD_FAILED);
@@ -134,83 +134,82 @@ CUDABILUPreconPrepare(Precon precon)
 template<UCFDInt block>
 __global__ static void
 CUDABILUPreconLowerApply(UCFDInt nstart, UCFDInt nend,
-                         UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values,
-                         UCFDInt *diagslots, UCFDReal *b)
+                         const UCFDInt *__restrict__ rowptr,
+                         const UCFDInt *__restrict__ colidx,
+                         const UCFDReal *__restrict__ values,
+                         const UCFDInt *__restrict__ diagslots,
+                         UCFDReal *__restrict__ b)
 {
-    UCFDInt idx, jdx, kdx, row, col;
-    UCFDInt dd, st, cind;
+    const UCFDInt _idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (_idx >= (nend-nstart)) return;
+    
+    const UCFDInt blkdim = block*block;
+    UCFDInt jdx, kdx, row, col, cind;
     UCFDReal v, arr[block];
-    UCFDInt blkdim = block*block;
-    UCFDInt range = nend - nstart;
 
-    idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx < range)
+    const UCFDInt idx = _idx + nstart;
+    const UCFDInt dd = diagslots[idx];
+    const UCFDInt st = rowptr[idx];
+
+    // Initialize arr
+    for (kdx = 0; kdx < block; ++kdx)
+        arr[kdx] = b[kdx + idx * block];
+
+    for (jdx = st; jdx < dd; ++jdx)
     {
-        idx += nstart;
-        dd = diagslots[idx];
-        st = rowptr[idx];
-
-        // Initialize arr
-        for (kdx = 0; kdx < block; kdx++)
-            arr[kdx] = b[kdx + idx * block];
-
-        for (jdx = st; jdx < dd; jdx++)
+        cind = colidx[jdx];
+        for (row = 0; row < block; ++row)
         {
-            cind = colidx[jdx];
-
-            for (row = 0; row < block; row++)
-            {
-                v = 0.0;
-                for (col = 0; col < block; col++)
-                    v += values[col + row * block + jdx * blkdim] * b[col + cind * block];
-                arr[row] -= v;
-            }
+            v = 0.0;
+            for (col = 0; col < block; ++col)
+                v += values[col + row * block + jdx * blkdim] * b[col + cind * block];
+            arr[row] -= v;
         }
-        for (kdx = 0; kdx < block; kdx++)
-            b[kdx + idx * block] = arr[kdx];
     }
+    for (kdx = 0; kdx < block; ++kdx)
+        b[kdx + idx * block] = arr[kdx];
 }
 
 template<UCFDInt block>
 __global__ static void
 CUDABILUPreconUpperApply(UCFDInt nstart, UCFDInt nend,
-                         UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values,
-                         UCFDInt *diagslots, UCFDReal *b)
+                         const UCFDInt *__restrict__ rowptr,
+                         const UCFDInt *__restrict__ colidx,
+                         const UCFDReal *__restrict__ values,
+                         const UCFDInt *__restrict__ diagslots,
+                         UCFDReal *__restrict__ b)
 {
-    UCFDInt idx, jdx, kdx, row, col;
-    UCFDInt dd, ed, cind;
+    const UCFDInt _idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (_idx >= (nend-nstart)) return;
+
+    const UCFDInt blkdim = block*block;
+    UCFDInt jdx, kdx, row, col, cind;
     UCFDReal v, arr[block];
-    UCFDInt blkdim = block*block;
-    UCFDInt range = nend - nstart;
 
-    idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx < range)
+    const UCFDInt idx = _idx + nstart;
+    const UCFDInt dd = diagslots[idx];
+    const UCFDInt ed = rowptr[idx + 1];
+
+    // Initialize
+    for (kdx = 0; kdx < block; ++kdx)
+        arr[kdx] = b[kdx + idx * block];
+
+    for (jdx = dd + 1; jdx < ed; ++jdx)
     {
-        idx += nstart;
-        dd = diagslots[idx];
-        ed = rowptr[idx + 1];
+        cind = colidx[jdx];
 
-        // Initialize
-        for (kdx = 0; kdx < block; kdx++)
-            arr[kdx] = b[kdx + idx * block];
-
-        for (jdx = dd + 1; jdx < ed; jdx++)
+        for (row = 0; row < block; ++row)
         {
-            cind = colidx[jdx];
-
-            for (row = 0; row < block; row++)
-            {
-                v = 0.0;
-                for (col = 0; col < block; col++)
-                    v += values[col + row * block + jdx * blkdim] * b[col + cind * block];
-                arr[row] -= v;
-            }
+            v = 0.0;
+            for (col = 0; col < block; ++col)
+                v += values[col + row * block + jdx * blkdim] * b[col + cind * block];
+            arr[row] -= v;
         }
-        // LU substitution for vector
-        lusub(block, &(values[dd*blkdim]), arr);
-        for (row=0; row<block; row++)
-            b[idx*block+row] = arr[row];
     }
+    // LU substitution for vector
+    lusub(block, &(values[dd*blkdim]), arr);
+    for (row=0; row<block; ++row)
+        b[idx*block+row] = arr[row];
 }
 
 static ucfd_status_t
@@ -223,84 +222,84 @@ CUDABILUPreconApply(Precon precon, UCFDReal *b)
     switch (pbilu->base.block) {
         case 1:
             UCFDWarning("Single block size(block=1)::Use ILU preconditioner")
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconLowerApply<1><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-            for (i=pbilu->ncolors-1; i>=0; i--)
+            for (i=pbilu->ncolors-1; i>=0; --i)
                 CUDABILUPreconUpperApply<1><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             break;
         case 2:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconLowerApply<2><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-            for (i=pbilu->ncolors-1; i>=0; i--)
+            for (i=pbilu->ncolors-1; i>=0; --i)
                 CUDABILUPreconUpperApply<2><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             break;
         case 3:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconLowerApply<3><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-            for (i=pbilu->ncolors-1; i>=0; i--)
+            for (i=pbilu->ncolors-1; i>=0; --i)
                 CUDABILUPreconUpperApply<3><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             break;
         case 4:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconLowerApply<4><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-            for (i=pbilu->ncolors-1; i>=0; i--)
+            for (i=pbilu->ncolors-1; i>=0; --i)
                 CUDABILUPreconUpperApply<4><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             break;
         case 5:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconLowerApply<5><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-            for (i=pbilu->ncolors-1; i>=0; i--)
+            for (i=pbilu->ncolors-1; i>=0; --i)
                 CUDABILUPreconUpperApply<5><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             break;
         case 6:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconLowerApply<6><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-            for (i=pbilu->ncolors-1; i>=0; i--)
+            for (i=pbilu->ncolors-1; i>=0; --i)
                 CUDABILUPreconUpperApply<6><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             break;
         case 7:
-            for (i=0; i<pbilu->ncolors; i++)
+            for (i=0; i<pbilu->ncolors; ++i)
                 CUDABILUPreconLowerApply<7><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
-            for (i=pbilu->ncolors-1; i>=0; i--)
+            for (i=pbilu->ncolors-1; i>=0; --i)
                 CUDABILUPreconUpperApply<7><<<bpg, TPB>>>(
                     pbilu->icolors[i], pbilu->icolors[i+1], precon->rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
@@ -310,7 +309,6 @@ CUDABILUPreconApply(Precon precon, UCFDReal *b)
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
-
 
 static ucfd_status_t CUDABILUPreconDestroy(Precon precon)
 {

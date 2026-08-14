@@ -20,14 +20,14 @@ static __device__ void ludcmp(UCFDInt block, UCFDReal *A)
     }
 
     else {
-        for (row=1; row<block; row++) {     // Skip first row
+        for (row=1; row<block; ++row) {     // Skip first row
             nrow = block*row;
             A[nrow] /= A[0];
-            for (col=1; col<block; col++) {
+            for (col=1; col<block; ++col) {
                 // Lower triangular matrix
                 if (row > col) {
                     val = 0.0;
-                    for (kdx=0; kdx<col; kdx++)
+                    for (kdx=0; kdx<col; ++kdx)
                         val += A[nrow+kdx] * A[col + block*kdx];
                     A[nrow+col] = (A[nrow+col] - val)/A[(block+1)*col];
                 }
@@ -35,7 +35,7 @@ static __device__ void ludcmp(UCFDInt block, UCFDReal *A)
                 // Upper triangular matrix
                 else {
                     val = 0.0;
-                    for (kdx=0; kdx<row; kdx++)
+                    for (kdx=0; kdx<row; ++kdx)
                         val += A[nrow+kdx]*A[block*kdx+col];
                     A[nrow+col] -= val;
                 }
@@ -59,20 +59,20 @@ static __device__ void lusub(UCFDInt block, UCFDReal *LU, UCFDReal *b)
 
     else {
         // Forward substitution
-        for (row=1; row<block; row++) {
+        for (row=1; row<block; ++row) {
             nrow = row*block;
             val = 0.0;
-            for (col=0; col<row; col++)
+            for (col=0; col<row; ++col)
                 val += LU[nrow+col]*b[col];
             b[row] -= val;
         }
 
         // Backward substitution
         b[block-1] /= LU[block*block-1];
-        for (row=block-2; row>-1; row--) {
+        for (row=block-2; row>-1; --row) {
             nrow = row*block;
             val = 0.0;
-            for (col=row+1; col<block; col++)
+            for (col=row+1; col<block; ++col)
                 val += LU[nrow+col]*b[col];
             b[row] = (b[row] - val)/LU[nrow+row];
         }
@@ -90,21 +90,21 @@ static __device__ void lusubmattrans(UCFDInt block, UCFDReal *LU, UCFDReal *B)
 
     else {
         // Forward substitution
-        for (scol=0; scol<block; scol++) B[scol*block] /= LU[0];
-        for (row=1; row<block; row++) {
-            for (scol=0; scol<block; scol++) {
+        for (scol=0; scol<block; ++scol) B[scol*block] /= LU[0];
+        for (row=1; row<block; ++row) {
+            for (scol=0; scol<block; ++scol) {
                 val = 0.0;
-                for (col=0; col<row; col++)
+                for (col=0; col<row; ++col)
                     val += B[scol*block+col] * LU[col*block+row];
                 B[scol*block+row] = (B[scol*block+row] - val)/LU[row*block+row];
             }
         }
 
         // Backward substitution
-        for (row=block-2; row>-1; row--) {
-            for (scol=0; scol<block; scol++) {
+        for (row=block-2; row>-1; --row) {
+            for (scol=0; scol<block; ++scol) {
                 val = 0.0;
-                for (col=row+1; col<block; col++)
+                for (col=row+1; col<block; ++col)
                     val += B[scol*block+col] * LU[col*block+row];
                 B[scol*block+row] -= val;
             }

@@ -9,17 +9,20 @@
  */
 static ucfd_status_t SpMV_CSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
-    UCFDInt i, rs, ed, j;
-    UCFDReal s;
     BaseCSR *A = (BaseCSR *)mat->data;
+    const UCFDInt n = A->n;
+    const UCFDInt *restrict rowptr = A->rowptr, *restrict colidx = A->colidx;
+    const UCFDReal *restrict values = A->values;
+    UCFDInt i, j;
 
-    OMPWrapper(rs, ed, j, s)
-    for (i=0; i<A->n; i++) {
-        rs = A->rowptr[i];
-        ed = A->rowptr[i+1];
-        s = 0.0;
-        for (j=rs; j<ed; j++) {
-            s += A->values[j] * x[A->colidx[j]];
+    OMPWrapper(j)
+    for (i=0; i<n; ++i) {
+        const UCFDInt st = rowptr[i];
+        const UCFDInt ed = rowptr[i+1];
+        UCFDReal s = 0.0;
+
+        for (j=st; j<ed; ++j) {
+            s += values[j] * x[colidx[j]];
         }
         y[i] = alpha*s + beta*y[i];
     }
@@ -55,42 +58,43 @@ static ucfd_status_t SpMV_BSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal b
 {
     BaseBSR *bsr = (BaseBSR *)mat->data;
     BaseCSR *A = (BaseCSR *)mat->data;
-    UCFDInt bn = bsr->bn;
-    UCFDInt blk = bsr->block;
+    const UCFDInt bn = bsr->bn, blk = bsr->block;
+    const UCFDInt blk2 = blk*blk;
+    const UCFDInt *restrict rowptr = A->rowptr, *restrict colidx = A->colidx;
+    const UCFDReal *restrict values = A->values;
 
-    UCFDInt idx, jdx, kdx, row, col, st, ed;
-    UCFDReal v, submat[blk*blk], arr[blk], xprt[blk];
-    UCFDInt blk2 = blk*blk;
+    UCFDInt idx, jdx, kdx, row, col;
+    UCFDReal submat[blk*blk], arr[blk], xprt[blk];
 
-    OMPWrapper(jdx, kdx, row, col, st, ed, v, submat, arr, xprt)
-    for (idx=0; idx<bn; idx++)
+    OMPWrapper(jdx, kdx, row, col, submat, arr, xprt)
+    for (idx=0; idx<bn; ++idx)
     {
         // Initialize
-        for (kdx=0; kdx<blk; kdx++) arr[kdx] = 0.0;
+        for (kdx=0; kdx<blk; ++kdx) arr[kdx] = 0.0;
 
-        st = A->rowptr[idx];
-        ed = A->rowptr[idx+1];
+        const UCFDInt st = rowptr[idx];
+        const UCFDInt ed = rowptr[idx+1];
         
-        for (jdx=st; jdx<ed; jdx++)
+        for (jdx=st; jdx<ed; ++jdx)
         {
-            kdx = A->colidx[jdx];
+            const UCFDInt ldx = colidx[jdx];
 
-            for (row=0; row<blk; row++) {
-                for (col=0; col<blk; col++) {
-                    submat[row*blk+col] = A->values[jdx*blk2 + row*blk + col];
+            for (row=0; row<blk; ++row) {
+                for (col=0; col<blk; ++col) {
+                    submat[row*blk+col] = values[jdx*blk2 + row*blk + col];
                 }
-                xprt[row] = x[kdx*blk+row];
+                xprt[row] = x[ldx*blk+row];
             }
             // blockmv
-            for (row=0; row<blk; row++) {
-                v = 0.0;
-                for (col=0; col<blk; col++)
+            for (row=0; row<blk; ++row) {
+                UCFDReal v = 0.0;
+                for (col=0; col<blk; ++col)
                     v += submat[row*blk+col] * xprt[col];
                 arr[row] += v;
             }
         }
 
-        for (kdx=0; kdx<blk; kdx++)
+        for (kdx=0; kdx<blk; ++kdx)
             y[idx*blk+kdx] = alpha * arr[kdx] + beta*y[idx*blk+kdx];
     }
     UCFDFunctionReturn(UCFD_SUCCESS);

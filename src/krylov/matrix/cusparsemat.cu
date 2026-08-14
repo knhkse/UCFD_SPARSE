@@ -7,34 +7,38 @@
 
 __global__ static void
 _SpMV_CUDACSR(UCFDReal alpha, UCFDInt n,
-              UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values,
-              UCFDReal *x, UCFDReal beta, UCFDReal *y)
+              const UCFDInt *__restrict__ rowptr,
+              const UCFDInt *__restrict__ colidx,
+              const UCFDReal *__restrict__ values,
+              const UCFDReal *__restrict__ x, UCFDReal beta,
+              UCFDReal *__restrict__ y)
 {
-    UCFDInt idx, jdx, rs, ed;
-    UCFDReal s;
+    UCFDInt jdx;
 
-    idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx < n)
-    {
-        rs = rowptr[idx];
-        ed = rowptr[idx+1];
-        s = 0.0;
-        for (jdx=rs; jdx<ed; jdx++) {
-            s += values[jdx] * x[colidx[jdx]];
-        }
-        y[idx] = alpha*s + beta*y[idx];
+    const UCFDInt idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (idx >= n) return;
+
+    const UCFDInt st = rowptr[idx];
+    const UCFDInt ed = rowptr[idx+1];
+    UCFDReal s = 0.0;
+
+    for (jdx=st; jdx<ed; ++jdx) {
+        s += values[jdx] * x[colidx[jdx]];
     }
+    y[idx] = alpha*s + beta*y[idx];
 }
 
 
 static inline ucfd_status_t
 SpMV_CUDACSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
+    BaseCSR *A = (BaseCSR *)mat->data;
 #if defined(DEBUG)
     CheckCUDAPointer(x);
     CheckCUDAPointer(y);
+    assert(x != y);
+    assert(A->n != 0);
 #endif
-    BaseCSR *A = (BaseCSR *)mat->data;
     UCFDInt bpg = (A->n + TPB - 1)/TPB;
     _SpMV_CUDACSR<<<bpg, TPB>>>(alpha, A->n, A->rowptr, A->colidx, A->values, x, beta, y);
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -70,54 +74,57 @@ UCFDMatCreateCUDACSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UC
 template<UCFDInt blk>
 __global__ static void
 _SpMV_CUDABSR(UCFDReal alpha, UCFDInt bn,
-              UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values,
-              UCFDReal *x, UCFDReal beta, UCFDReal *y)
+              const UCFDInt *__restrict__ rowptr,
+              const UCFDInt *__restrict__ colidx,
+              const UCFDReal *__restrict__ values,
+              const UCFDReal *__restrict__ x, UCFDReal beta,
+              UCFDReal *__restrict__ y)
 {
-    UCFDInt idx, jdx, kdx, row, col, st, ed;
-    UCFDReal v, mat[blk*blk], arr[blk], xprt[blk];
-    UCFDInt blk2 = blk*blk;
+    UCFDInt jdx, kdx, row, col;
+    UCFDReal mat[blk*blk], arr[blk], xprt[blk];
+    const UCFDInt blk2 = blk*blk;
 
-    idx = threadIdx.x + blockIdx.x * blockDim.x;
+    const UCFDInt idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (idx >= bn) return;
 
-    if (idx < bn)
+    /* Initialize */
+    for (kdx=0; kdx<blk; ++kdx) arr[kdx] = 0.0;
+    const UCFDInt st = rowptr[idx];
+    const UCFDInt ed = rowptr[idx+1];
+
+    for (jdx=st; jdx<ed; ++jdx)
     {
-        /* Initialize */
-        for (kdx=0; kdx<blk; kdx++) arr[kdx] = 0.0;
-        st = rowptr[idx];
-        ed = rowptr[idx+1];
+        const UCFDInt ldx = colidx[jdx];
 
-        for (jdx=st; jdx<ed; jdx++)
-        {
-            kdx = colidx[jdx];
-
-            for (row=0; row<blk; row++) {
-                for (col=0; col<blk; col++) {
-                    mat[row*blk+col] = values[jdx*blk2 + row*blk + col];
-                }
-                xprt[row] = x[kdx*blk+row];
+        for (row=0; row<blk; ++row) {
+            for (col=0; col<blk; ++col) {
+                mat[row*blk+col] = values[jdx*blk2 + row*blk + col];
             }
-            // blockmv
-            for (row=0; row<blk; row++) {
-                v = 0.0;
-                for (col=0; col<blk; col++)
-                    v += mat[row*blk+col] * xprt[col];
-                arr[row] += v;
-            }
+            xprt[row] = x[ldx*blk+row];
         }
-        for (kdx=0; kdx<blk; kdx++)
-            y[idx*blk+kdx] = alpha*arr[kdx] + beta*y[idx*blk+kdx];
+        // blockmv
+        for (row=0; row<blk; ++row) {
+            UCFDReal v = 0.0;
+            for (col=0; col<blk; ++col)
+                v += mat[row*blk+col] * xprt[col];
+            arr[row] += v;
+        }
     }
+    for (kdx=0; kdx<blk; ++kdx)
+        y[idx*blk+kdx] = alpha*arr[kdx] + beta*y[idx*blk+kdx];
 }
 
 
 static ucfd_status_t
 SpMV_CUDABSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
+    BaseCSR *A = (BaseCSR *)mat->data;
 #if defined(DEBUG)
     CheckCUDAPointer(x);
     CheckCUDAPointer(y);
+    assert(x != y);
+    assert(A->bn != 0);
 #endif
-    BaseCSR *A = (BaseCSR *)mat->data;
     BaseBSR *bsr = (BaseBSR *)mat->data;
     UCFDInt bpg = (bsr->bn + TPB - 1)/TPB;
 

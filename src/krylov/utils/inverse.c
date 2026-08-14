@@ -96,7 +96,7 @@ void lusubmattrans(UCFDInt block, UCFDReal *LU, UCFDReal *B)
         }
 
         // Backward substitution
-        for (row=block-2; row>-1; row--) {
+        for (row=block-2; row>-1; --row) {
             for (scol=0; scol<block; ++scol) {
                 val = 0.0;
                 for (col=row+1; col<block; ++col)
