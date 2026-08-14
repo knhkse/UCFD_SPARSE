@@ -41,6 +41,32 @@ struct _FlowSys {
     FlowElem *eles;
 };
 
-UCFD_INTERN ucfd_status_t pre_lusgs(FlowSys, UCFDInt, UCFDInt, UCFDReal, UCFDReal*);
-UCFD_INTERN ucfd_status_t lower_sweep(FlowSys, UCFDInt, UCFDInt, UCFDReal, fluxfunc, UCFDReal*);
-UCFD_INTERN ucfd_status_t upper_sweep(FlowSys, UCFDInt, UCFDInt, UCFDReal, fluxfunc, UCFDReal*);
+UCFD_INTERN
+ucfd_status_t pre_lusgs(const UCFDInt nlocal, const UCFDInt nv0, const UCFDInt nv1,
+                        const UCFDReal kappa,
+                        const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_slots,
+                        const UCFDReal *restrict face_area, const UCFDReal *restrict rcp_vol,
+                        const UCFDReal *restrict lambdaf, UCFDReal *restrict diag);
+
+UCFD_INTERN
+ucfd_status_t lower_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
+                          fluxfunc fluxf, const UCFDReal *restrict lambdaf,
+                          const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfvars,
+                          const UCFDInt ndims, const UCFDInt nfaces,
+                          const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+                          const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+                          const UCFDReal *restrict face_area, const UCFDReal *restrict face_normal,
+                          const UCFDReal *restrict rcp_vol, const UCFDReal *restrict diag,
+                          const UCFDReal *restrict rank_u, UCFDReal *restrict rank_du);
+
+UCFD_INTERN
+ucfd_status_t upper_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
+                          fluxfunc fluxf, const UCFDReal *restrict lambdaf,
+                          const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfvars,
+                          const UCFDInt ndims, const UCFDInt nfaces,
+                          const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+                          const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+                          const UCFDReal *restrict face_area, const UCFDReal *restrict face_normal,
+                          const UCFDReal *restrict rcp_vol, const UCFDReal *restrict diag,
+                          const UCFDReal *restrict rank_u, UCFDReal *restrict rank_du);
+

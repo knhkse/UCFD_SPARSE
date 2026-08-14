@@ -2,6 +2,7 @@
 #include "flux.h"
 
 
+// ! Test functions
 void TestPack(FlowSys sys, UCFDInt eidx)
 {
     FlowElem *e  = &sys->eles[eidx];
@@ -45,23 +46,22 @@ void Exportrankdiag(FlowSys sys, UCFDReal *diag)
 }
 
 
-
-
-
-
 /**
  * Pack & update kernels => per-element execution
  */
-ucfd_status_t UCFDLUSGS_Pack(FlowSys sys, UCFDInt eidx,
-                             UCFDReal a0, UCFDReal turb_factor)
-{
-    FlowElem *e  = &sys->eles[eidx];
-    const UCFDInt nvars = sys->nvars, nfvars = sys->nfvars;
-    const UCFDInt *cell_ids = e->cell_ids;
-    UCFDReal *upts = e->uptsb, *rhs = e->rhs, *dt = e->dt, *dsrc = e->dsrc;
-    UCFDReal *rank_u = sys->u, *rank_du = sys->du, *rank_diag = sys->diag;
 
-    const UCFDInt neles = e->neles, nlocal = sys->nlocal;
+static ucfd_status_t
+UCFDLUSGS_Pack_Impl(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+                    const UCFDInt nfvars, const UCFDReal turb_factor, const UCFDReal a0,
+                    const UCFDInt *restrict cell_ids,
+                    const UCFDReal *restrict upts,
+                    const UCFDReal *restrict rhs,
+                    const UCFDReal *restrict dt,
+                    const UCFDReal *restrict dsrc,
+                    UCFDReal *restrict rank_u,
+                    UCFDReal *restrict rank_du,
+                    UCFDReal *restrict rank_diag)
+{
     UCFDInt idx, ridx, kdx, rank_idx, ele_idx;
     UCFDReal factor;
 
@@ -81,13 +81,26 @@ ucfd_status_t UCFDLUSGS_Pack(FlowSys sys, UCFDInt eidx,
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDLUSGS_Update(FlowSys sys, UCFDInt eidx)
+ucfd_status_t UCFDLUSGS_Pack(FlowSys sys, UCFDInt eidx,
+                             UCFDReal a0, UCFDReal turb_factor)
 {
-    FlowElem e  = sys->eles[eidx];
-    const UCFDInt nvars = sys->nvars, nlocal = sys->nlocal, neles = e.neles;
-    const UCFDInt *cell_ids = e.cell_ids;
-    UCFDReal *upts = e.uptsb, *rank_du = sys->du;
+    FlowElem *e  = &sys->eles[eidx];
 
+    UCFDCall(UCFDLUSGS_Pack_Impl(
+        sys->nlocal, e->neles, sys->nvars, sys->nfvars, turb_factor, a0,
+        e->cell_ids, e->uptsb, e->rhs, e->dt, e->dsrc,
+        sys->u, sys->du, sys->diag
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+static ucfd_status_t
+UCFDLUSGS_Update_Impl(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+                      const UCFDInt *restrict cell_ids,
+                      const UCFDReal *restrict rank_du,
+                      UCFDReal *restrict upts)
+{
     UCFDInt idx, ridx, kdx;
 
     OMPWrapper(ridx, kdx)
@@ -100,16 +113,35 @@ ucfd_status_t UCFDLUSGS_Update(FlowSys sys, UCFDInt eidx)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+ucfd_status_t UCFDLUSGS_Update(FlowSys sys, UCFDInt eidx)
+{
+    FlowElem *e  = &sys->eles[eidx];
+
+    UCFDCall(UCFDLUSGS_Update_Impl(
+        sys->nlocal, e->neles, sys->nvars,
+        e->cell_ids, sys->du, e->uptsb
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
 
 ucfd_status_t UCFDLUSGS_NSPrepare(FlowSys sys, UCFDReal kappa)
 {
-    UCFDCall(pre_lusgs(sys, 0, sys->nfvars, kappa, sys->fspr));
+    UCFDCall(pre_lusgs(
+        sys->nlocal, 0, sys->nfvars, kappa,
+        sys->rowptr, sys->slots, sys->face_area, sys->rcp_vol,
+        sys->fspr, sys->diag
+    ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 ucfd_status_t UCFDLUSGS_RANSPrepare(FlowSys sys, UCFDReal kappa)
 {
-    UCFDCall(pre_lusgs(sys, sys->nfvars, sys->nvars, kappa, sys->tfspr));
+    UCFDCall(pre_lusgs(
+        sys->nlocal, sys->nfvars, sys->nvars, kappa,
+        sys->rowptr, sys->slots, sys->face_area, sys->rcp_vol,
+        sys->tfspr, sys->diag
+    ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
@@ -117,7 +149,13 @@ ucfd_status_t UCFDLUSGS_NSLowerSweep(FlowSys sys, UCFDReal kappa)
 {
     fluxfunc f = ns_flux_container;
     
-    UCFDCall(lower_sweep(sys, 0, sys->nfvars, kappa, f, sys->fspr));
+    UCFDCall(lower_sweep(
+        0, sys->nfvars, kappa, f, sys->fspr,
+        sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
+        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
+        sys->face_normal, sys->rcp_vol, sys->diag,
+        sys->u, sys->du
+    ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
@@ -128,7 +166,13 @@ ucfd_status_t UCFDLUSGS_RANSLowerSweep(FlowSys sys, UCFDReal kappa)
 #endif
     fluxfunc f = rans_flux_container;
     
-    UCFDCall(lower_sweep(sys, sys->nfvars, sys->nvars, kappa, f, sys->tfspr));
+    UCFDCall(lower_sweep(
+        sys->nfvars, sys->nvars, kappa, f, sys->tfspr,
+        sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
+        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
+        sys->face_normal, sys->rcp_vol, sys->diag,
+        sys->u, sys->du
+    ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
@@ -136,7 +180,13 @@ ucfd_status_t UCFDLUSGS_NSUpperSweep(FlowSys sys, UCFDReal kappa)
 {
     fluxfunc f = ns_flux_container;
     
-    UCFDCall(upper_sweep(sys, 0, sys->nfvars, kappa, f, sys->fspr));
+    UCFDCall(upper_sweep(
+        0, sys->nfvars, kappa, f, sys->fspr,
+        sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
+        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
+        sys->face_normal, sys->rcp_vol, sys->diag,
+        sys->u, sys->du
+    ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
@@ -147,7 +197,13 @@ ucfd_status_t UCFDLUSGS_RANSUpperSweep(FlowSys sys, UCFDReal kappa)
 #endif
     fluxfunc f = rans_flux_container;
     
-    UCFDCall(upper_sweep(sys, sys->nfvars, sys->nvars, kappa, f, sys->tfspr));
+    UCFDCall(upper_sweep(
+        sys->nfvars, sys->nvars, kappa, f, sys->tfspr,
+        sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
+        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
+        sys->face_normal, sys->rcp_vol, sys->diag,
+        sys->u, sys->du
+    ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 

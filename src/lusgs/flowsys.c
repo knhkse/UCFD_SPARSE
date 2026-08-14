@@ -4,13 +4,12 @@
 #include "flowsys.h"
 
 
-ucfd_status_t pre_lusgs(FlowSys sys, UCFDInt nv0, UCFDInt nv1, UCFDReal kappa, UCFDReal *lambdaf)
+ucfd_status_t pre_lusgs(const UCFDInt nlocal, const UCFDInt nv0, const UCFDInt nv1,
+                        const UCFDReal kappa,
+                        const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_slots,
+                        const UCFDReal *restrict face_area, const UCFDReal *restrict rcp_vol,
+                        const UCFDReal *restrict lambdaf, UCFDReal *restrict diag)
 {
-    const UCFDInt nlocal = sys->nlocal;
-    const UCFDInt *face_indptr = sys->rowptr, *face_slots = sys->slots;
-    const UCFDReal *face_area = sys->face_area, *rcp_vol = sys->rcp_vol;
-    UCFDReal *diag = sys->diag;
-
     UCFDInt ridx, pos, slot, kdx, st, ed;
     UCFDReal lamf, spectral_diag;
 
@@ -33,9 +32,11 @@ ucfd_status_t pre_lusgs(FlowSys sys, UCFDInt nv0, UCFDInt nv1, UCFDReal kappa, U
 }
 
 
-static inline void diff_flux(UCFDInt nvars, UCFDInt nfvars, UCFDInt nturbvars, UCFDInt ndims, UCFDInt dnv,
+static inline void diff_flux(UCFDInt nvars, UCFDInt nfvars, UCFDInt nturbvars,
+                             UCFDInt ndims, UCFDInt dnv,
                              fluxfunc fluxf,
-                             UCFDReal *u, UCFDReal *du, UCFDReal *df, UCFDReal *nf)
+                             UCFDReal *restrict u, UCFDReal *restrict du, 
+                             UCFDReal *restrict df, UCFDReal *restrict nf)
 {
     UCFDInt i;
     UCFDReal f[dnv];
@@ -46,20 +47,21 @@ static inline void diff_flux(UCFDInt nvars, UCFDInt nfvars, UCFDInt nturbvars, U
 }
 
 
-ucfd_status_t lower_sweep(FlowSys sys, UCFDInt nv0, UCFDInt nv1, UCFDReal kappa,
-                          fluxfunc fluxf, UCFDReal *lambdaf)
+// ucfd_status_t lower_sweep(FlowSys sys, UCFDInt nv0, UCFDInt nv1, UCFDReal kappa,
+//                           fluxfunc fluxf, UCFDReal *lambdaf)
+ucfd_status_t lower_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
+                          fluxfunc fluxf, const UCFDReal *restrict lambdaf,
+                          const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfvars,
+                          const UCFDInt ndims, const UCFDInt nfaces,
+                          const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+                          const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+                          const UCFDReal *restrict face_area, const UCFDReal *restrict face_normal,
+                          const UCFDReal *restrict rcp_vol, const UCFDReal *restrict diag,
+                          const UCFDReal *restrict rank_u, UCFDReal *restrict rank_du)
 {
-    const UCFDInt nvars = sys->nvars, nfvars = sys->nfvars, ntvars = sys->nturbvars;
-    const UCFDInt ndims = sys->ndims, nfaces = sys->nfaces, nlocal = sys->nlocal;
-    const UCFDInt *face_indptr = sys->rowptr, *face_slots = sys->slots;
-    const UCFDInt8 *face_sides = sys->sides;
-    const UCFDInt *face_neighbors = sys->colidx;
-    const UCFDReal *face_area = sys->face_area, *face_normal = sys->face_normal, *rcp_vol = sys->rcp_vol;
-    UCFDReal *rank_u = sys->u, *rank_du = sys->du, *diag = sys->diag;
-
     UCFDInt ridx, kdx, pos, neib, slot;
     UCFDInt8 side;
-    const UCFDInt dnv = nv1 - nv0;
+    const UCFDInt dnv = nv1 - nv0, ntvars = nvars - nfvars;
     UCFDReal du[nvars], dfj[dnv], df[dnv];
     UCFDReal u[nvars], nf[ndims];
     UCFDReal fv;
@@ -97,20 +99,19 @@ ucfd_status_t lower_sweep(FlowSys sys, UCFDInt nv0, UCFDInt nv1, UCFDReal kappa,
 }
 
 
-ucfd_status_t upper_sweep(FlowSys sys, UCFDInt nv0, UCFDInt nv1, UCFDReal kappa,
-                          fluxfunc fluxf, UCFDReal *lambdaf)
+ucfd_status_t upper_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
+                          fluxfunc fluxf, const UCFDReal *restrict lambdaf,
+                          const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfvars,
+                          const UCFDInt ndims, const UCFDInt nfaces,
+                          const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+                          const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+                          const UCFDReal *restrict face_area, const UCFDReal *restrict face_normal,
+                          const UCFDReal *restrict rcp_vol, const UCFDReal *restrict diag,
+                          const UCFDReal *restrict rank_u, UCFDReal *restrict rank_du)
 {
-    const UCFDInt nvars = sys->nvars, nfvars = sys->nfvars, ntvars = sys->nturbvars;
-    const UCFDInt ndims = sys->ndims, nfaces = sys->nfaces, nlocal = sys->nlocal;
-    const UCFDInt *face_indptr = sys->rowptr, *face_slots = sys->slots;
-    const UCFDInt8 *face_sides = sys->sides;
-    const UCFDInt *face_neighbors = sys->colidx;
-    const UCFDReal *face_area = sys->face_area, *face_normal = sys->face_normal, *rcp_vol = sys->rcp_vol;
-    UCFDReal *rank_u = sys->u, *rank_du = sys->du, *diag = sys->diag;
-
     UCFDInt ridx, kdx, pos, neib, slot;
     UCFDInt8 side;
-    const UCFDInt dnv = nv1 - nv0;
+    const UCFDInt dnv = nv1 - nv0, ntvars = nvars - nfvars;
     UCFDReal du[nvars], dfj[dnv], df[dnv];
     UCFDReal u[nvars], nf[ndims];
     UCFDReal fv;
