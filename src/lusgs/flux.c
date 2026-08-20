@@ -26,7 +26,7 @@
  *              typically Rusanov flux is implemented.  
  *              Therefore, only convective flux is used.
  */
-void ns_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f)
+void ns_flux_container(UCFDInt nfvars, UCFDInt nturbvars, UCFDInt ndims, UCFDReal *u, UCFDReal *nf, UCFDReal *f)
 {   
     /**
      * Variable description :  
@@ -36,12 +36,12 @@ void ns_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f)
      * `contrav` : Contravariant velocity
      */
     UCFDReal rho = u[0];
-    UCFDReal et = u[NFVARS-1];
+    UCFDReal et = u[nfvars-1];
     UCFDReal temp = 0.0;
     UCFDReal contrav = 0.0;
     int i;
 
-    for (i=0; i<NDIMS; i++) {
+    for (i=0; i<ndims; ++i) {
         contrav += u[i+1]*nf[i];
         temp += u[i+1]*u[i+1];
     }
@@ -52,7 +52,7 @@ void ns_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f)
     if (p < PMIN) {
         p = PMIN;
         et = p/(GAMMA-1.0) + 0.5*temp/rho;
-        u[NFVARS-1] = et;
+        u[nfvars-1] = et;
     }
     
     // Total enthalpy
@@ -60,10 +60,10 @@ void ns_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f)
 
     // Computes flux array
     f[0] = rho*contrav;
-    for (UCFDInt i=0; i<NDIMS; i++) {
+    for (UCFDInt i=0; i<ndims; ++i) {
         f[i+1] = u[i+1] * contrav + nf[i]*p;
     }
-    f[NFVARS-1] = ht*contrav;
+    f[nfvars-1] = ht*contrav;
 }
 
 /**
@@ -74,35 +74,18 @@ void ns_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f)
  *              Convective flux in RANS equations is computed
  *              simply by multiplying conservative variables and contravariant velocity.
  */
-void rans_flux_container(UCFDReal *u, UCFDReal *nf, UCFDReal *f)
+void rans_flux_container(UCFDInt nfvars, UCFDInt nturbvars, UCFDInt ndims, UCFDReal *u, UCFDReal *nf, UCFDReal *f)
 {
     UCFDReal rho = u[0];
     UCFDReal contrav = 0.0;
 
-    for (UCFDInt i=0; i<NDIMS; i++) {
+    for (UCFDInt i=0; i<ndims; ++i) {
         contrav += u[i+1] * nf[i];
     }
     contrav /= rho;
 
-    for (UCFDInt i=0; i<NTURBVARS; i++) {
-        f[i] = u[NFVARS+i]*contrav;
+    for (UCFDInt i=0; i<nturbvars; ++i) {
+        f[i] = u[nfvars+i]*contrav;
     }
 }
 
-
-ucfd_status_t rans_source_jacobian(UCFDReal *uf, UCFDReal tmat[NTURBVARS][NTURBVARS], UCFDReal *dsrc)
-{
-    /* 1-equation RANS model (Spalart-Allmaras) */
-    if (NTURBVARS == 1) tmat[0][0] += dsrc[NVARS-1];
-
-    /* 2-equations RANS model (kw-SST) */
-    else if (NTURBVARS == 2) {
-        UCFDReal k = uf[NVARS-2] / uf[0];
-        tmat[0][0] += dsrc[NVARS-2];
-        tmat[0][1] += max(BETAST*k, 0.0);
-        tmat[1][1] += dsrc[NVARS-1];
-    }
-    else return UCFD_STATUS_NOT_SUPPORTED;
-
-    return UCFD_SUCCESS;
-}

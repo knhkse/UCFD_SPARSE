@@ -1,326 +1,321 @@
-/** ======================================================================================================================
- * @file        lusgs.c
- * @brief       LU-SGS time integration method for unstructured grid.
- * @details     LU-SGS time integration method (Single thread only).  
- *              To compute solution of the next time step, refer to the following steps.  
- *                
- *              (1) Preparing LU-SGS :  
- *                  Computes diagonal matrix of the Implicit operator.  
- *              (2) Lower sweep :  
- *                  First step of LU-SGS method, which computes intermediate solution difference array.  
- *              (3) Upper sweep :  
- *                  Second step of LU-SGS method, which computes next solution difference array.  
- *              (4) Update :  
- *                  Time integration by adding current solution with next time step solution difference.  
- * 
- * @note        In case of RANS equations, add rans_serial_{}_sweep function right after the ns_serial_{}_sweep function.  
- *              Be aware that ns and rans sweep function must be paired with each sweep step.
- * 
- * @author
- *              - Namhyoung Kim (knhkse@inha.edu), Department of Aerospace Engineering, Inha University
- *              - Jin Seok Park (jinseok.park@inha.ac.kr), Department of Aerospace Engineering, Inha University
- * 
- * @date        July 2024
- * @version     1.0
- * @par         Copyright
- *              Copyright (c) 2024, Namhyoung Kim and Jin Seok Park, Inha University, All rights reserved.
- * @par         License
- *              This project is release under the terms of the MIT License (see LICENSE file).
- * 
- * =======================================================================================================================
- */
-#include "lusgs.h"
+#include "flowsys.h"
 #include "flux.h"
 
+
 /**
- * @details     This function computes diagonal matrix of the implicit operator.
- *              In LU-SGS method, implicit operator is replaced with `spectral radius`,
- *              so that all element except diagonal is zero.
- *              Therefore, `diag` array can be allocated as one-dimensional,
- *              which has less memory requirement.  
- *              Diffusive margin of wave speed is applied.
+ * Pack & update kernels => per-element execution
  */
-void serial_pre_lusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
-                      UCFDReal *fnorm_vol, UCFDReal *dt, UCFDReal *diag, UCFDReal *fspr)
+static ucfd_status_t
+lusgs_pack(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+           const UCFDInt nfvars, const UCFDReal turb_factor, const UCFDReal a0,
+           const UCFDInt *restrict cell_ids,
+           const UCFDReal *restrict upts,
+           const UCFDReal *restrict rhs,
+           const UCFDReal *restrict dt,
+           const UCFDReal *restrict dsrc,
+           UCFDReal *restrict rank_u,
+           UCFDReal *restrict rank_du,
+           UCFDReal *restrict rank_diag)
 {
-    UCFDInt idx;       // Element index
-    UCFDInt jdx;       // Face index
-    UCFDReal lamf;    // Spectral radius at each face
+    UCFDInt idx, ridx, kdx, rank_idx, ele_idx;
+    UCFDReal factor;
 
-    for (idx=0; idx<neles; idx++) {
-        // Diagonals of implicit operator
-        diag[idx] = 1.0/(dt[idx]*factor);
-
-        for (jdx=0; jdx<nface; jdx++) {
-            // Apply diffusive margin of wave speed at face
-            lamf = fspr[neles*jdx + idx]*1.01;
-
-            // Save spectral radius
-            fspr[neles*jdx + idx] = lamf;
-
-            // Add portion of lower and upper spectral radius
-            diag[idx] += 0.5*lamf*fnorm_vol[neles*jdx + idx];
+    OMPWrapper(ridx, kdx, rank_idx, ele_idx, factor)
+    for (idx=0; idx<neles; ++idx)
+    {
+        ridx = cell_ids[idx];
+        for (kdx=0; kdx<nvars; ++kdx) {
+            rank_idx = ridx + kdx*nlocal;
+            ele_idx = idx + kdx*neles;
+            factor = kdx < nfvars ? 1.0 : turb_factor;
+            rank_u[rank_idx] = upts[ele_idx];
+            rank_du[rank_idx] = rhs[ele_idx];
+            rank_diag[rank_idx] = 1.0/(dt[idx]*factor) + a0 + dsrc[ele_idx];
         }
     }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDLUSGS_Pack(FlowSys sys, UCFDInt eidx,
+                             UCFDReal turb_factor, UCFDReal a0)
+{
+    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    FlowElem *e  = &(sys->eles[eidx]);
+
+    UCFDCall(lusgs_pack(
+        sys->nlocal, e->neles, sys->nvars, sys->nfvars, turb_factor, a0,
+        e->cell_ids, e->uptsb, e->rhs, e->dt, e->dsrc,
+        lusgs->u, lusgs->du, lusgs->diag
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+static ucfd_status_t
+rank_lusgs_update(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+                  const UCFDInt *restrict cell_ids,
+                  const UCFDReal *restrict rank_du,
+                  UCFDReal *restrict upts)
+{
+    UCFDInt idx, ridx, kdx;
+
+    OMPWrapper(ridx, kdx)
+    for (idx=0; idx<neles; ++idx)
+    {
+        ridx = cell_ids[idx];
+        for (kdx=0; kdx<nvars; ++kdx)
+            upts[idx + kdx*neles] += rank_du[ridx + kdx*nlocal];
+    }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDLUSGS_Update(FlowSys sys, UCFDInt eidx)
+{
+    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    FlowElem *e  = &sys->eles[eidx];
+
+    UCFDCall(rank_lusgs_update(
+        sys->nlocal, e->neles, sys->nvars,
+        e->cell_ids, lusgs->du, e->uptsb
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+/**
+ * Preparation => Compute diagonal element
+ */
+static ucfd_status_t
+pre_lusgs(const UCFDInt nlocal, const UCFDInt nv0, const UCFDInt nv1,
+          const UCFDReal kappa,
+          const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_slots,
+          const UCFDReal *restrict face_area, const UCFDReal *restrict rcp_vol,
+          const UCFDReal *restrict lambdaf, UCFDReal *restrict diag)
+{
+    UCFDInt ridx, pos, slot, kdx, st, ed;
+    UCFDReal lamf, spectral_diag;
+
+    OMPWrapper(st, ed, spectral_diag, pos, slot, lamf, kdx)
+    for (ridx=0; ridx<nlocal; ++ridx)
+    {
+        st = face_indptr[ridx];
+        ed = face_indptr[ridx+1];
+        spectral_diag = 0.0;
+        for (pos=st; pos<ed; ++pos)
+        {
+            slot = face_slots[pos];
+            lamf = lambdaf[slot]*kappa;
+            spectral_diag += 0.5*lamf*face_area[slot]*rcp_vol[ridx];
+        }
+        for (kdx=nv0; kdx<nv1; ++kdx)
+            diag[ridx+kdx*nlocal] += spectral_diag;
+    }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDLUSGS_NSPrepare(FlowSys sys, UCFDReal kappa)
+{
+    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+
+    UCFDCall(pre_lusgs(
+        sys->nlocal, 0, sys->nfvars, kappa,
+        sys->rowptr, sys->slots, sys->face_area, sys->rcp_vol,
+        lusgs->fspr, lusgs->diag
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDLUSGS_RANSPrepare(FlowSys sys, UCFDReal kappa)
+{
+    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+
+    UCFDCall(pre_lusgs(
+        sys->nlocal, sys->nfvars, sys->nvars, kappa,
+        sys->rowptr, sys->slots, sys->face_area, sys->rcp_vol,
+        lusgs->tfspr, lusgs->diag
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 
 /**
- * @details     By processing lower sweep, intermediate solution \f$\Delta Q^*\f$ is computed.
- *              This function is used for Euler or Navier-Stokes equations,
- *              which has the same flux shape.  
- *              solution array is stored in `dub` array.
+ * Sweep functions
  */
-void serial_ns_lower_sweep(UCFDInt neles, UCFDInt nface, UCFDInt *nei_ele, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
-                           UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr)
-{   
-    UCFDInt idx, neib, jdx, kdx;
-    UCFDReal du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
-    UCFDReal u[NFVARS], f[NFVARS];
+static inline void diff_flux(UCFDInt nvars, UCFDInt nfvars, UCFDInt nturbvars,
+                             UCFDInt ndims, UCFDInt dnv,
+                             fluxfunc fluxf,
+                             UCFDReal *restrict u, UCFDReal *restrict du, 
+                             UCFDReal *restrict df, UCFDReal *restrict nf)
+{
+    UCFDInt i;
+    UCFDReal f[dnv];
+    for (i=0; i<nvars; ++i) du[i] += u[i];
+    fluxf(nfvars, nturbvars, ndims, u, nf, f);
+    fluxf(nfvars, nturbvars, ndims, du, nf, df);
+    for (i=0; i<dnv; ++i) df[i] -= f[i];
+}
+
+static ucfd_status_t
+lower_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
+            fluxfunc fluxf, const UCFDReal *restrict lambdaf,
+            const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfvars,
+            const UCFDInt ndims, const UCFDInt nfaces,
+            const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+            const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+            const UCFDReal *restrict face_area, const UCFDReal *restrict face_normal,
+            const UCFDReal *restrict rcp_vol, const UCFDReal *restrict diag,
+            const UCFDReal *restrict rank_u, UCFDReal *restrict rank_du)
+{
+    UCFDInt ridx, kdx, pos, neib, slot;
+    UCFDInt8 side;
+    const UCFDInt dnv = nv1 - nv0, ntvars = nvars - nfvars;
+    UCFDReal du[nvars], dfj[dnv], df[dnv];
+    UCFDReal u[nvars], nf[ndims];
+    UCFDReal fv;
+
+    for (ridx=0; ridx<nlocal; ++ridx)
+    {
+        for (kdx=0; kdx<dnv; ++kdx) df[kdx] = 0.0;
+
+        const UCFDInt pos_st = face_indptr[ridx];
+        const UCFDInt pos_end = face_indptr[ridx+1];
+        for (pos=pos_st; pos<pos_end; ++pos)
+        {
+            neib = face_neighbors[pos];
+            if (neib < ridx) {
+                slot = face_slots[pos];
+                for (kdx=0; kdx<nvars; ++kdx) u[kdx] = rank_u[neib+kdx*nlocal];
+                side = face_sides[pos];
+                for (kdx=0; kdx<ndims; ++kdx) nf[kdx] = side*face_normal[slot+kdx*nfaces];
+                fv = face_area[slot] * rcp_vol[ridx];
+
+                for (kdx=0; kdx<nvars; ++kdx) du[kdx] = 0.0;
+                for (kdx=nv0; kdx<nv1; ++kdx) du[kdx] = rank_du[neib + kdx*nlocal];
+                diff_flux(nvars, nfvars, ntvars, ndims, dnv, fluxf, u, du, dfj, nf);
+
+                for (kdx=0; kdx<dnv; ++kdx)
+                    df[kdx] += (dfj[kdx] - kappa*lambdaf[slot]*rank_du[neib+(kdx+nv0)*nlocal])*fv;
+            }
+        }
+        for (kdx=0; kdx<dnv; ++kdx) {
+            const UCFDInt ldx = ridx + (kdx+nv0)*nlocal;
+            rank_du[ldx] = (rank_du[ldx] - 0.5*df[kdx])/diag[ldx];
+        }
+    }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t
+upper_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
+            fluxfunc fluxf, const UCFDReal *restrict lambdaf,
+            const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfvars,
+            const UCFDInt ndims, const UCFDInt nfaces,
+            const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+            const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+            const UCFDReal *restrict face_area, const UCFDReal *restrict face_normal,
+            const UCFDReal *restrict rcp_vol, const UCFDReal *restrict diag,
+            const UCFDReal *restrict rank_u, UCFDReal *restrict rank_du)
+{
+    UCFDInt ridx, kdx, pos, neib, slot;
+    UCFDInt8 side;
+    const UCFDInt dnv = nv1 - nv0, ntvars = nvars - nfvars;
+    UCFDReal du[nvars], dfj[dnv], df[dnv];
+    UCFDReal u[nvars], nf[ndims];
+    UCFDReal fv;
+
+    const UCFDInt i_begin = nlocal-1;
+
+    for (ridx=i_begin; ridx>-1; --ridx)
+    {
+        for (kdx=0; kdx<dnv; ++kdx) df[kdx] = 0.0;
+
+        const UCFDInt pos_st = face_indptr[ridx];
+        const UCFDInt pos_end = face_indptr[ridx+1];
+        for (pos=pos_st; pos<pos_end; ++pos)
+        {
+            neib = face_neighbors[pos];
+            if (neib > ridx) {
+                slot = face_slots[pos];
+                for (kdx=0; kdx<nvars; ++kdx) u[kdx] = rank_u[neib+kdx*nlocal];
+                side = face_sides[pos];
+                for (kdx=0; kdx<ndims; ++kdx) nf[kdx] = side*face_normal[slot+kdx*nfaces];
+                fv = face_area[slot] * rcp_vol[ridx];
+
+                for (kdx=0; kdx<nvars; ++kdx) du[kdx] = 0.0;
+                for (kdx=nv0; kdx<nv1; ++kdx) du[kdx] = rank_du[neib + kdx*nlocal];
+                diff_flux(nvars, nfvars, ntvars, ndims, dnv, fluxf, u, du, dfj, nf);
+
+                for (kdx=0; kdx<dnv; ++kdx)
+                    df[kdx] += (dfj[kdx] - kappa*lambdaf[slot]*rank_du[neib+(kdx+nv0)*nlocal])*fv;
+            }
+        }
+        for (kdx=0; kdx<dnv; ++kdx) {
+            const UCFDInt ldx = ridx + (kdx+nv0)*nlocal;
+            rank_du[ldx] -= (0.5*df[kdx] / diag[ldx]);
+        }
+    }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDLUSGS_NSLowerSweep(FlowSys sys, UCFDReal kappa)
+{
+    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    fluxfunc f = ns_flux_container;
     
-    // Lower sweep via mapping
-    for (idx=0; idx<neles; idx++) {
-        // Initialize `df` array
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            df[kdx] = 0.0;
-        }
-
-        // Set of faces surrounding a cell
-        for (jdx=0; jdx<nface; jdx++) {
-            // Get face normal vector
-            for (kdx=0; kdx<NDIMS; kdx++) {
-                nf[kdx] = vec_fnorm[NDIMS*neles*jdx + neles*kdx + idx];
-            }
-
-            // Neighbor element index meet at face
-            neib = nei_ele[neles*jdx + idx];
-
-            // Only for lower neighbor cell
-            if (neib < idx) {
-                for (kdx=0; kdx<NFVARS; kdx++) {
-                    u[kdx] = uptsb[neles*kdx + neib];
-                    du[kdx] = u[kdx] + dub[neles*kdx + neib];
-                }
-                
-                ns_flux_container(u, nf, f);
-                ns_flux_container(du, nf, dfj);
-
-                for (kdx=0; kdx<NFVARS; kdx++) {
-                    dfj[kdx] -= f[kdx];
-                }
-
-                for (kdx=0; kdx<NFVARS; kdx++) {
-                    df[kdx] += (dfj[kdx] - fspr[neles*jdx + idx] \
-                                * dub[neles*kdx + neib])*fnorm_vol[neles*jdx + idx];
-                }
-            }
-        }
-        // Update dub array
-        for (kdx=0; kdx<NFVARS; kdx++)
-            dub[neles*kdx + idx] = (dub[neles*kdx + idx] - 0.5*df[kdx])/diag[idx];
-    }
+    UCFDCall(lower_sweep(
+        0, sys->nfvars, kappa, f, lusgs->fspr,
+        sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
+        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
+        sys->face_normal, sys->rcp_vol, lusgs->diag,
+        lusgs->u, lusgs->du
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-/**
- * @details     By processing lower sweep, intermediate solution \f$\Delta Q^*\f$ is computed.
- *              This function is used for RANS equations.  
- *              solution array is stored in `dub` array.
- */
-void serial_rans_lower_sweep(UCFDInt neles, UCFDInt nface, UCFDInt *nei_ele, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm, 
-                             UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr, UCFDReal *dsrc)
+ucfd_status_t UCFDLUSGS_RANSLowerSweep(FlowSys sys, UCFDReal kappa)
 {
-    UCFDInt idx, neib, jdx, kdx;
-    UCFDReal du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
-    UCFDReal u[NVARS], f[NTURBVARS];
-
-    // Lower sweep via mapping
-    for (idx=0; idx<neles; idx++) {
-        // Initialize `df` array
-        for (kdx=0; kdx<NTURBVARS; kdx++) {
-            df[kdx] = 0.0;
-        }
-        
-        // Set of faces surrounding a cell
-        for (jdx=0; jdx<nface; jdx++) {
-            // Get face normal vector
-            for (kdx=0; kdx<NDIMS; kdx++) {
-                nf[kdx] = vec_fnorm[NDIMS*neles*jdx + neles*kdx + idx];
-            }
-            
-            // Neighbor element index meet at face
-            neib = nei_ele[neles*jdx + idx];
-
-            // Only for lower neighbor cell
-            if (neib < idx) {
-                for (kdx=0; kdx<NVARS; kdx++) {
-                    u[kdx] = uptsb[neles*kdx + neib];
-                    du[kdx] = u[kdx];
-                }
-
-                for (kdx=NFVARS; kdx<NVARS; kdx++) {
-                    du[kdx] += dub[neles*kdx + neib];
-                }
-                
-                rans_flux_container(u, nf, f);
-                rans_flux_container(du, nf, dfj);
-
-                for (kdx=0; kdx<NTURBVARS; kdx++) {
-                    dfj[kdx] -= f[kdx];
-                }
-
-                for (kdx=0; kdx<NTURBVARS; kdx++) {
-                    df[kdx] += (dfj[kdx] - fspr[neles*jdx + idx] \
-                                * dub[neles*(kdx+NFVARS) + neib]) * fnorm_vol[neles*jdx + idx];
-                }
-            }
-        }
-        // Update dub array
-        for (kdx=0; kdx<NTURBVARS; kdx++) {
-            dub[neles*(kdx+NFVARS) + idx] = (dub[neles*(kdx+NFVARS)+idx] - \
-                                            0.5*df[kdx])/(diag[idx]+dsrc[neles*(kdx+NFVARS)+idx]);
-        }
-    }
+    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    fluxfunc f = rans_flux_container;
+#if defined(DEBUG)
+    UCFDCheckNull(lusgs->tfspr, "Turbulent spectral radius is not set\n");
+#endif
+    UCFDCall(lower_sweep(
+        sys->nfvars, sys->nvars, kappa, f, lusgs->tfspr,
+        sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
+        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
+        sys->face_normal, sys->rcp_vol, lusgs->diag,
+        lusgs->u, lusgs->du
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
-/**
- * @details     By processing upper sweep, next time step solution \f$\Delta Q\f$ is computed.
- *              This function is used for Euler or Navier-Stokes equations,
- *              which has the same flux shape.  
- *              Solution difference array is stored in `dub` array,
- *              since right-hand-side array is no longer needed.
- */
-void serial_ns_upper_sweep(UCFDInt neles, UCFDInt nface, UCFDInt *nei_ele, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
-                           UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr)
+ucfd_status_t UCFDLUSGS_NSUpperSweep(FlowSys sys, UCFDReal kappa)
 {
-    UCFDInt idx, neib, jdx, kdx;
-    UCFDReal du[NFVARS], dfj[NFVARS], df[NFVARS], nf[NDIMS];
-    UCFDReal u[NFVARS], f[NFVARS];
+    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    fluxfunc f = ns_flux_container;
     
-    // Upper sweep via mapping
-    for (idx=neles-1; idx>-1; idx--) {
-        // Initialize `df` array
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            df[kdx] = 0.0;
-        }
-        
-        // Set of faces surrounding a cell
-        for (jdx=0; jdx<nface; jdx++) {
-            // Get face normal vector
-            for (kdx=0; kdx<NDIMS; kdx++) {
-                nf[kdx] = vec_fnorm[NDIMS*neles*jdx + neles*kdx + idx];
-            }
-            
-            // Neighbor element index meet at face
-            neib = nei_ele[neles*jdx + idx];
-
-            // Only for upper neighbor cell
-            if (neib > idx) {
-                for (kdx=0; kdx<NFVARS; kdx++) {
-                    u[kdx] = uptsb[neles*kdx + neib];
-                    du[kdx] = u[kdx] + dub[neles*kdx + neib];
-                }
-                
-                ns_flux_container(u, nf, f);
-                ns_flux_container(du, nf, dfj);
-
-                for (kdx=0; kdx<NFVARS; kdx++) {
-                    dfj[kdx] -= f[kdx];
-                }
-                
-                for (kdx=0; kdx<NFVARS; kdx++) {
-                    df[kdx] += (dfj[kdx] - fspr[neles*jdx + idx] \
-                                * dub[neles*kdx + neib])*fnorm_vol[neles*jdx + idx];
-                }
-            }
-        }
-        // Update dub array
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            dub[neles*kdx + idx] = dub[neles*kdx + idx] - 0.5*df[kdx]/diag[idx];
-        }
-    }
+    UCFDCall(upper_sweep(
+        0, sys->nfvars, kappa, f, lusgs->fspr,
+        sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
+        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
+        sys->face_normal, sys->rcp_vol, lusgs->diag,
+        lusgs->u, lusgs->du
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
-/**
- * @details     By processing upper sweep, next time step solution \f$\Delta Q\f$ is computed.
- *              This function is used for RANS equations.  
- *              Solution array is stored in `dub` array,
- *              since right-hand-side array is no longer needed.
- */
-void serial_rans_upper_sweep(UCFDInt neles, UCFDInt nface, UCFDInt *nei_ele, UCFDReal *fnorm_vol, UCFDReal *vec_fnorm,
-                             UCFDReal *uptsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fspr, UCFDReal *dsrc)
+ucfd_status_t UCFDLUSGS_RANSUpperSweep(FlowSys sys, UCFDReal kappa)
 {
-    UCFDInt idx, neib, jdx, kdx;
-    UCFDReal du[NVARS], dfj[NTURBVARS], df[NTURBVARS], nf[NDIMS];
-    UCFDReal u[NVARS], f[NTURBVARS];
-
-    // Upper sweep via mapping
-    for (idx=neles-1; idx>-1; idx--) {
-        // Initialize `df` array
-        for (kdx=0; kdx<NTURBVARS; kdx++) {
-            df[kdx] = 0.0;
-        }
-        
-        // Set of faces surrounding a cell
-        for (jdx=0; jdx<nface; jdx++) {
-            // Get face normal vector
-            for (kdx=0; kdx<NDIMS; kdx++) {
-                nf[kdx] = vec_fnorm[NDIMS*neles*jdx + neles*kdx + idx];
-            }
-
-            // Neighbor element index meet at face
-            neib = nei_ele[neles*jdx + idx];
-
-            // Only for upper neighbor cell
-            if (neib > idx) {
-                for (kdx=0; kdx<NVARS; kdx++) {
-                    u[kdx] = uptsb[neles*kdx + neib];
-                    du[kdx] = u[kdx];
-                }
-
-                for (kdx=NFVARS; kdx<NVARS; kdx++) {
-                    du[kdx] += dub[neles*kdx + neib];
-                }
-
-                rans_flux_container(u, nf, f);
-                rans_flux_container(du, nf, dfj);
-
-                for (kdx=0; kdx<NTURBVARS; kdx++) {
-                    dfj[kdx] -= f[kdx];
-                }
-
-                for (kdx=0; kdx<NTURBVARS; kdx++) {
-                    df[kdx] += (dfj[kdx] - fspr[neles*jdx+idx] \
-                                * dub[neles*(kdx+NFVARS)+neib])*fnorm_vol[neles*jdx+idx];
-                }
-            }
-        }
-        // Update dub array
-        for (kdx=0; kdx<NTURBVARS; kdx++) {
-            dub[neles*(kdx+NFVARS)+idx] = dub[neles*(kdx+NFVARS)+idx] - \
-                                        0.5*df[kdx]/(diag[idx] + dsrc[neles*(kdx+NFVARS)+idx]);
-        }
-    }
-}
-
-
-/**
- * @details     solution array updated by adding \f$\Delta Q\f$.
- *              Be aware that `dub` array in function parameter
- *              is the difference array after upper sweep,
- *              not the right-hand-side array.
- */
-void serial_lusgs_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub)
-{
-    UCFDInt idx, kdx;
-    
-    // Iterate for all cell
-    for (idx=0; idx<neles; idx++) {
-        // Update conservative variables
-        for (kdx=0; kdx<NVARS; kdx++) {
-            // Indexing 2D array as 1D
-            uptsb[neles*kdx + idx] += dub[neles*kdx + idx];
-        }
-    }
+    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    fluxfunc f = rans_flux_container;
+#if defined(DEBUG)
+    UCFDCheckNull(lusgs->tfspr, "Turbulent spectral radius is not set\n");
+#endif    
+    UCFDCall(upper_sweep(
+        sys->nfvars, sys->nvars, kappa, f, lusgs->tfspr,
+        sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
+        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
+        sys->face_normal, sys->rcp_vol, lusgs->diag,
+        lusgs->u, lusgs->du
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }

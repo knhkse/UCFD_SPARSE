@@ -1,420 +1,440 @@
-/** ======================================================================================================================
- * @file        blusgs.c
- * @brief       Block LU-SGS time integration method for unstructured grid.
- * @details     Block LU-SGS time integration method (Single thread only).  
- *              In contrast to LU-SGS method, Block LU-SGS method uses `block operator` instead of `spectral radius`.  
- *              Computation process is same with LU-SGS.  
- *              For more information, refer to the `lusgs.c`.  
- * 
- * @note        In case of RANS equations, add rans_serial_pre_blusgs function right after the ns_serial_pre_blusgs function.  
- *              Also, add rans_serial_{}_sweep function right after the ns_serial_{}_sweep function.  
- *              Be aware that ns and rans pre_blusgs/sweep functions must be paired with each sweep step.
- * 
- * @author
- *              - Namhyoung Kim (knhkse@inha.edu), Department of Aerospace Engineering, Inha University
- *              - Jin Seok Park (jinseok.park@inha.ac.kr), Department of Aerospace Engineering, Inha University
- * 
- * @date        Nov 2024
- * @version     1.0
- * @par         Copyright
- *              Copyright (c) 2024, Namhyoung Kim and Jin Seok Park, Inha University, All rights reserved.
- * @par         License
- *              This project is release under the terms of the MIT License (see LICENSE file).
- * 
- * =======================================================================================================================
- */
-#include "blusgs.h"
+#include <string.h>
+#include "flowsys.h"
 #include "flux.h"
 #include "inverse.h"
-#include <stdio.h>
 
 
 /**
- * @details     This function computes diagonal matrices of the implicit operator.
- *              In Block LU-SGS method, implicit operator is approximated with `block operator`.
- *              Diagonal matrices is composed of block operator matrix, which size is n-by-n.
- *              `n` is the number of conservative variables in Navier-Stokes equations,
- *              or the number of turbulent variables in RANS equations.
+ * ! ----------------- array structure -------------
+ * rhs, du, dup : [nlocal, nvars]   <- different with pyBaram
+ * diag : [nlocal, nfvars, nfvars]
+ * tdiag : [nlocal, nturbvars, nturbvars]
  */
-void ns_serial_pre_blusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
-                          UCFDReal *fnorm_vol, UCFDReal *dt, UCFDReal *diag, UCFDReal *fjmat)
-{
-    UCFDInt idx, jdx, kdx, row, col;
-    UCFDReal fv, dti;
-    UCFDReal dmat[NFVARS][NFVARS];
 
-    for (idx=0; idx<neles; idx++) {
-        // Initialize diagonal matrix
-        for (row=0; row<NFVARS; row++) {
-            for (col=0; col<NFVARS; col++)
-                dmat[row][col] = 0.0;
-        }
+/**
+ * Pack & update kernels => per-element execution
+ */
+static ucfd_status_t
+rank_blusgs_pack(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+                 const UCFDInt nfvars, const UCFDReal a0,
+                 const UCFDInt *restrict cell_ids,
+                 const UCFDReal *restrict rhs,
+                 const UCFDReal *restrict dt,
+                 UCFDReal *restrict rank_rhs,
+                 UCFDReal *restrict diag)
+{
+    UCFDInt idx, ridx, kdx, row, col;
+    const UCFDInt dim2 = nfvars*nfvars;
+
+    for (idx=0; idx<neles; ++idx)
+    {
+        ridx = cell_ids[idx];
+        for (kdx=0; kdx<nvars; ++kdx)
+            // rank_rhs[ridx, kdx] = rhs[kdx, idx]
+            rank_rhs[kdx + ridx*nvars] = rhs[idx + kdx*neles];
         
-        // Computes diagonal matrix based on neighbor cells
-        for (jdx=0; jdx<nface; jdx++) {
-            fv = fnorm_vol[neles*jdx + idx];
-            for (row=0; row<NFVARS; row++) {
-                for (col=0; col<NFVARS; col++) {
-                    dmat[row][col] \
-                        += fjmat[idx+neles*jdx+nface*neles*col+NFVARS*nface*neles*row]*fv;
+        for (row=0; row<nfvars; ++row) {
+            const UCFDInt offset = row*nfvars + ridx*dim2;
+            for (col=0; col<nfvars; ++col)
+                // diag[ridx, row, col] = 0.0
+                diag[col + offset] = 0.0;
+            diag[row + offset] = 1/dt[idx] + a0;
+        }
+    }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDBLUSGS_Pack(FlowSys sys, UCFDInt eidx, UCFDReal a0)
+{
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowElem *e  = &sys->eles[eidx];
+    
+    UCFDCall(rank_blusgs_pack(
+        sys->nlocal, e->neles, sys->nvars, sys->nfvars, a0,
+        e->cell_ids, e->rhs, e->dt, blusgs->rhs, blusgs->diag
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+static ucfd_status_t
+rank_tblusgs_pack(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+                        const UCFDInt nfvars, const UCFDReal a0, const UCFDReal factor,
+                        srcjacobian dsrcf,
+                        const UCFDInt *restrict cell_ids,
+                        const UCFDReal *restrict uptsb,
+                        const UCFDReal *restrict dsrc,
+                        const UCFDReal *restrict dt,
+                        UCFDReal *restrict diag)
+{
+    UCFDInt idx, ridx, kdx, row, col;
+    const UCFDInt nturbvars = nvars - nfvars;
+    const UCFDInt dim2 = nturbvars*nturbvars;
+    UCFDReal u[nvars], d[nvars];
+
+    for (idx=0; idx<neles; ++idx)
+    {
+        ridx = cell_ids[idx];
+        for (row=0; row<nturbvars; ++row) {
+            for (col=0; col<nturbvars; ++col)
+                diag[col + row*nturbvars + ridx*dim2] = 0.0;
+        }
+
+        // Prepare cell uf and dsrc
+        for (kdx=0; kdx<nvars; ++kdx) {
+            u[kdx] = uptsb[idx + kdx*neles];
+            d[kdx] = dsrc[idx + kdx*neles];
+        }
+        dsrcf(nvars, nturbvars, u, &diag[ridx*dim2], d);
+
+        for (row=0; row<nturbvars; ++row)
+            diag[row + row*nturbvars + ridx*dim2] += 1/(dt[idx]*factor) + a0;
+    }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDBLUSGS_KWSST_Pack(FlowSys sys, UCFDInt eidx, UCFDReal turb_factor, UCFDReal a0)
+{
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    srcjacobian dsrcf = kwsst_src_jacobian;
+    FlowElem *e  = &sys->eles[eidx];
+
+    UCFDCall(rank_tblusgs_pack(
+        sys->nlocal, e->neles, sys->nvars, sys->nfvars, a0, turb_factor,
+        dsrcf, e->cell_ids, e->uptsb, e->dsrc, e->dt, blusgs->tdiag
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDBLUSGS_SA_Pack(FlowSys sys, UCFDInt eidx, UCFDReal turb_factor, UCFDReal a0)
+{
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    srcjacobian dsrcf = sa_src_jacobian;
+    FlowElem *e  = &sys->eles[eidx];
+
+    UCFDCall(rank_tblusgs_pack(
+        sys->nlocal, e->neles, sys->nvars, sys->nfvars, a0, turb_factor,
+        dsrcf, e->cell_ids, e->uptsb, e->dsrc, e->dt, blusgs->tdiag
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+/**
+ * Update
+ */
+static ucfd_status_t
+rank_blusgs_update(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+                   const UCFDInt *restrict cell_ids,
+                   const UCFDReal *restrict rank_du,
+                   UCFDReal *restrict upts)
+{
+    UCFDInt idx, ridx, kdx;
+
+    OMPWrapper(ridx, kdx)
+    for (idx=0; idx<neles; ++idx)
+    {
+        ridx = cell_ids[idx];
+        for (kdx=0; kdx<nvars; ++kdx)
+            // upts[kdx, idx] += du[ridx, kdx]
+            upts[idx + kdx*neles] += rank_du[kdx + ridx*nvars];
+    }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDBLUSGS_Update(FlowSys sys, UCFDInt eidx)
+{
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowElem *e  = &sys->eles[eidx];
+
+    UCFDCall(rank_blusgs_update(
+        sys->nlocal, e->neles, sys->nvars,
+        e->cell_ids, blusgs->du, e->uptsb
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+/**
+ * Inner iteration residual
+ */
+static ucfd_status_t
+rank_sub_residual(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+                  const UCFDInt *restrict cell_ids,
+                  const UCFDReal *restrict vol,
+                  const UCFDReal *restrict du,
+                  UCFDReal *restrict dup,
+                  UCFDReal *restrict res)
+{
+    UCFDInt idx, ridx, kdx, offset;
+    UCFDReal diff;
+
+    OMPWrapper(ridx, kdx, diff)
+    for (idx=0; idx<neles; ++idx)
+    {
+        ridx = cell_ids[idx];
+
+        for (kdx=0; kdx<nvars; ++kdx) {
+            offset = kdx + ridx*nvars;
+            diff = du[offset] - dup[offset];
+            res[idx + kdx*neles] = diff*diff*vol[idx];
+            dup[offset] = du[offset];
+        }
+    }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDBLUSGS_SubResidual(FlowSys sys, UCFDInt eidx)
+{
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowElem *e  = &sys->eles[eidx];
+
+    UCFDCall(rank_sub_residual(
+        sys->nlocal, e->neles, sys->nvars, e->cell_ids,
+        e->vol, blusgs->du, blusgs->dup, e->resid_out
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+static ucfd_status_t
+pre_blusgs(const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfaces,
+           const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_slots,
+           const UCFDInt8 *restrict face_sides, const UCFDReal *restrict face_area,
+           const UCFDReal *restrict rcp_vol,
+           UCFDReal *restrict diag, UCFDReal *restrict jmat)
+{
+    UCFDInt ridx, pos, row, col, slot, st, ed;
+    UCFDInt8 side;
+    const UCFDInt dim2 = nvars*nvars;
+    UCFDReal dmat[dim2], fv, val;
+
+
+    for (ridx=0; ridx<nlocal; ++ridx)
+    {
+        for (row=0; row<nvars; ++row) {
+            for (col=0; col<nvars; ++col)
+                dmat[col + row*nvars] = diag[col + row*nvars + ridx*dim2];
+        }
+
+        st = face_indptr[ridx];
+        ed = face_indptr[ridx+1];
+        for (pos=st; pos<ed; ++pos)
+        {
+            slot = face_slots[pos];
+            side = face_sides[pos];
+            fv = face_area[slot]*rcp_vol[ridx];
+
+            for (row=0; row<nvars; ++row) {
+                for (col=0; col<nvars; ++col) {
+                    if (side == 1)
+                        val = jmat[slot + col*nfaces + row*nfaces*nvars];
+                    else
+                        val = -jmat[slot + col*nfaces + row*nfaces*nvars + dim2*nfaces];
+                    dmat[col + row*nvars] += val*fv;
                 }
             }
         }
+        ludcmp(nvars, dmat);
 
-        // Complete implicit operator
-        dti = 1.0/(dt[idx]*factor);
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            dmat[kdx][kdx] += dti;
-        }
-        
-        // LU decomposition for inverse process
-        ludcmp(NFVARS, dmat);
-
-        // Allocate temporal matrix to diag array
-        for (row=0; row<NFVARS; row++) {
-            for (col=0; col<NFVARS; col++) {
-                diag[idx+neles*col+neles*NFVARS*row] = dmat[row][col];
-            }
+        for (row=0; row<nvars; ++row) {
+            for (col=0; col<nvars; ++col)
+                diag[col + row*nvars + ridx*dim2] = dmat[col + row*nvars];
         }
     }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDBLUSGS_NSPrepare(FlowSys sys)
+{
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+
+    UCFDCall(pre_blusgs(
+        sys->nlocal, sys->nfvars, sys->nfaces,
+        sys->rowptr, sys->slots, sys->sides, sys->face_area,
+        sys->rcp_vol, blusgs->diag, blusgs->jmat
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDBLUSGS_RANSPrepare(FlowSys sys)
+{
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+
+    UCFDCall(pre_blusgs(
+        sys->nlocal, sys->nturbvars, sys->nfaces,
+        sys->rowptr, sys->slots, sys->sides, sys->face_area,
+        sys->rcp_vol, blusgs->tdiag, blusgs->tjmat
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 
-/**
- * @details     This function computes diagonal matrices of the implicit operator of RANS equations.
- *              In Block LU-SGS method, implicit operator is approximated with `block operator`.
- *              Diagonal matrices is composed of block operator matrix, which size is n-by-n.
- *              `n` is the number of conservative variables in Navier-Stokes equations,
- *              or the number of turbulent variables in RANS equations.
- */
-void rans_serial_pre_blusgs(UCFDInt neles, UCFDInt nface, UCFDReal factor,
-                            UCFDReal *fnorm_vol, UCFDReal *uptsb, UCFDReal *dt,
-                            UCFDReal *tdiag, UCFDReal *tjmat, UCFDReal *dsrc)
+static ucfd_status_t
+lower_sweep(const UCFDInt var0, const UCFDInt nv, const UCFDInt nlocal,
+            const UCFDInt nvars, const UCFDInt ndims, const UCFDInt nfaces,
+            const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+            const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+            const UCFDReal *restrict face_area, const UCFDReal *restrict rcp_vol,
+            const UCFDReal *restrict rhsb, const UCFDReal *restrict diag,
+            const UCFDReal *restrict jmat, UCFDReal *restrict dub)
 {
-    UCFDInt idx, jdx, kdx, row, col;
-    UCFDReal fv;
-    UCFDReal tmat[NTURBVARS][NTURBVARS];
-    UCFDReal uf[NVARS], dsrcf[NVARS];
+    UCFDInt ridx, row, col, pos, neib, slot;
+    const UCFDInt dim2 = nv*nv;
+    UCFDInt8 side;
+    UCFDReal rhs[nv], dmat[dim2], fv, val, jval;
 
-    for (idx=0; idx<neles; idx++) {
-        // Initialize diagonal matrix
-        for (row=0; row<NTURBVARS; row++) {
-            for (col=0; col<NTURBVARS; col++)
-                tmat[row][col] = 0.0;
+    for (ridx=0; ridx<nlocal; ++ridx)
+    {
+        for (row=0; row<nv; ++row) {
+            rhs[row] = rhsb[var0+row + ridx*nvars];
+            for (col=0; col<nv; ++col)
+                dmat[col + nv*row] = diag[col + nv*row + ridx*dim2];
         }
-        
-        for (kdx=0; kdx<NVARS; kdx++) {
-            uf[kdx] = uptsb[idx+neles*kdx];
-            dsrcf[kdx] = dsrc[idx+neles*kdx];
-        }
-        
-        // Computes diagonal matrix based on neighbor cells
-        for (jdx=0; jdx<nface; jdx++) {
-            fv = fnorm_vol[neles*jdx + idx];
-            for (row=0; row<NTURBVARS; row++) {
-                for (col=0; col<NTURBVARS; col++) {
-                    tmat[row][col] \
-                        += tjmat[idx+neles*jdx+nface*neles*col+NTURBVARS*nface*neles*row]*fv;
+
+        const UCFDInt pos_st = face_indptr[ridx];
+        const UCFDInt pos_end = face_indptr[ridx+1];
+        for (pos=pos_st; pos<pos_end; ++pos)
+        {
+            neib = face_neighbors[pos];
+            slot = face_slots[pos];
+            side = face_sides[pos];
+            fv = face_area[slot]*rcp_vol[ridx];
+
+            for (row=0; row<nv; ++row) {
+                val = 0.0;
+                for (col=0; col<nv; ++col) {
+                    if (side == 1)
+                        jval = jmat[slot + col*nfaces + row*nv*nfaces + dim2*nfaces];
+                    else
+                        jval = -jmat[slot + col*nfaces + row*nv*nfaces];
+                    val += jval * dub[var0+col + neib*nvars];
                 }
+                rhs[row] -= val*fv;
             }
         }
-
-        // Computes Source term Jacobian
-        if (rans_source_jacobian(uf, tmat, dsrcf) == UCFD_STATUS_NOT_SUPPORTED)
-            printf("Error::Invalid `NTURBVARS` value\n");
-
-        // Complete implicit operator
-        for (kdx=0; kdx<NTURBVARS; kdx++) {
-            tmat[kdx][kdx] += 1.0/(dt[idx]*factor);
-        }
-        
-        // LU decomposition for inverse process
-        ludcmp(NTURBVARS, tmat);
-
-        // Allocate temporal matrix to diag array
-        for (row=0; row<NTURBVARS; row++) {
-            for (col=0; col<NTURBVARS; col++) {
-                tdiag[idx+neles*col+neles*NTURBVARS*row] = tmat[row][col];
-            }
-        }
+        lusub(nv, dmat, rhs);
+        for (row=0; row<nv; ++row)
+            dub[var0+row + ridx*nvars] = rhs[row];
     }
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
-/**
- * @details     By processing lower sweep, intermediate solution \f$\Delta Q^*\f$ is computed.
- *              This function is used for Euler or Navier-Stokes equations,
- *              which has the same flux shape.  
- *              solution array is stored in `dub` array.
- * 
- * @note        The last argument array, `fjmat` is NOT identical with ns_serial_pre_blusgs function.  
- *              For more details, refer to the Block LU-SGS in the document.
- */
-void ns_serial_block_lower_sweep(UCFDInt neles, UCFDInt nface,
-                                 UCFDInt *nei_ele, UCFDReal *fnorm_vol,
-                                 UCFDReal *rhsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fjmat)
+static ucfd_status_t
+upper_sweep(const UCFDInt var0, const UCFDInt nv, const UCFDInt nlocal,
+            const UCFDInt nvars, const UCFDInt ndims, const UCFDInt nfaces,
+            const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+            const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+            const UCFDReal *restrict face_area, const UCFDReal *restrict rcp_vol,
+            const UCFDReal *restrict rhsb, UCFDReal *restrict diag,
+            const UCFDReal *restrict jmat, UCFDReal *restrict dub)
 {
-    UCFDInt idx, jdx, kdx, neib;
-    UCFDInt row, col;
-    UCFDReal rhs[NFVARS], dmat[NFVARS][NFVARS];
-    UCFDReal val, fv;
+    UCFDInt ridx, row, col, pos, neib, slot;
+    const UCFDInt dim2 = nv*nv;
+    UCFDInt8 side;
+    UCFDReal rhs[nv], dmat[dim2], fv, val, jval;
 
-    // Lower sweep via mapping
-    for (idx=0; idx<neles; idx++) {
-        // Initialize
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            rhs[kdx] = rhsb[idx+kdx*neles];
+    const UCFDInt i_begin = nlocal - 1;
+
+    for (ridx=i_begin; ridx>-1; --ridx)
+    {
+        for (row=0; row<nv; ++row) {
+            rhs[row] = rhsb[var0+row + ridx*nvars];
+            for (col=0; col<nv; ++col)
+                dmat[col + nv*row] = diag[col + nv*row + ridx*dim2];
         }
 
-        for (row=0; row<NFVARS; row++) {
-            for (col=0; col<NFVARS; col++) {
-                dmat[row][col] = diag[idx+neles*col+neles*NFVARS*row];
-            }
-        }
+        const UCFDInt pos_st = face_indptr[ridx];
+        const UCFDInt pos_end = face_indptr[ridx+1];
+        for (pos=pos_st; pos<pos_end; ++pos)
+        {
+            neib = face_neighbors[pos];
+            slot = face_slots[pos];
+            side = face_sides[pos];
+            fv = face_area[slot]*rcp_vol[ridx];
 
-        // Only for neighbor cells
-        for (jdx=0; jdx<nface; jdx++) {
-            neib = nei_ele[idx+neles*jdx];
-
-            if (neib != idx) {
-                fv = fnorm_vol[neles*jdx + idx];
-                // Matrix-Vector multiplication
-                for (row=0; row<NFVARS; row++) {
-                    val = 0.0;
-                    for (col=0; col<NFVARS; col++) {
-                        val += fjmat[idx+neles*jdx+nface*neles*col+NFVARS*nface*neles*row] \
-                                * dub[neib+neles*col];
-                    }
-                    rhs[row] -= val*fv;
+            for (row=0; row<nv; ++row) {
+                val = 0.0;
+                for (col=0; col<nv; ++col) {
+                    if (side == 1)
+                        jval = jmat[slot + col*nfaces + row*nv*nfaces + dim2*nfaces];
+                    else
+                        jval = -jmat[slot + col*nfaces + row*nv*nfaces];
+                    val += jval * dub[var0+col + neib*nvars];
                 }
+                rhs[row] -= val*fv;
             }
         }
-
-        // Compute inverse of diagonal matrix multiplication
-        lusub(NFVARS, dmat, rhs);
-
-        // Update dub array
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            dub[idx+neles*kdx] = rhs[kdx];
-        }
+        lusub(nv, dmat, rhs);
+        for (row=0; row<nv; ++row)
+            dub[var0+row + ridx*nvars] = rhs[row];
     }
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
-/**
- * @details     Lower sweep of Block LU-SGS.  
- *              This function is used for RANS equations.
- *              solution array is stored in `dub` array.
- * 
- * @note        The last argument array, `tjmat` is NOT identical with ns_serial_pre_blusgs function.  
- *              For more details, refer to the Block LU-SGS in the document.
- */
-void rans_serial_block_lower_sweep(UCFDInt neles, UCFDInt nface,
-                                   UCFDInt *nei_ele, UCFDReal *fnorm_vol,
-                                   UCFDReal *rhsb, UCFDReal *dub, UCFDReal *tdiag, UCFDReal *tjmat)
+ucfd_status_t UCFDBLUSGS_NSLowerSweep(FlowSys sys)
 {
-    UCFDInt idx, jdx, kdx, neib;
-    UCFDInt row, col;
-    UCFDReal val, fv;
-    UCFDReal rhs[NTURBVARS], tmat[NTURBVARS][NTURBVARS];
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
 
-    // Lower sweep via mapping
-    for (idx=0; idx<neles; idx++) {
-        // Initialize
-        for (kdx=0; kdx<NTURBVARS; kdx++) {
-            rhs[kdx] = rhsb[idx+(kdx+NFVARS)*neles];
-        }
-
-        for (row=0; row<NTURBVARS; row++) {
-            for (col=0; col<NTURBVARS; col++) {
-                tmat[row][col] = tdiag[idx+neles*col+neles*NTURBVARS*row];
-            }
-        }
-
-        // Only for neighbor cells
-        for (jdx=0; jdx<nface; jdx++) {
-            neib = nei_ele[idx+neles*jdx];
-
-            if (neib != idx) {
-                fv = fnorm_vol[idx+neles*jdx];
-                // Matrix-Vector multiplication
-                for (row=0; row<NTURBVARS; row++) {
-                    val = 0.0;
-                    for (col=0; col<NTURBVARS; col++) {
-                        val += tjmat[idx+neles*jdx+nface*neles*col+NTURBVARS*nface*neles*row] \
-                                * dub[neib+neles*(col+NFVARS)];
-                    }
-                    rhs[row] -= val*fv;
-                }
-            }
-        }
-
-        // Compute inverse of diagonal matrix multiplication
-        lusub(NTURBVARS, tmat, rhs);
-
-        // Update dub array
-        for (kdx=0; kdx<NTURBVARS; kdx++) {
-            dub[idx+neles*(kdx+NFVARS)] = rhs[kdx];
-        }
-    }
+    UCFDCall(lower_sweep(
+        0, sys->nfvars, sys->nlocal, sys->nvars, sys->ndims,
+        sys->nfaces, sys->rowptr, sys->colidx, sys->sides,
+        sys->slots, sys->face_area, sys->rcp_vol, blusgs->rhs,
+        blusgs->diag, blusgs->jmat, blusgs->du
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
-/**
- * @details     By processing upper sweep, next sub-iteration solution \f$\Delta Q^(k+1)\f$ is computed.
- *              This function is used for Euler or Navier-Stokes equations,
- *              which has the same flux shape.  
- *              solution array is stored in `dub` array.
- * 
- * @note        The last argument array, `fjmat` is NOT identical with ns_serial_pre_blusgs function.  
- *              For more details, refer to the Block LU-SGS in the document.
- */
-void ns_serial_block_upper_sweep(UCFDInt neles, UCFDInt nface,
-                                 UCFDInt *nei_ele, UCFDReal *fnorm_vol,
-                                 UCFDReal *rhsb, UCFDReal *dub, UCFDReal *diag, UCFDReal *fjmat)
+ucfd_status_t UCFDBLUSGS_RANSLowerSweep(FlowSys sys)
 {
-    UCFDInt idx, jdx, kdx, neib;
-    UCFDInt row, col;
-    UCFDReal val, fv;
-    UCFDReal rhs[NFVARS], dmat[NFVARS][NFVARS];
-
-    // Upper sweep via mapping
-    for (idx=neles-1; idx>-1; idx--) {
-        // Initialize
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            rhs[kdx] = rhsb[idx+kdx*neles];
-        }
-
-        for (row=0; row<NFVARS; row++) {
-            for (col=0; col<NFVARS; col++) {
-                dmat[row][col] = diag[idx+neles*col+neles*NFVARS*row];
-            }
-        }
-
-        // Only for neighbor cells
-        for (jdx=0; jdx<nface; jdx++) {
-            neib = nei_ele[idx+neles*jdx];
-
-            if (neib != idx) {
-                fv = fnorm_vol[neles*jdx + idx];
-                // Matrix-Vector multiplication
-                for (row=0; row<NFVARS; row++) {
-                    val = 0.0;
-                    for (col=0; col<NFVARS; col++) {
-                        val += fjmat[idx+neles*jdx+nface*neles*col+NFVARS*nface*neles*row] \
-                                * dub[neib+neles*col];
-                    }
-                    rhs[row] -= val*fv;
-                }
-            }
-        }
-
-        // Compute inverse of diagonal matrix multiplication
-        lusub(NFVARS, dmat, rhs);
-
-        // Update dub array
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            dub[idx+neles*kdx] = rhs[kdx];
-        }
-    }
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+#if defined(DEBUG)
+    UCFDCheckNull(blusgs->tjmat, "Turbulent jacobian matrix is not set\n");
+#endif
+    UCFDCall(lower_sweep(
+        sys->nfvars, sys->nturbvars, sys->nlocal, sys->nvars, sys->ndims,
+        sys->nfaces, sys->rowptr, sys->colidx, sys->sides,
+        sys->slots, sys->face_area, sys->rcp_vol, blusgs->rhs,
+        blusgs->tdiag, blusgs->tjmat, blusgs->du
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
-/**
- * @details     Upper sweep of Block LU-SGS.  
- *              This function is used for RANS equations.
- *              solution array is stored in `dub` array.
- * 
- * @note        The last argument array, `tjmat` is NOT identical with ns_serial_pre_blusgs function.  
- *              For more details, refer to the Block LU-SGS in the document.
- */
-void rans_serial_block_upper_sweep(UCFDInt neles, UCFDInt nface,
-                                   UCFDInt *nei_ele, UCFDReal *fnorm_vol,
-                                   UCFDReal *rhsb, UCFDReal *dub, UCFDReal *tdiag, UCFDReal *tjmat)
+ucfd_status_t UCFDBLUSGS_NSUpperSweep(FlowSys sys)
 {
-    UCFDInt idx, jdx, kdx, neib;
-    UCFDInt row, col;
-    UCFDReal val, fv;
-    UCFDReal rhs[NTURBVARS], tmat[NTURBVARS][NTURBVARS];
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
 
-    // Lower sweep via mapping
-    for (idx=neles-1; idx>-1; idx--) {
-
-        // Initialize
-        for (kdx=0; kdx<NTURBVARS; kdx++) {
-            rhs[kdx] = rhsb[idx+(kdx+NFVARS)*neles];
-        }
-
-        for (row=0; row<NTURBVARS; row++) {
-            for (col=0; col<NTURBVARS; col++) {
-                tmat[row][col] = tdiag[idx+neles*col+neles*NTURBVARS*row];
-            }
-        }
-
-        // Only for neighbor cells
-        for (jdx=0; jdx<nface; jdx++) {
-            neib = nei_ele[idx+neles*jdx];
-
-            if (neib != idx) {
-                fv = fnorm_vol[neles*jdx + idx];
-                // Matrix-Vector multiplication
-                for (row=0; row<NTURBVARS; row++) {
-                    val = 0.0;
-                    for (col=0; col<NTURBVARS; col++) {
-                        val += tjmat[idx+neles*jdx+nface*neles*col+NTURBVARS*nface*neles*row] \
-                                * dub[neib+neles*(col+NFVARS)];
-                    }
-                    rhs[row] -= val*fv;
-                }
-            }
-        }
-
-        // Compute inverse of diagonal matrix multiplication
-        lusub(NTURBVARS, tmat, rhs);
-
-        // Update dub array
-        for (kdx=0; kdx<NTURBVARS; kdx++) {
-            dub[idx+neles*(kdx+NFVARS)] = rhs[kdx];
-        }
-    }
+    UCFDCall(upper_sweep(
+        0, sys->nfvars, sys->nlocal, sys->nvars, sys->ndims,
+        sys->nfaces, sys->rowptr, sys->colidx, sys->sides,
+        sys->slots, sys->face_area, sys->rcp_vol, blusgs->rhs,
+        blusgs->diag, blusgs->jmat, blusgs->du
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
-/**
- * @details     solution array is updated by adding \f$\Delta Q\f$.
- */
-void blusgs_serial_ns_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub, UCFDReal *subres)
+ucfd_status_t UCFDBLUSGS_RANSUpperSweep(FlowSys sys)
 {
-    UCFDInt idx, kdx;
-
-    for (idx=0; idx<neles; idx++) {
-        for (kdx=0; kdx<NFVARS; kdx++) {
-            uptsb[idx+neles*kdx] += dub[idx+neles*kdx];
-
-            // Initialize dub array
-            dub[idx+neles*kdx] = 0.0;
-        }
-        // Initialize sub-residual array
-        subres[idx] = 0.0;
-    }
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+#if defined(DEBUG)
+    UCFDCheckNull(blusgs->tjmat, "Turbulent jacobian matrix is not set\n");
+#endif
+    UCFDCall(upper_sweep(
+        sys->nfvars, sys->nturbvars, sys->nlocal, sys->nvars, sys->ndims,
+        sys->nfaces, sys->rowptr, sys->colidx, sys->sides,
+        sys->slots, sys->face_area, sys->rcp_vol, blusgs->rhs,
+        blusgs->tdiag, blusgs->tjmat, blusgs->du
+    ));
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
-/**
- * @details     solution array is updated by adding \f$\Delta Q\f$.
- */
-void blusgs_serial_update(UCFDInt neles, UCFDReal *uptsb, UCFDReal *dub, UCFDReal *subres)
+ucfd_status_t UCFDBLUSGS_Reset(FlowSys sys)
 {
-    UCFDInt idx, kdx;
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    const UCFDInt nlocal = sys->nlocal, nvars = sys->nvars;
 
-    for (idx=0; idx<neles; idx++) {
-        for (kdx=0; kdx<NVARS; kdx++) {
-            uptsb[idx+neles*kdx] += dub[idx+neles*kdx];
+    memset(blusgs->du, 0, nlocal*nvars*sizeof(UCFDReal));
+    memset(blusgs->dup, 0, nlocal*nvars*sizeof(UCFDReal));
 
-            // Initialize dub array
-            dub[idx+neles*kdx] = 0.0;
-        }
-        // Initialize sub-residual array
-        subres[idx] = 0.0;
-    }
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
