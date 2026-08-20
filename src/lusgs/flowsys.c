@@ -7,8 +7,6 @@ ucfd_status_t UCFDFlowSysDestroy(FlowSys *sys)
 {
     if (!sys || !*sys) UCFDFunctionReturn(UCFD_SUCCESS);
     UCFDCall((*sys)->destroy(*sys));
-    free((*sys)->u);
-    free((*sys)->du);
     free((*sys)->eles);
     free(*sys);
     *sys = NULL;
@@ -46,10 +44,6 @@ ucfd_status_t UCFDFlowSysCreate(FlowSys *sys,
     s->data             = NULL;
     s->destroy          = NULL;
 
-    /* Allocate interior arrays */
-    s->u = malloc(nvars*nlocal*sizeof(UCFDReal));
-    s->du = malloc(nvars*nlocal*sizeof(UCFDReal));
-
     /* Elements allocation */
     s->eles = calloc(nelem, sizeof(FlowElem));
 
@@ -70,11 +64,13 @@ static ucfd_status_t LUSGSDestroy(FlowSys sys)
 ucfd_status_t UCFDFlowSysSetLUSGS(FlowSys *sys, UCFDReal *fspr, UCFDReal *tfspr)
 {
     FlowSys s       = *sys;
-    LUSGSSys *lusgs = calloc(1, sizeof(*lusgs));
+    LUSGSSys *lusgs = (LUSGSSys *)calloc(1, sizeof(*lusgs));
     UCFDInt nlocal  = s->nlocal;
     UCFDInt nvars   = s->nvars;
 
-    lusgs->diag     = malloc(nvars*nlocal*sizeof(UCFDReal));
+    lusgs->u        = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
+    lusgs->du       = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
+    lusgs->diag     = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
     lusgs->fspr     = fspr;
     lusgs->tfspr    = tfspr;
 
@@ -95,15 +91,20 @@ static ucfd_status_t BLUSGSDestroy(FlowSys sys)
 ucfd_status_t UCFDFlowSysSetBLUSGS(FlowSys *sys, UCFDReal *jmat, UCFDReal *tjmat)
 {
     FlowSys s       = *sys;
-    BLUSGSSys *blu  = calloc(1, sizeof(*blu));
+    BLUSGSSys *blu  = (BLUSGSSys *)calloc(1, sizeof(*blu));
     UCFDInt nlocal  = s->nlocal;
+    UCFDInt nvars   = s->nvars;
     UCFDInt nfvars  = s->nfvars;
     UCFDInt ntvars  = s->nturbvars;
 
+    blu->rhs        = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
+    blu->du         = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
+    blu->dup        = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
+
     /* diag : [nlocal, nfvars, nfvars] */
-    blu->diag       = malloc(nlocal*nfvars*nfvars*sizeof(UCFDReal));
+    blu->diag       = (UCFDReal *)malloc(nlocal*nfvars*nfvars*sizeof(UCFDReal));
     if (ntvars != 0)
-        blu->tdiag  = malloc(nlocal*ntvars*ntvars*sizeof(UCFDReal));
+        blu->tdiag  = (UCFDReal *)malloc(nlocal*ntvars*ntvars*sizeof(UCFDReal));
     else blu->tdiag = NULL;
 
     blu->jmat       = jmat;
@@ -119,18 +120,21 @@ ucfd_status_t UCFDFlowSysSetBLUSGS(FlowSys *sys, UCFDReal *jmat, UCFDReal *tjmat
 ucfd_status_t UCFDFlowSysSetElement(FlowSys *sys, UCFDInt eidx,
                                     UCFDInt neles, UCFDInt nface, UCFDInt *cell_ids,
                                     UCFDReal *uptsb, UCFDReal *rhs,
-                                    UCFDReal *dt, UCFDReal *dsrc)
+                                    UCFDReal *dt, UCFDReal *dsrc,
+                                    UCFDReal *vol, UCFDReal *resid_out)
 {
     FlowSys s = *sys;
     FlowElem *e = &s->eles[eidx];
 
-    e->neles    = neles;
-    e->nface    = nface;
-    e->cell_ids = cell_ids;
-    e->uptsb    = uptsb;
-    e->rhs      = rhs;
-    e->dt       = dt;
-    e->dsrc     = dsrc;
+    e->neles        = neles;
+    e->nface        = nface;
+    e->cell_ids     = cell_ids;
+    e->uptsb        = uptsb;
+    e->rhs          = rhs;
+    e->dt           = dt;
+    e->dsrc         = dsrc;
+    e->vol          = vol;
+    e->resid_out    = resid_out;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

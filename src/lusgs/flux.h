@@ -26,10 +26,11 @@
 #endif
 
 typedef void (*fluxfunc)(UCFDInt, UCFDInt, UCFDInt, UCFDReal*, UCFDReal*, UCFDReal*);
+typedef void (*srcjacobian)(UCFDInt, UCFDInt, UCFDReal*, UCFDReal*, UCFDReal*);
 
 void ns_flux_container(UCFDInt nfvars, UCFDInt nturbvars, UCFDInt ndims, UCFDReal *u, UCFDReal *nf, UCFDReal *f);
 void rans_flux_container(UCFDInt nfvars, UCFDInt nturbvars, UCFDInt ndims, UCFDReal *u, UCFDReal *nf, UCFDReal *f);
 
-
-
+void kwsst_src_jacobian(UCFDInt nvars, UCFDInt nturbvars, UCFDReal *uf, UCFDReal *A, UCFDReal *dsrc);
+void sa_src_jacobian(UCFDInt nvars, UCFDInt nturbvars, UCFDReal *uf, UCFDReal *A, UCFDReal *dsrc);
 

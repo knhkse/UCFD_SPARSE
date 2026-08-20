@@ -9,20 +9,23 @@ typedef struct {
     /* Input from main program */
     UCFDInt neles, nface;
 
+    UCFDInt     *cell_ids;
     UCFDReal    *uptsb, *rhs;
     UCFDReal    *dt, *dsrc;
-    UCFDInt     *cell_ids;
+    UCFDReal    *vol, *resid_out;
 } FlowElem;
 
 
 /* LU-SGS system */
 typedef struct {
+    UCFDReal *u, *du;
     UCFDReal *diag;
     UCFDReal *fspr, *tfspr;
 } LUSGSSys;
 
 /* Block LU-SGS system */
 typedef struct {
+    UCFDReal *rhs, *du, *dup;
     UCFDReal *diag, *tdiag;
     UCFDReal *jmat, *tjmat;
 } BLUSGSSys;
@@ -44,9 +47,6 @@ struct _FlowSys {
     UCFDReal *face_area;
     UCFDReal *face_normal;
     UCFDReal *rcp_vol;
-
-    /* Interior flow attributes */
-    UCFDReal *u, *du;
 
     /* LU-SGS or BLU-SGS */
     void *data;

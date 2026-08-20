@@ -37,7 +37,7 @@ lusgs_pack(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
 }
 
 ucfd_status_t UCFDLUSGS_Pack(FlowSys sys, UCFDInt eidx,
-                             UCFDReal a0, UCFDReal turb_factor)
+                             UCFDReal turb_factor, UCFDReal a0)
 {
     LUSGSSys *lusgs = (LUSGSSys *)sys->data;
     FlowElem *e  = &(sys->eles[eidx]);
@@ -45,7 +45,7 @@ ucfd_status_t UCFDLUSGS_Pack(FlowSys sys, UCFDInt eidx,
     UCFDCall(lusgs_pack(
         sys->nlocal, e->neles, sys->nvars, sys->nfvars, turb_factor, a0,
         e->cell_ids, e->uptsb, e->rhs, e->dt, e->dsrc,
-        sys->u, sys->du, lusgs->diag
+        lusgs->u, lusgs->du, lusgs->diag
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -71,11 +71,12 @@ rank_lusgs_update(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars
 
 ucfd_status_t UCFDLUSGS_Update(FlowSys sys, UCFDInt eidx)
 {
+    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
     FlowElem *e  = &sys->eles[eidx];
 
     UCFDCall(rank_lusgs_update(
         sys->nlocal, e->neles, sys->nvars,
-        e->cell_ids, sys->du, e->uptsb
+        e->cell_ids, lusgs->du, e->uptsb
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -265,25 +266,24 @@ ucfd_status_t UCFDLUSGS_NSLowerSweep(FlowSys sys, UCFDReal kappa)
         sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
         sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
         sys->face_normal, sys->rcp_vol, lusgs->diag,
-        sys->u, sys->du
+        lusgs->u, lusgs->du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 ucfd_status_t UCFDLUSGS_RANSLowerSweep(FlowSys sys, UCFDReal kappa)
 {
-#if defined(DEBUG)
-    UCFDCheckNull(sys->tfspr, "Turbulent spectral radius is not set\n");
-#endif
     LUSGSSys *lusgs = (LUSGSSys *)sys->data;
     fluxfunc f = rans_flux_container;
-    
+#if defined(DEBUG)
+    UCFDCheckNull(lusgs->tfspr, "Turbulent spectral radius is not set\n");
+#endif
     UCFDCall(lower_sweep(
         sys->nfvars, sys->nvars, kappa, f, lusgs->tfspr,
         sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
         sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
         sys->face_normal, sys->rcp_vol, lusgs->diag,
-        sys->u, sys->du
+        lusgs->u, lusgs->du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -298,25 +298,24 @@ ucfd_status_t UCFDLUSGS_NSUpperSweep(FlowSys sys, UCFDReal kappa)
         sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
         sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
         sys->face_normal, sys->rcp_vol, lusgs->diag,
-        sys->u, sys->du
+        lusgs->u, lusgs->du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 ucfd_status_t UCFDLUSGS_RANSUpperSweep(FlowSys sys, UCFDReal kappa)
 {
-#if defined(DEBUG)
-    UCFDCheckNull(sys->tfspr, "Turbulent spectral radius is not set\n");
-#endif
     LUSGSSys *lusgs = (LUSGSSys *)sys->data;
     fluxfunc f = rans_flux_container;
-    
+#if defined(DEBUG)
+    UCFDCheckNull(lusgs->tfspr, "Turbulent spectral radius is not set\n");
+#endif    
     UCFDCall(upper_sweep(
         sys->nfvars, sys->nvars, kappa, f, lusgs->tfspr,
         sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
         sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
         sys->face_normal, sys->rcp_vol, lusgs->diag,
-        sys->u, sys->du
+        lusgs->u, lusgs->du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
