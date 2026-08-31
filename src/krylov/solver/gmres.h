@@ -9,7 +9,7 @@ typedef struct {
 } Solver_GMRES;
 
 
-#if defined(USE_CUDA)
+#if defined(__CUDACC__)
 typedef struct {
     UCFDInt         n;
     cublasHandle_t  handle;

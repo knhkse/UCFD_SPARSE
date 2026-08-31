@@ -171,7 +171,6 @@ UCFDMatCreateCUDABSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDI
 }
 
 
-#if defined(USE_CUSPARSE)
 /**
  * Generic code for SpMV operation
  */
@@ -361,5 +360,3 @@ UCFDMatCreateCUSPBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt bnnz, UCFDInt 
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
-
-#endif

@@ -34,10 +34,11 @@ typedef struct {
 } MKLBSR;
 #endif
 
+
 /**
  * cuSPARSE matrix format
  */
-#if defined(USE_CUSPARSE)
+#if defined(__CUDACC__)
 typedef struct {
     cusparseHandle_t        handle;
     cusparseSpMatDescr_t    op;
@@ -70,5 +71,13 @@ typedef struct {
 #endif
 
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* Empty kernel (do nothing) */
 static inline ucfd_status_t UCFDEmptyKernel(SpMat mat) {UCFDFunctionReturn(UCFD_SUCCESS);}
+
+#if defined(__cplusplus)
+}
+#endif

@@ -14,8 +14,8 @@ static ucfd_status_t arnoldi_cgs2(UCFDInt n, Solver solver, Precon pc, SpMat A, 
     UCFDReal *restrict h2 = gmres->htmp;
 
     /* w = inv(M) @ A @ V_j */
-    UCFDCall(UCFDSpMV(1.0, A, vj, 0.0, w));
-    UCFDCall(UCFDPreconApply(pc, w));
+    UCFDCall(matrix_spmv(1.0, A, vj, 0.0, w));
+    UCFDCall(apply_precon(pc, w));
 
     /* CGS step 1 */
     solver->ops->dgemvcoltrans(n, k, n, 1.0, Vj, w, 0.0, Hcol);
@@ -60,7 +60,7 @@ static ucfd_status_t GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, 
     while (iter < maxiter)
     {
         /* Compute residual */
-        UCFDCall(UCFDCalcResidual(solver, A, n, x, b, r));
+        UCFDCall(calc_residual(solver, A, n, x, b, r));
 
         /* Convergence check */
         abeta = solver->ops->dnorm2(n, r);
@@ -70,7 +70,7 @@ static ucfd_status_t GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, 
             break;
         }
 
-        UCFDCall(UCFDPreconApply(pc, r));
+        UCFDCall(apply_precon(pc, r));
         beta = solver->ops->dnorm2(n, r);
         y[0] = beta;
         solver->ops->dcopy(n, V, r);

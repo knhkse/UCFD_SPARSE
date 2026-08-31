@@ -58,17 +58,11 @@
 #if defined(__CUDACC__)
     #include <cuda_runtime.h>
     #include <cublas_v2.h>
+    #include <cusparse.h>
 
-    #ifndef(TPB)
+    #if !defined(TPB)
         #define TPB 128         // Default Threads-per-block size
     #endif
-#endif
-
-/**
- * cuSPARSE configuration
- */
-#if defined(USE_CUSPARSE)
-    #include <cusparse.h>
 
     #if defined(UCFD_INT64)
         #define CUSPARSE_INTTYPE CUSPARSE_INDEX_64I

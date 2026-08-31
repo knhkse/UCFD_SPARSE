@@ -5,53 +5,53 @@
 static ucfd_status_t
 arnoldi_cgs2(Solver solver, Precon pc, SpMat A, UCFDInt j, UCFDReal *wnorm)
 {
-    Solver_CUDAGMRES *ctx = (Solver_CUDAGMRES *)solver->data;
+    Solver_CUDAGMRES *gmres = (Solver_CUDAGMRES *)solver->data;
     const UCFDInt k = j + 1;
-    const UCFDInt n = ctx->n, m = ctx->restart, ldv = ctx->ldv;
+    const UCFDInt n = gmres->n, m = gmres->restart, ldv = gmres->ldv;
     UCFDReal one=1.0, zero=0.0, neg=-1.0;
     UCFDReal inv;
 
-    UCFDReal *vj        = ctx->d_V + (size_t)(j*ldv);
-    UCFDReal *d_h       = ctx->d_proj;            /* offset 0           */
-    UCFDReal *d_h2      = ctx->d_proj + (m+1);    /* offset m+1         */
-    UCFDReal *d_norm    = ctx->d_proj + 2*(m+1);  /* offset 2(m+1)      */
-    UCFDReal *vnext     = ctx->d_V + (size_t)(k*ldv);
+    UCFDReal *vj        = gmres->d_V + (size_t)(j*ldv);
+    UCFDReal *d_h       = gmres->d_proj;            /* offset 0           */
+    UCFDReal *d_h2      = gmres->d_proj + (m+1);    /* offset m+1         */
+    UCFDReal *d_norm    = gmres->d_proj + 2*(m+1);  /* offset 2(m+1)      */
+    UCFDReal *vnext     = gmres->d_V + (size_t)(k*ldv);
 
-    UCFDCall(UCFDSpMV(one, A, vj, zero, ctx->d_w));
-    UCFDCall(UCFDPreconApply(pc, ctx->d_w));
+    UCFDCall(matrix_spmv(one, A, vj, zero, gmres->d_w));
+    UCFDCall(apply_precon(pc, gmres->d_w));
 
     /* ---- CGS2 pass 1:  h = V^T w ;  w -= V h ---- */
-    CUBLASCall(cublasDgemv(ctx->handle, CUBLAS_OP_T, n, k, &one,
-                           ctx->d_V, ldv, ctx->d_w, 1, &zero, d_h, 1));
-    CUBLASCall(cublasDgemv(ctx->handle, CUBLAS_OP_N, n, k, &neg,
-                           ctx->d_V, ldv, d_h, 1, &one, ctx->d_w, 1));
+    CUBLASCall(cublasDgemv(gmres->handle, CUBLAS_OP_T, n, k, &one,
+                           gmres->d_V, ldv, gmres->d_w, 1, &zero, d_h, 1));
+    CUBLASCall(cublasDgemv(gmres->handle, CUBLAS_OP_N, n, k, &neg,
+                           gmres->d_V, ldv, d_h, 1, &one, gmres->d_w, 1));
 
     /* ---- CGS2 pass 2 (reorthogonalisation):  h2 = V^T w ;  w -= V h2 ---- */
-    CUBLASCall(cublasDgemv(ctx->handle, CUBLAS_OP_T, n, k, &one,
-                           ctx->d_V, ldv, ctx->d_w, 1, &zero, d_h2, 1));
-    CUBLASCall(cublasDgemv(ctx->handle, CUBLAS_OP_N, n, k, &neg,
-                           ctx->d_V, ldv, d_h2, 1, &one, ctx->d_w, 1));
+    CUBLASCall(cublasDgemv(gmres->handle, CUBLAS_OP_T, n, k, &one,
+                           gmres->d_V, ldv, gmres->d_w, 1, &zero, d_h2, 1));
+    CUBLASCall(cublasDgemv(gmres->handle, CUBLAS_OP_N, n, k, &neg,
+                           gmres->d_V, ldv, d_h2, 1, &one, gmres->d_w, 1));
 
     /* ---- ||w|| written to DEVICE so it rides the single transfer ---- */
-    CUBLASCall(cublasSetPointerMode(ctx->handle, CUBLAS_POINTER_MODE_DEVICE));
-    CUBLASCall(cublasDnrm2(ctx->handle, n, ctx->d_w, 1, d_norm));
-    CUBLASCall(cublasSetPointerMode(ctx->handle, CUBLAS_POINTER_MODE_HOST));
+    CUBLASCall(cublasSetPointerMode(gmres->handle, CUBLAS_POINTER_MODE_DEVICE));
+    CUBLASCall(cublasDnrm2(gmres->handle, n, gmres->d_w, 1, d_norm));
+    CUBLASCall(cublasSetPointerMode(gmres->handle, CUBLAS_POINTER_MODE_HOST));
 
     /* ---- THE single device->host round trip for this iteration ---- */
-    CUDACall(cudaMemcpy(ctx->proj_host, ctx->d_proj,
+    CUDACall(cudaMemcpy(gmres->proj_host, gmres->d_proj,
                         (size_t)(2*(m+1)+1)*sizeof(UCFDReal), cudaMemcpyDeviceToHost));
 
     /* ---- assemble H column j on host:  H[i,j] = h[i] + h2[i] ---- */
-    UCFDReal *Hcol = ctx->H + (size_t)j*(m+1);          /* col-major: j*(m+1) */
+    UCFDReal *Hcol = gmres->H + (size_t)j*(m+1);          /* col-major: j*(m+1) */
     for(UCFDInt i=0; i<k; ++i)
-        Hcol[i] = ctx->proj_host[i] + ctx->proj_host[(m+1)+i];
-    *wnorm = ctx->proj_host[2*(m+1)];
+        Hcol[i] = gmres->proj_host[i] + gmres->proj_host[(m+1)+i];
+    *wnorm = gmres->proj_host[2*(m+1)];
     Hcol[k] = *wnorm;                                  /* H[j+1,j] = ||w||   */
 
     /* ---- normalise v_{j+1} = w / ||w|| ---- */
     inv = 1.0 / (*wnorm);
-    CUBLASCall(cublasDcopy(ctx->handle, n, ctx->d_w, 1, vnext, 1));
-    CUBLASCall(cublasDscal(ctx->handle, n, &inv, vnext, 1));
+    CUBLASCall(cublasDcopy(gmres->handle, n, gmres->d_w, 1, vnext, 1));
+    CUBLASCall(cublasDscal(gmres->handle, n, &inv, vnext, 1));
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -131,7 +131,7 @@ update_solution(const UCFDInt n, const UCFDInt k,
     /* x += Vy */
     CUBLASCall(cublasDgemv(
         gmres->handle, CUBLAS_OP_N, n, k, &one,
-        gmres->d_V, ldv, gmres->d_y, 1, &one, x, 1
+        gmres->d_V, gmres->ldv, gmres->d_y, 1, &one, x, 1
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -165,7 +165,7 @@ GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
     {
         /* Compute residual */
         CUBLASCall(cublasDcopy(gmres->handle, n, b, 1, gmres->d_r, 1));
-        UCFDCall(UCFDSpMV(-1.0, A, x, 1.0, gmres->d_r));
+        UCFDCall(matrix_spmv(-1.0, A, x, 1.0, gmres->d_r));
 
         /* Convergence check */
         CUBLASCall(cublasDnrm2(gmres->handle, n, gmres->d_r, 1, &abeta));
@@ -176,7 +176,7 @@ GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
         }
 
         /* Start cycle */
-        UCFDCall(UCFDPreconApply(pc, gmres->d_r));
+        UCFDCall(apply_precon(pc, gmres->d_r));
         CUBLASCall(cublasDnrm2(gmres->handle, n, gmres->d_r, 1, &beta));
         gmres->y[0] = beta;
         inv = 1.0/beta;
@@ -259,7 +259,7 @@ UCFDSolverCreateCUDAGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxiter,
     Solver_CUDAGMRES *gmres = (Solver_CUDAGMRES *)calloc(1, sizeof(*gmres));
     UCFDCheckNull(gmres, "GMRES solver allocation failed\n");
 
-#if defined(USE_CUDA)
+#if defined(__CUDACC__)
     CUBLASCall(cublasCreate(&gmres->handle));
 #endif
 

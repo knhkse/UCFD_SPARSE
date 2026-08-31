@@ -60,23 +60,23 @@ struct _Solver {
 
 
 /* Encapsulated functions */
-static inline ucfd_status_t UCFDPreconApply(Precon precon, UCFDReal *b)
+static inline ucfd_status_t apply_precon(Precon precon, UCFDReal *b)
 {
     UCFDCall(precon->ops->apply(precon, b));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static inline ucfd_status_t UCFDSpMV(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal beta, UCFDReal *y)
+static inline ucfd_status_t matrix_spmv(UCFDReal alpha, SpMat A, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
     UCFDCall(A->ops->spmv(alpha, A, x, beta, y));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 /* Computes r := b - A@x */
-static inline ucfd_status_t UCFDCalcResidual(Solver s, SpMat A, UCFDInt n, UCFDReal *x, UCFDReal *b, UCFDReal *r)
+static inline ucfd_status_t calc_residual(Solver s, SpMat A, UCFDInt n, UCFDReal *x, UCFDReal *b, UCFDReal *r)
 {
     s->ops->dcopy(n, r, b);
-    UCFDCall(UCFDSpMV(-1.0, A, x, 1.0, r));
+    UCFDCall(matrix_spmv(-1.0, A, x, 1.0, r));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 

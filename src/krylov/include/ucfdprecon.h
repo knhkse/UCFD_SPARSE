@@ -32,6 +32,7 @@ UCFD_EXTERN ucfd_status_t UCFDPreconSetILU(Precon *, UCFDInt);
 UCFD_EXTERN ucfd_status_t UCFDPreconSetBILU(Precon*, UCFDInt, UCFDInt);
 UCFD_EXTERN ucfd_status_t UCFDPreconSetBLUSGS(Precon*, UCFDInt, UCFDInt);
 UCFD_EXTERN ucfd_status_t UCFDPreconSetPBILU(Precon*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);
+UCFD_EXTERN ucfd_status_t UCFDPreconSetPBLUSGS(Precon*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);
 #if defined(__CUDACC__)
 UCFD_EXTERN ucfd_status_t UCFDPreconSetCUDABILU(Precon*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);
 UCFD_EXTERN ucfd_status_t UCFDPreconSetCUDABLUSGS(Precon*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);

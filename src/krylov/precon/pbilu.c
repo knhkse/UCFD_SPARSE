@@ -169,14 +169,14 @@ static ucfd_status_t PBILUPreconApply(Precon precon, UCFDReal *b)
     const UCFDInt *icolors = pbilu->icolors;
 
     // Lower sweep
-    for (i=0; i<pbilu->ncolors; ++i)
+    for (i=0; i<ncolors; ++i)
         _pbilu_lower(
             icolors[i], icolors[i+1], bn, block, precon->rowptr,
             precon->colidx, precon->diagslots, precon->values, b
         );
     
     // Upper sweep
-    for (i=pbilu->ncolors-1; i>=0; --i)
+    for (i=ncolors-1; i>=0; --i)
         _pbilu_upper(
             icolors[i], icolors[i+1], bn, block, precon->rowptr,
             precon->colidx, precon->diagslots, precon->values, b

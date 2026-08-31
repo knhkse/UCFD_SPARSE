@@ -132,7 +132,7 @@ static ucfd_status_t BILUPreconPrepare(Precon precon)
     Precon_BILU *bilu = (Precon_BILU *)precon->data;
     const UCFDInt bn = bilu->bn, block = bilu->block;
     _bilu_prepare(
-        bilu->bn, bilu->block, precon->rowptr, precon->colidx,
+        bn, block, precon->rowptr, precon->colidx,
         precon->diagslots, bilu->iw, precon->values
     );
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -143,7 +143,7 @@ static ucfd_status_t BILUPreconApply(Precon precon, UCFDReal *b)
     Precon_BILU *bilu = (Precon_BILU *)precon->data;
     const UCFDInt bn = bilu->bn, block = bilu->block;
     _bilu_apply(
-        bilu->bn, bilu->block, precon->rowptr, precon->colidx,
+        bn, block, precon->rowptr, precon->colidx,
         precon->diagslots, precon->values, b
     );
     UCFDFunctionReturn(UCFD_SUCCESS);
