@@ -2,16 +2,12 @@
 #include "inverse.h"
 
 
-static ucfd_status_t BILUPreconPrepare(Precon precon)
+static void _bilu_prepare(const UCFDInt bn, const UCFDInt block,
+                          const UCFDInt *restrict rowptr, const UCFDInt *restrict colidx,
+                          const UCFDInt *restrict diagslots, UCFDInt *restrict iw,
+                          UCFDReal *restrict values)
 {
-    Precon_BILU *bilu = (Precon_BILU *)precon->data;
-    const UCFDInt bn = bilu->bn, block = bilu->block;
     const UCFDInt blkdim = block*block;
-    const UCFDInt *restrict rowptr = precon->rowptr, *restrict colidx = precon->colidx, \
-                  *restrict diagslots = precon->diagslots;
-    UCFDInt *restrict iw = bilu->iw;
-    UCFDReal *restrict values = precon->values;
-
     UCFDInt idx, kdx, row, col, ele;
     UCFDInt ck, kk, kst, ked, jj, iwj;
     UCFDReal v, Aik[block][block];
@@ -63,18 +59,14 @@ static ucfd_status_t BILUPreconPrepare(Precon precon)
         // LU decomposition of current row diagonal matrix
         ludcmp(block, &(values[ed*blkdim]));
     }
-    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static ucfd_status_t BILUPreconApply(Precon precon, UCFDReal *b)
+static void _bilu_apply(const UCFDInt bn, const UCFDInt block,
+                        const UCFDInt *restrict rowptr, const UCFDInt *restrict colidx,
+                        const UCFDInt *restrict diagslots, const UCFDReal *restrict values,
+                        UCFDReal *restrict b)
 {
-    Precon_BILU *bilu = (Precon_BILU *)precon->data;
-    const UCFDInt bn = bilu->bn, block = bilu->block;
     const UCFDInt blkdim = block*block;
-    const UCFDInt *restrict rowptr = precon->rowptr, *restrict colidx = precon->colidx, \
-                  *restrict diagslots = precon->diagslots;
-    const UCFDReal *restrict values = precon->values;
-
     UCFDInt idx, jdx, kdx, row, col, cind;
     UCFDReal arr[block];
 
@@ -132,6 +124,28 @@ static ucfd_status_t BILUPreconApply(Precon precon, UCFDReal *b)
         lusub(block, &(values[dd*blkdim]), arr);
         for (row=0; row<block; ++row) b[idx*block+row] = arr[row];
     }
+}
+
+
+static ucfd_status_t BILUPreconPrepare(Precon precon)
+{
+    Precon_BILU *bilu = (Precon_BILU *)precon->data;
+    const UCFDInt bn = bilu->bn, block = bilu->block;
+    _bilu_prepare(
+        bilu->bn, bilu->block, precon->rowptr, precon->colidx,
+        precon->diagslots, bilu->iw, precon->values
+    );
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t BILUPreconApply(Precon precon, UCFDReal *b)
+{
+    Precon_BILU *bilu = (Precon_BILU *)precon->data;
+    const UCFDInt bn = bilu->bn, block = bilu->block;
+    _bilu_apply(
+        bilu->bn, bilu->block, precon->rowptr, precon->colidx,
+        precon->diagslots, precon->values, b
+    );
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 

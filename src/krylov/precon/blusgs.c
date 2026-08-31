@@ -4,13 +4,11 @@
 #include "inverse.h"
 
 
-ucfd_status_t BLUSGSPreconPrepare(Precon precon)
+static void _blusgs_prepare(const UCFDInt bn, const UCFDInt block,
+                            const UCFDInt *restrict diagslots,
+                            const UCFDReal *restrict values,
+                            UCFDReal *restrict diagvalues)
 {
-    Precon_BLUSGS *blu = (Precon_BLUSGS *)precon->data;
-    const UCFDInt *restrict diagslots = precon->diagslots;
-    const UCFDReal *restrict values = precon->values;
-    UCFDReal *restrict diagvalues = blu->diagvalues;
-    const UCFDInt bn = blu->bn, block = blu->block;
     const UCFDInt blkdim = block*block;
     UCFDInt idx, didx;
     UCFDReal *diagblock;
@@ -22,18 +20,14 @@ ucfd_status_t BLUSGSPreconPrepare(Precon precon)
         memcpy(diagblock, &values[didx*blkdim], sizeof(UCFDReal)*blkdim);
         ludcmp(block, diagblock);
     }
-    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static ucfd_status_t BLUSGSPreconApply(Precon precon, UCFDReal *b)
+static void _blusgs_apply(const UCFDInt bn, const UCFDInt block,
+                          const UCFDInt *restrict rowptr, const UCFDInt *restrict colidx,
+                          const UCFDInt *restrict diagslots, const UCFDReal *restrict values,
+                          const UCFDReal *restrict diagvalues, UCFDReal *restrict b)
 {
-    Precon_BLUSGS *blu = (Precon_BLUSGS *)precon->data;
-    const UCFDInt *restrict rowptr = precon->rowptr, *restrict colidx = precon->colidx, \
-                  *restrict diagslots = precon->diagslots;
-    const UCFDReal *restrict values = precon->values, *restrict diagvalues = blu->diagvalues;
-    const UCFDInt bn = blu->bn, block = blu->block;
     const UCFDInt blkdim = block*block;
-
     UCFDInt idx, jdx, kdx, row, col, cind;
     UCFDReal arr[block];
 
@@ -96,6 +90,25 @@ static ucfd_status_t BLUSGSPreconApply(Precon precon, UCFDReal *b)
         for (kdx = 0; kdx < block; ++kdx)
             b[kdx + idx * block] -= arr[kdx];
     }
+}
+
+
+ucfd_status_t BLUSGSPreconPrepare(Precon precon)
+{
+    Precon_BLUSGS *blu = (Precon_BLUSGS *)precon->data;
+    _blusgs_prepare(
+        blu->bn, blu->block, precon->diagslots, precon->values, blu->diagvalues
+    );
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t BLUSGSPreconApply(Precon precon, UCFDReal *b)
+{
+    Precon_BLUSGS *blu = (Precon_BLUSGS *)precon->data;
+    _blusgs_apply(
+        blu->bn, blu->block, precon->rowptr, precon->colidx,
+        precon->diagslots, precon->values, blu->diagvalues, b
+    );    
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 

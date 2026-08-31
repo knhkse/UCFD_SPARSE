@@ -4,7 +4,7 @@
 /**
  * @details     Decompose matrix A into lower and upper triangular matrix
  */
-void ludcmp(UCFDInt block, UCFDReal *A)
+void ludcmp(const UCFDInt block, UCFDReal *A)
 {
     UCFDInt row, col, kdx, nrow;
     UCFDReal val;
@@ -42,7 +42,7 @@ void ludcmp(UCFDInt block, UCFDReal *A)
 /**
  * @details     This function performs Forward/Backward substitution of LU decomposed matrix.
  */
-void lusub(UCFDInt block, UCFDReal *LU, UCFDReal *b)
+void lusub(const UCFDInt block, const UCFDReal *LU, UCFDReal *b)
 {
     UCFDInt row, col, nrow;
     UCFDReal val;
@@ -74,7 +74,7 @@ void lusub(UCFDInt block, UCFDReal *LU, UCFDReal *b)
 }
 
 
-void lusubmattrans(UCFDInt block, UCFDReal *LU, UCFDReal *B)
+void lusubmattrans(const UCFDInt block, const UCFDReal *LU, UCFDReal *B)
 {
     UCFDInt row, col, scol;
     UCFDReal val;

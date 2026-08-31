@@ -24,7 +24,7 @@ UCFD_EXTERN ucfd_status_t UCFDSolverGetResidualHistory(Solver, UCFDReal*);
 
 UCFD_EXTERN ucfd_status_t UCFDSolverCreateGMRES(Solver*, UCFDInt, UCFDInt, UCFDInt, UCFDReal);
 UCFD_EXTERN ucfd_status_t UCFDSolverCreateBICGSTAB(Solver*, UCFDInt, UCFDInt, UCFDReal);
-#if defined(USE_CUDA)
+#if defined(__CUDACC__)
 UCFD_EXTERN ucfd_status_t UCFDSolverCreateCUDAGMRES(Solver*, UCFDInt, UCFDInt, UCFDInt, UCFDReal);
 #endif
 

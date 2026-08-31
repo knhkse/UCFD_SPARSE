@@ -8,6 +8,6 @@
 #include "macros.h"
 
 
-MAYBE_UNUSED void ludcmp(UCFDInt, UCFDReal*);
-MAYBE_UNUSED void lusub(UCFDInt, UCFDReal*, UCFDReal*);
-MAYBE_UNUSED void lusubmattrans(UCFDInt, UCFDReal*, UCFDReal*);
+MAYBE_UNUSED void ludcmp(const UCFDInt, UCFDReal*);
+MAYBE_UNUSED void lusub(const UCFDInt, const UCFDReal*, UCFDReal*);
+MAYBE_UNUSED void lusubmattrans(const UCFDInt, const UCFDReal*, UCFDReal*);

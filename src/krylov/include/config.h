@@ -55,11 +55,11 @@
  * Currently, Krylov subspace methods for CUDA computation
  * require cuBLAS functions
  */
-#if defined(USE_CUDA)
+#if defined(__CUDACC__)
     #include <cuda_runtime.h>
     #include <cublas_v2.h>
 
-    #if !defined(TPB)
+    #ifndef(TPB)
         #define TPB 128         // Default Threads-per-block size
     #endif
 #endif

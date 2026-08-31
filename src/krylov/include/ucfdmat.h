@@ -29,18 +29,20 @@ UCFD_EXTERN ucfd_status_t UCFDMatMult(UCFDReal, SpMat, UCFDReal*, UCFDReal, UCFD
 /* Matrix Setting API */
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+
 #if defined(USE_MPI)
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMPICSR(Ctx*, SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 #endif
+
 #if defined(USE_MKL)
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMKLCSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMKLBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 #endif
-#if defined(USE_CUDA)
+
+#if defined(__CUDACC__)
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCUDACSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCUDABSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
-#endif
-#if defined(USE_CUSPARSE)
+
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCUSPCSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCUSPBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 #endif

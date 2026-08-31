@@ -4,25 +4,22 @@
 #include "inverse.h"
 
 
-static ucfd_status_t PBLUSGSPreconLowerApply(UCFDInt nstart, UCFDInt nend, Precon precon, UCFDReal *b)
+static void _pblusgs_lower(const UCFDInt nstart, const UCFDInt nend,
+                           const UCFDInt bn, const UCFDInt block,
+                           const UCFDInt *restrict rowptr, const UCFDInt *restrict colidx,
+                           const UCFDInt *restrict diagslots, const UCFDReal *restrict values,
+                           const UCFDReal *restrict diagvalues, UCFDReal *restrict b)
 {
-    Precon_BLUSGS *blu = (Precon_BLUSGS *)precon->data;
-    const UCFDInt bn = blu->bn, block = blu->block;
     const UCFDInt blkdim = block*block;
-    const UCFDInt *restrict rowptr = precon->rowptr, *restrict colidx = precon->colidx, \
-                  *restrict diagslots = precon->diagslots;
-    const UCFDReal *restrict values = precon->values, *restrict diagvalues = blu->diagvalues;
-
-    UCFDInt idx, jdx, kdx, row, col;
-    UCFDInt dd, st, cind;
+    UCFDInt idx, jdx, kdx, row, col, cind;
     UCFDReal v, arr[block];
 
     // Forward substitution
-    OMPWrapper(jdx, kdx, row, col, dd, st, cind, v, arr)
+    OMPWrapper(jdx, kdx, row, col, cind, v, arr)
     for (idx=nstart; idx<nend; ++idx)
     {
-        st = rowptr[idx];
-        dd = diagslots[idx];
+        const UCFDInt st = rowptr[idx];
+        const UCFDInt dd = diagslots[idx];
 
         for (kdx=0; kdx<block; ++kdx)
             arr[kdx] = b[kdx + idx * block];
@@ -42,28 +39,24 @@ static ucfd_status_t PBLUSGSPreconLowerApply(UCFDInt nstart, UCFDInt nend, Preco
         for (kdx=0; kdx<block; ++kdx)
             b[kdx + idx*block] = arr[kdx];
     }
-    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static ucfd_status_t PBLUSGSPreconUpperApply(UCFDInt nstart, UCFDInt nend, Precon precon, UCFDReal *b)
+static void _pblusgs_upper(const UCFDInt nstart, const UCFDInt nend,
+                           const UCFDInt bn, const UCFDInt block,
+                           const UCFDInt *restrict rowptr, const UCFDInt *restrict colidx,
+                           const UCFDInt *restrict diagslots, const UCFDReal *restrict values,
+                           const UCFDReal *restrict diagvalues, UCFDReal *restrict b)
 {
-    Precon_BLUSGS *blu = (Precon_BLUSGS *)precon->data;
-    const UCFDInt bn = blu->bn, block = blu->block;
     const UCFDInt blkdim = block*block;
-    const UCFDInt *restrict rowptr = precon->rowptr, *restrict colidx = precon->colidx, \
-                  *restrict diagslots = precon->diagslots;
-    const UCFDReal *restrict values = precon->values, *restrict diagvalues = blu->diagvalues;
-
-    UCFDInt idx, jdx, kdx, row, col;
-    UCFDInt dd, ed, cind;
+    UCFDInt idx, jdx, kdx, row, col, cind;
     UCFDReal v, arr[block];
 
     // Backward substitution
-    OMPWrapper(jdx, kdx, row, col, dd, ed, cind, v, arr)
+    OMPWrapper(jdx, kdx, row, col, cind, v, arr)
     for (idx=nstart; idx<nend; ++idx)
     {
-        dd = diagslots[idx];
-        ed = rowptr[idx+1];
+        const UCFDInt dd = diagslots[idx];
+        const UCFDInt ed = rowptr[idx+1];
 
         for (kdx = 0; kdx < block; ++kdx)
             arr[kdx] = 0.0;
@@ -83,7 +76,6 @@ static ucfd_status_t PBLUSGSPreconUpperApply(UCFDInt nstart, UCFDInt nend, Preco
         for (kdx=0; kdx<block; ++kdx)
             b[kdx + idx*block] -= arr[kdx];
     }
-    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 
@@ -95,10 +87,16 @@ static ucfd_status_t PBLUSGSPreconApply(Precon precon, UCFDReal *b)
     const UCFDInt *icolors = blu->icolors;
 
     for (i=0; i<ncolors; ++i)
-        UCFDCall(PBLUSGSPreconLowerApply(icolors[i], icolors[i+1], precon, b));
+        _pblusgs_lower(
+            icolors[i], icolors[i+1], blu->base.bn, blu->base.block, precon->rowptr, precon->colidx,
+            precon->diagslots, precon->values, blu->base.diagvalues, b
+        );
     
     for (i=ncolors-1; i>=0; --i)
-        UCFDCall(PBLUSGSPreconUpperApply(icolors[i], icolors[i+1], precon, b));
+        _pblusgs_upper(
+            icolors[i], icolors[i+1], blu->base.bn, blu->base.block, precon->rowptr, precon->colidx,
+            precon->diagslots, precon->values, blu->base.diagvalues, b
+        );
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

@@ -1,14 +1,11 @@
 #include "ilu.h"
 
 
-static ucfd_status_t ILUPreconPrepare(Precon precon)
+static void _ilu_prepare(const UCFDInt n,
+                         const UCFDInt *restrict rowptr, const UCFDInt *restrict colidx,
+                         const UCFDInt *restrict diagslots, UCFDInt *restrict iw,
+                         UCFDReal *restrict values)
 {
-    Precon_ILU *ilu = (Precon_ILU *)precon->data;
-    const UCFDInt n = ilu->n;
-    const UCFDInt *restrict rowptr = precon->rowptr, *restrict colidx = precon->colidx, \
-                  *restrict diagslots = precon->diagslots;
-    UCFDInt *restrict iw = ilu->iw;
-    UCFDReal *restrict values = precon->values;
     UCFDInt idx, kdx, ck;
     UCFDInt kk, kst, ked, jj, iwj;
     UCFDReal Aik;
@@ -44,16 +41,13 @@ static ucfd_status_t ILUPreconPrepare(Precon precon)
             for (jj=kst; jj<ked; ++jj) iw[colidx[jj]] = -1;
         }
     }
-    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static ucfd_status_t ILUPreconApply(Precon precon, UCFDReal *b)
+static void _ilu_apply(const UCFDInt n,
+                       const UCFDInt *restrict rowptr, const UCFDInt *restrict colidx,
+                       const UCFDInt *restrict diagslots, UCFDReal *restrict values,
+                       UCFDReal *restrict b)
 {
-    Precon_ILU *ilu = (Precon_ILU *)precon->data;
-    const UCFDInt n = ilu->n;
-    const UCFDInt *restrict rowptr = precon->rowptr, *restrict colidx = precon->colidx, \
-                  *restrict diagslots = precon->diagslots;
-    const UCFDReal *restrict values = precon->values;
     UCFDInt idx, jdx, cind;
 
     /* Forward sweep */
@@ -85,6 +79,26 @@ static ucfd_status_t ILUPreconApply(Precon precon, UCFDReal *b)
         }
         b[idx] = v/values[dd];
     }
+}
+
+
+static ucfd_status_t ILUPreconPrepare(Precon precon)
+{
+    Precon_ILU *ilu = (Precon_ILU *)precon->data;
+    _ilu_prepare(
+        ilu->n, precon->rowptr, precon->colidx, precon->diagslots,
+        ilu->iw, precon->values
+    );
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t ILUPreconApply(Precon precon, UCFDReal *b)
+{
+    Precon_ILU *ilu = (Precon_ILU *)precon->data;
+    _ilu_apply(
+        ilu->n, precon->rowptr, precon->colidx, precon->diagslots,
+        precon->values, b
+    );
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
