@@ -24,13 +24,13 @@ typedef struct {
 } MKLWrapper;
 
 typedef struct {
-    BaseCSR        mat;
     MKLWrapper     handle;
+    BaseCSR        mat;
 } MKLCSR;
 
 typedef struct {
-    BaseBSR        mat;
     MKLWrapper     handle;
+    BaseBSR        mat;
 } MKLBSR;
 #endif
 

@@ -142,7 +142,7 @@ static ucfd_status_t Destroy_MKL(SpMat mat)
     MKLWrapper *handle = (MKLWrapper *)mat->data;
     MKLCall(mkl_sparse_destroy(handle->op));
 
-    UCFDFunctionReturn(UCFD_SUCCESS);    
+    UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 ucfd_status_t UCFDMatCreateMKLBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
@@ -154,11 +154,16 @@ ucfd_status_t UCFDMatCreateMKLBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *
     MKLBSR *bsr = (MKLBSR *)calloc(1, sizeof(*bsr));
     UCFDCheckNull(bsr, "MKL BSR matrix creation failed\n");
 
-    ((BaseBSR *)bsr)->bn       = bn;
-    ((BaseBSR *)bsr)->block    = blk;
-    bsr->handle.desc.type      = SPARSE_MATRIX_TYPE_GENERAL;
-    bsr->handle.desc.mode      = 0;
-    bsr->handle.desc.diag      = 0;
+    bsr->mat.bn                 = bn;
+    bsr->mat.block              = blk;
+    bsr->mat.basemat.n          = bn*blk;
+    bsr->mat.basemat.rowptr     = rowptr;
+    bsr->mat.basemat.colidx     = colidx;
+    bsr->mat.basemat.values     = values;
+
+    bsr->handle.desc.type       = SPARSE_MATRIX_TYPE_GENERAL;
+    bsr->handle.desc.mode       = 0;
+    bsr->handle.desc.diag       = 0;
 
     MKLCall(mkl_create_bsr(
         &bsr->handle.op, SPARSE_INDEX_BASE_ZERO, SPARSE_LAYOUT_ROW_MAJOR,
@@ -172,13 +177,9 @@ ucfd_status_t UCFDMatCreateMKLBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *
         bsr->handle.op, SPARSE_OPERATION_NON_TRANSPOSE, bsr->handle.desc, EXPECTED_SPMV_COUNT
     ));
 #endif
-    
+
     MKLCall(mkl_sparse_optimize(bsr->handle.op));
 
-    ((BaseCSR *)bsr)->n         = (UCFDInt)(bn*blk);
-    ((BaseCSR *)bsr)->rowptr    = rowptr;
-    ((BaseCSR *)bsr)->colidx    = colidx;
-    ((BaseCSR *)bsr)->values    = values;
     m->data                     = bsr;
     m->ops->spmv                = SpMV_MKL;
     m->ops->destroy             = Destroy_MKL;
@@ -196,9 +197,14 @@ ucfd_status_t UCFDMatCreateMKLCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDIn
     MKLCSR *csr = (MKLCSR *)calloc(1, sizeof(*csr));
     UCFDCheckNull(csr, "MKL CSR matrix creation failed\n");
 
-    csr->handle.desc.type      = SPARSE_MATRIX_TYPE_GENERAL;
-    csr->handle.desc.mode      = 0;
-    csr->handle.desc.diag      = 0;
+    csr->mat.n                  = n;
+    csr->mat.rowptr             = rowptr;
+    csr->mat.colidx             = colidx;
+    csr->mat.values             = values;
+
+    csr->handle.desc.type       = SPARSE_MATRIX_TYPE_GENERAL;
+    csr->handle.desc.mode       = 0;
+    csr->handle.desc.diag       = 0;
 
     MKLCall(mkl_create_csr(
         &csr->handle.op, SPARSE_INDEX_BASE_ZERO, n, n, rowptr, rowptr+1, colidx, values
@@ -214,10 +220,6 @@ ucfd_status_t UCFDMatCreateMKLCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDIn
 
     MKLCall(mkl_sparse_optimize(csr->handle.op));
 
-    ((BaseCSR *)csr)->n         = n;
-    ((BaseCSR *)csr)->rowptr    = rowptr;
-    ((BaseCSR *)csr)->colidx    = colidx;
-    ((BaseCSR *)csr)->values    = values;
     m->data                     = csr;
     m->ops->spmv                = SpMV_MKL;
     m->ops->destroy             = Destroy_MKL;
