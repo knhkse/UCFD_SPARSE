@@ -3,72 +3,18 @@
 #include <string.h>
 
 #include "mpisparsemat.h"
+#include "mpihelper.h"
 
 
-/**
- * Common helper functions
- */
-static UCFDInt cmp_idx(const void *a, const void *b)
+static ucfd_status_t UCFDSetCSRMPIContext(UCFDSpMVContext *c,
+                                          const UCFDInt *range,
+                                          const UCFDInt *garray,
+                                          UCFDInt n_ghost)
 {
-    const UCFDInt x = *(const UCFDInt *)a;
-    const UCFDInt y = *(const UCFDInt *)b;
-    return (x > y) - (x < y);
-}
-
-static UCFDInt bsearch_idx(const UCFDInt *a, UCFDInt m, UCFDInt g)
-{
-    UCFDInt lo = 0;
-    UCFDInt hi = m;
-
-    while (lo < hi)
-    {
-        const UCFDInt md = lo + (hi - lo) / 2;
-        if (a[md] < g)
-            lo = md + 1;
-        else if (a[md] > g)
-            hi = md;
-        else
-            return md;
-    }
-    return -1;
-}
-
-static size_t owner(const UCFDInt *range, size_t size, UCFDInt g)
-{
-    size_t lo = 0;
-    size_t hi = size;
-
-    while (hi - lo > 1)
-    {
-        const int md = lo + (hi - lo) / 2;
-        if (g < range[md])
-            hi = md;
-        else
-            lo = md;
-    }
-    return lo;
-}
-
-static void build_range(MPI_Comm comm, UCFDInt n_local, UCFDInt *range)
-{
-    UCFDInt size;
-
-    MPI_Comm_size(comm, &size);
-    range[0] = 0;
-    MPI_Allgather(&n_local, 1, MPI_INT, range + 1, 1, MPI_INT, comm);
-    for (int p = 1; p <= size; ++p)
-        range[p] += range[p - 1];
-}
-
-/* MPI Context initialization */
-static ucfd_status_t UCFDSetMPIContext(UCFDSpMVContext *c,
-                                       const UCFDInt *range,
-                                       const UCFDInt *garray,
-                                       UCFDInt n_ghost)
-{
-    int size, err;
+    int size;
     MPI_Comm_size(c->comm, &size);
     c->nghost = n_ghost;
+    c->blocksize = 0;
 
     /* Receive side: requested counts and owner-local request indices. */
     int *req_to = calloc((size_t)size, sizeof(*req_to));
@@ -199,7 +145,7 @@ static ucfd_status_t UCFDSetMPIContext(UCFDSpMVContext *c,
 
 
 /* Destroy function */
-static ucfd_status_t UCFDSpMVContextDestroy(UCFDSpMVContext *c)
+ucfd_status_t UCFDSpMVContextDestroy(UCFDSpMVContext *c)
 {
     for (int j = 0; j < c->nreq; ++j)
         MPI_Request_free(&c->reqs[j]);
@@ -217,7 +163,7 @@ static ucfd_status_t UCFDSpMVContextDestroy(UCFDSpMVContext *c)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDMPIMatDestroy(SpMat mat)
+static ucfd_status_t UCFDMPIMatDestroy(SpMat mat)
 {
     if (!mat) UCFDFunctionReturn(UCFD_SUCCESS);
     MPICSR *A = (MPICSR *)mat->data;
@@ -244,11 +190,7 @@ static inline void halo_start(UCFDSpMVContext *c, const UCFDReal *restrict x_loc
     if (c->nsend) MPI_Startall(c->nsend, c->reqs + c->nrecv);
 }
 
-static inline void halo_wait(UCFDSpMVContext *c)
-{
-    if (c->nreq)
-        MPI_Waitall(c->nreq, c->reqs, MPI_STATUSES_IGNORE);
-}
+
 
 /**
  * Local CSR-type SpMV kernel
@@ -417,10 +359,6 @@ static ucfd_status_t UCFDSplitCSR(UCFDInt n, const UCFDInt *rp, const UCFDInt *c
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
-/**
- * CSR MPI Matrix
- */
 ucfd_status_t UCFDMatCreateMPICSR(Ctx *ctx, SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
     Ctx c = *ctx;
@@ -449,7 +387,7 @@ ucfd_status_t UCFDMatCreateMPICSR(Ctx *ctx, SpMat *mat, UCFDInt n, UCFDInt *rowp
     UCFDCall(UCFDSplitCSR(
         n, rowptr, colidx, values,
         range[rank], range[rank+1], csr));
-    UCFDCall(UCFDSetMPIContext(
+    UCFDCall(UCFDSetCSRMPIContext(
         &csr->spmvctx, range, csr->garray, csr->n_ghost
     ));
 

@@ -5,7 +5,6 @@
  */
 #pragma once
 
-#include <mpi.h>
 #include "ucfdmpi.h"
 
 

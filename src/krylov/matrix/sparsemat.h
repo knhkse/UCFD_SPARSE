@@ -10,7 +10,7 @@ typedef struct {
 } BaseCSR;
 
 typedef struct {
-    BaseCSR    basemat;
+    BaseCSR     basemat;
     UCFDInt     bn;
     UCFDInt     block;
 } BaseBSR;

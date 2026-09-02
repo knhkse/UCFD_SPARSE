@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ucfdtypes.h"
+#include "ucfdmpi.h"
 
 typedef struct _SpMat *SpMat;
 
@@ -32,6 +33,7 @@ UCFD_EXTERN ucfd_status_t UCFDMatCreateBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, U
 
 #if defined(USE_MPI)
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMPICSR(Ctx*, SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDMatCreateMPIBSR(Ctx*, SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 #endif
 
 #if defined(USE_MKL)

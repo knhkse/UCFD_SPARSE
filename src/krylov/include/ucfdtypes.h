@@ -12,8 +12,6 @@
 #define UCFD_FALSE false
 #define UCFD_TRUE true
 
-typedef int8_t UCFDInt8;
-
 typedef enum
 {
     UCFD_SUCCESS = 0,
@@ -39,6 +37,3 @@ typedef enum
     UCFD_MPI_ALLOCATION_FAILED  = 4,
     UCFD_MPI_ERROR              = 5
 } ucfd_mpi_t;
-
-
-typedef bool UCFDBool;

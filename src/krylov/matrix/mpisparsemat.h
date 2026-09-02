@@ -1,12 +1,12 @@
 #pragma once
 
-#include <mpi.h>
 #include "sparsemat.h"
 #include "mpicontext.h"
 
 
 typedef struct {
     MPI_Comm        comm;
+    UCFDInt         blocksize;                          // Only used in BSR
     UCFDInt         nrecv, tag;
     UCFDInt         *recv_nei, *recv_count, *recv_off;
     
@@ -31,5 +31,23 @@ typedef struct {
 } MPICSR;
 
 
+typedef struct {
+    BaseBSR          A;
+    BaseBSR          B;
+    UCFDInt          n_local, n_ghost, n_boundary;
+    UCFDInt          *garray;
+    UCFDInt          *boundary_rows;
+    UCFDSpMVContext  spmvctx;
+} MPIBSR;
 
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+/* Internal functions */
+UCFD_INTERN ucfd_status_t UCFDSpMVContextDestroy(UCFDSpMVContext *c);
+
+#if defined(__cplusplus)
+}
+#endif
