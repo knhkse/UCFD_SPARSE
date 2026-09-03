@@ -167,12 +167,18 @@ static ucfd_status_t UCFDSetBSRMPIContext(UCFDSpMVContext *c,
 static ucfd_status_t UCFDMPIMatDestroy(SpMat mat)
 {
     if (!mat) UCFDFunctionReturn(UCFD_SUCCESS);
-    MPIBSR *A = (MPIBSR *)mat->data;
-    UCFDSpMVContext ctx = A->spmvctx;
+    MPIBSR *bsr = (MPIBSR *)mat->data;
+    UCFDSpMVContext ctx = bsr->spmvctx;
 
     UCFDCall(UCFDSpMVContextDestroy(&ctx));
-    free(A->garray);
-    free(A->boundary_rows);
+    free(bsr->value_dest);
+    free(bsr->split_values);
+    free(bsr->garray);
+    free(bsr->boundary_rows);
+    free(bsr->A.basemat.rowptr);
+    free(bsr->A.basemat.colidx);
+    free(bsr->B.basemat.rowptr);
+    free(bsr->B.basemat.colidx);
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -383,12 +389,20 @@ static ucfd_status_t UCFDSplitBSR(UCFDInt bn, UCFDInt blk,
     const UCFDInt nnzb_B = Brp[bn];
     UCFDInt *Aci = malloc((size_t)(nnzb_A ? nnzb_A : 1) * sizeof(*Aci));
     UCFDInt *Bci = malloc((size_t)(nnzb_B ? nnzb_B : 1) * sizeof(*Bci));
-    UCFDReal *Aval = malloc((size_t)(nnzb_A ? nnzb_A : 1) * block_elems *
-                         sizeof(*Aval));
-    UCFDReal *Bval = malloc((size_t)(nnzb_B ? nnzb_B : 1) * block_elems *
-                         sizeof(*Bval));
+    UCFDInt *value_dest = 
+        malloc((size_t)(nnzb ? nnzb : 1)*sizeof(*value_dest));
 
-    /* Pass 2: remap block columns and copy complete row-major dense blocks. */
+    /* A.val and B.val are views of one [A blocks | B blocks] allocation. */
+    const size_t value_count = (size_t)nnzb * block_elems;
+    UCFDReal *split_values =
+        malloc((value_count ? value_count : 1) * sizeof(*split_values));
+    UCFDReal *Aval = split_values;
+    UCFDReal *Bval = split_values + (size_t)nnzb_A * block_elems;
+
+    /*
+     * Pass 2: remap block columns and build a permanent original-block to
+     * split-block permutation while copying the initial dense blocks.
+     */
     UCFDInt ap = 0;
     UCFDInt bp = 0;
     for (UCFDInt ib = 0; ib < bn; ++ib)
@@ -400,23 +414,26 @@ static ucfd_status_t UCFDSplitBSR(UCFDInt bn, UCFDInt blk,
             if (gblock >= cstart && gblock < cend)
             {
                 Aci[ap] = gblock - cstart;
-                memcpy(Aval + (size_t)ap * block_elems, src,
-                       block_elems * sizeof(*Aval));
+                value_dest[kb] = ap;
                 ++ap;
             }
             else
             {
                 Bci[bp] = bsearch_idx(garray, ng, gblock);
-                memcpy(Bval + (size_t)bp * block_elems, src,
-                       block_elems * sizeof(*Bval));
+                value_dest[kb] = nnzb_A + bp;
                 ++bp;
             }
+            memcpy(split_values + (size_t)value_dest[kb] * block_elems,
+                   src, block_elems * sizeof(*split_values));
         }
     }
 
     UCFDInt n = bn*blk;
     mat->A = (BaseBSR){{n, Arp, Aci, Aval}, bn, blk};
     mat->B = (BaseBSR){{n, Brp, Bci, Bval}, bn, blk};
+    mat->nnzb = nnzb;
+    mat->value_dest = value_dest;
+    mat->split_values = split_values;
     mat->garray = garray;
     mat->n_ghost = ng;
     mat->boundary_rows = boundary_block_rows;
@@ -425,6 +442,29 @@ static ucfd_status_t UCFDSplitBSR(UCFDInt bn, UCFDInt blk,
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+
+static ucfd_status_t UCFDMatUpdateValues(SpMat mat,
+                                         UCFDReal *new_values)
+{
+    MPIBSR *bsr = (MPIBSR *)mat->data;
+
+    const size_t dim2                   = (size_t)bsr->A.block * (size_t)bsr->A.block;
+    UCFDReal *restrict dst              = bsr->split_values;
+    const UCFDInt *restrict value_dest  = bsr->value_dest;
+    const UCFDInt nnzb                  = bsr->nnzb;
+
+    OMPFOR
+    for (UCFDInt kb = 0; kb < nnzb; ++kb)
+    {
+        const UCFDReal *restrict src_block =
+            new_values + (size_t)kb * dim2;
+        UCFDReal *restrict dst_block =
+            dst + (size_t)value_dest[kb] * dim2;
+
+        memcpy(dst_block, src_block, dim2 * sizeof(*dst_block));
+    }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
 
 ucfd_status_t UCFDMatCreateMPIBSR(Ctx *ctx, SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
@@ -462,6 +502,7 @@ ucfd_status_t UCFDMatCreateMPIBSR(Ctx *ctx, SpMat *mat, UCFDInt bn, UCFDInt blk,
     m->data         = bsr;
     m->ops->spmv    = SpMV_MPIBSR;
     m->ops->destroy = UCFDMPIMatDestroy;
+    m->ops->update  = UCFDMatUpdateValues;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mpi.h>
 #include "ucfdtypes.h"
 
 typedef struct _Ctx *Ctx;

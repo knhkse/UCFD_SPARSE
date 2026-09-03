@@ -166,12 +166,18 @@ ucfd_status_t UCFDSpMVContextDestroy(UCFDSpMVContext *c)
 static ucfd_status_t UCFDMPIMatDestroy(SpMat mat)
 {
     if (!mat) UCFDFunctionReturn(UCFD_SUCCESS);
-    MPICSR *A = (MPICSR *)mat->data;
-    UCFDSpMVContext ctx = A->spmvctx;
+    MPICSR *csr = (MPICSR *)mat->data;
+    UCFDSpMVContext ctx = csr->spmvctx;
 
     UCFDCall(UCFDSpMVContextDestroy(&ctx));
-    free(A->garray);
-    free(A->boundary_rows);
+    free(csr->value_dest);
+    free(csr->split_values);
+    free(csr->garray);
+    free(csr->boundary_rows);
+    free(csr->A.rowptr);
+    free(csr->A.colidx);
+    free(csr->B.rowptr);
+    free(csr->B.colidx);
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -323,10 +329,19 @@ static ucfd_status_t UCFDSplitCSR(UCFDInt n, const UCFDInt *rp, const UCFDInt *c
     const UCFDInt nB = Brp[n];
     UCFDInt *Aci = malloc((size_t)(nA ? nA : 1) * sizeof(*Aci));
     UCFDInt *Bci = malloc((size_t)(nB ? nB : 1) * sizeof(*Bci));
-    UCFDReal *Av = malloc((size_t)(nA ? nA : 1) * sizeof(*Av));
-    UCFDReal *Bv = malloc((size_t)(nB ? nB : 1) * sizeof(*Bv));
+    UCFDInt *value_dest =
+        malloc((size_t)(nnz ? nnz : 1) * sizeof(*value_dest));
 
-    /* Pass 2: fill A and B, remapping global columns to local slots */
+    UCFDReal *split_values =
+        malloc((size_t)(nnz ? nnz : 1) * sizeof(*split_values));
+    UCFDReal *Av = split_values;
+    UCFDReal *Bv = split_values + nA;
+
+    /*
+     * Pass 2: fill the fixed column patterns and remember where every value
+     * from the original CSR belongs in the combined [A values | B values]
+     * allocation.  value_dest is a permutation of [0, nnz).
+     */
     UCFDInt ap = 0;
     UCFDInt bp = 0;
     for (UCFDInt i = 0; i < n; ++i)
@@ -337,13 +352,13 @@ static ucfd_status_t UCFDSplitCSR(UCFDInt n, const UCFDInt *rp, const UCFDInt *c
             if (g >= cstart && g < cend)
             {
                 Aci[ap] = g - cstart;
-                Av[ap] = va[k];
+                value_dest[k] = ap;
                 ++ap;
             }
             else
             {
                 Bci[bp] = bsearch_idx(garray, ng, g);
-                Bv[bp] = va[k];
+                value_dest[k] = nA + bp;
                 ++bp;
             }
         }
@@ -351,10 +366,29 @@ static ucfd_status_t UCFDSplitCSR(UCFDInt n, const UCFDInt *rp, const UCFDInt *c
 
     mat->A = (BaseCSR){n, Arp, Aci, Av};
     mat->B = (BaseCSR){n, Brp, Bci, Bv};
+    mat->nnz = nnz;
+    mat->value_dest = value_dest;
+    mat->split_values = split_values;
     mat->garray = garray;
     mat->n_ghost = ng;
     mat->boundary_rows = boundary_rows;
     mat->n_boundary = n_boundary_rows;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+static ucfd_status_t UCFDMatUpdateValues(SpMat mat,
+                                         UCFDReal *new_values)
+{
+    MPICSR *csr = (MPICSR *)mat->data;
+    UCFDReal *restrict dst = csr->split_values;
+    const UCFDInt *restrict value_dest = csr->value_dest;
+    const UCFDInt nnz = csr->nnz;
+
+    OMPFOR
+    for (UCFDInt k=0; k<nnz; ++k)
+        dst[value_dest[k]] = new_values[k];
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -396,6 +430,7 @@ ucfd_status_t UCFDMatCreateMPICSR(Ctx *ctx, SpMat *mat, UCFDInt n, UCFDInt *rowp
     m->data         = csr;
     m->ops->spmv    = SpMV_MPICSR;
     m->ops->destroy = UCFDMPIMatDestroy;
+    m->ops->update  = UCFDMatUpdateValues;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

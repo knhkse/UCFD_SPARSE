@@ -1,4 +1,5 @@
-#include <mpi.h>
+#pragma once
+
 #include "config.h"
 
 

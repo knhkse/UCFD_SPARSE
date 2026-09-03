@@ -8,6 +8,9 @@ ucfd_status_t UCFDMatInit(SpMat *mat)
 
     m->type_name    = NULL;
     m->data         = NULL;
+    m->ops->spmv    = NULL;
+    m->ops->destroy = NULL;
+    m->ops->update  = NULL;
     *mat            = m;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -31,3 +34,12 @@ ucfd_status_t UCFDMatDestroy(SpMat *mat)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+ucfd_status_t UCFDMatUpdateValues(SpMat mat, UCFDReal *val)
+{
+#if defined(DEBUG)
+    UCFDCheckNull(mat->ops->update, "Matrix has no update function\n");
+#endif
+    UCFDCall(mat->ops->update(mat, val));
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}

@@ -22,22 +22,28 @@ typedef struct {
 } UCFDSpMVContext;
 
 typedef struct {
-    BaseCSR          A;
-    BaseCSR          B;
-    UCFDInt          n_local, n_ghost, n_boundary;
-    UCFDInt          *garray;
-    UCFDInt          *boundary_rows;
     UCFDSpMVContext  spmvctx;
+    BaseCSR         A;
+    BaseCSR         B;
+    UCFDInt         nnz;
+    UCFDInt         *value_dest;
+    UCFDReal        *split_values;
+    UCFDInt         n_local, n_ghost, n_boundary;
+    UCFDInt         *garray;
+    UCFDInt         *boundary_rows;
 } MPICSR;
 
 
 typedef struct {
-    BaseBSR          A;
-    BaseBSR          B;
-    UCFDInt          n_local, n_ghost, n_boundary;
-    UCFDInt          *garray;
-    UCFDInt          *boundary_rows;
     UCFDSpMVContext  spmvctx;
+    BaseBSR         A;
+    BaseBSR         B;
+    UCFDInt         nnzb;
+    UCFDInt         *value_dest;
+    UCFDReal        *split_values;
+    UCFDInt         n_local, n_ghost, n_boundary;
+    UCFDInt         *garray;
+    UCFDInt         *boundary_rows;
 } MPIBSR;
 
 

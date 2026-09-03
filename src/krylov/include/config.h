@@ -5,9 +5,11 @@
  */
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <float.h>
 #include <inttypes.h>
+#include <mpi.h>
 
 /**
  * Integer type designation
@@ -23,8 +25,10 @@
  */
 #if defined(UCFD_FLOAT32)
     typedef float UCFDReal;
+    #define MPI_REALTYPE MPI_FLOAT
 #else
     typedef double UCFDReal;
+    #define MPI_REALTYPE MPI_DOUBLE
 #endif
 
 typedef int8_t UCFDInt8;
