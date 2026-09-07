@@ -23,12 +23,12 @@ extern "C" {
 /* General functions */
 UCFD_EXTERN ucfd_status_t UCFDPreconCreatefromArrays(Precon*, UCFDInt*, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDPreconCreatefromMPIMat(Precon*, SpMat, UCFDInt);
-UCFD_EXTERN ucfd_status_t UCFDPreconCreateNone(Precon*);
 UCFD_EXTERN ucfd_status_t UCFDPreconPrepare(Precon);
 UCFD_EXTERN ucfd_status_t UCFDPreconApply(Precon, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDPreconDestroy(Precon*);
 
 /* Specific functions */
+UCFD_EXTERN ucfd_status_t UCFDPreconSetNone(Precon *);
 UCFD_EXTERN ucfd_status_t UCFDPreconSetILU(Precon *, UCFDInt);
 UCFD_EXTERN ucfd_status_t UCFDPreconSetBILU(Precon*, UCFDInt, UCFDInt);
 UCFD_EXTERN ucfd_status_t UCFDPreconSetBLUSGS(Precon*, UCFDInt, UCFDInt);
