@@ -22,6 +22,7 @@ extern "C" {
 
 /* General functions */
 UCFD_EXTERN ucfd_status_t UCFDPreconCreatefromArrays(Precon*, UCFDInt*, UCFDInt*, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDPreconCreatefromMPIMat(Precon*, SpMat, UCFDInt);
 UCFD_EXTERN ucfd_status_t UCFDPreconCreateNone(Precon*);
 UCFD_EXTERN ucfd_status_t UCFDPreconPrepare(Precon);
 UCFD_EXTERN ucfd_status_t UCFDPreconApply(Precon, UCFDReal*);

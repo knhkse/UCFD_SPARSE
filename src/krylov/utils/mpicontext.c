@@ -1,6 +1,8 @@
 #include "mpicontext.h"
 
 
+int UCFDMPISizeofFint(void) { return (int)sizeof(MPI_Fint); }
+
 static int mpi_is_active(void)
 {
     int initialized = 0;
@@ -27,8 +29,11 @@ ucfd_mpi_t UCFDMPIContextCreate(MPI_Fint fcomm, Ctx *ctx)
         free(c); return UCFD_MPI_ERROR;
     }
 
-    /* Query the */
-    /* Query the largest legal tag rather than assuming 32767.        */
+    /* Get current rank and total size */
+    MPI_Comm_rank(c->comm, &c->rank);
+    MPI_Comm_size(c->comm, &c->size);
+
+    /* Query the largest legal tag */
     void *attr_val = NULL;
     int   flag = 0;
     MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_TAG_UB, &attr_val, &flag);

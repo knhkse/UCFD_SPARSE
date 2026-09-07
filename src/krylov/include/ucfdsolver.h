@@ -16,11 +16,11 @@ extern "C" {
 
 UCFD_EXTERN ucfd_status_t UCFDSolverInit(Solver*);
 UCFD_EXTERN ucfd_status_t UCFDSolverDestroy(Solver*);
-UCFD_EXTERN ucfd_status_t UCFDSolve(Solver, Precon, SpMat, UCFDReal*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDSolve(Ctx, Solver, Precon, SpMat, UCFDReal*, UCFDReal*);
 
 UCFD_EXTERN ucfd_status_t UCFDSolverGetResult(Solver, UCFDInt*, UCFDInt*, UCFDReal*);
-UCFD_EXTERN ucfd_status_t UCFDSolverTraceResidualHistory(Solver);
-UCFD_EXTERN ucfd_status_t UCFDSolverGetResidualHistory(Solver, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDSolverTraceResidualHistory(Ctx, Solver);
+UCFD_EXTERN ucfd_status_t UCFDSolverGetResidualHistory(Ctx, Solver, UCFDReal*);
 
 UCFD_EXTERN ucfd_status_t UCFDSolverCreateGMRES(Solver*, UCFDInt, UCFDInt, UCFDInt, UCFDReal);
 UCFD_EXTERN ucfd_status_t UCFDSolverCreateBICGSTAB(Solver*, UCFDInt, UCFDInt, UCFDReal);

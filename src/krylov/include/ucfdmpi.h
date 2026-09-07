@@ -11,6 +11,7 @@ extern "C" {
 
 UCFD_EXTERN ucfd_mpi_t UCFDMPIContextCreate(MPI_Fint, Ctx*);
 UCFD_EXTERN ucfd_mpi_t UCFDMPIContextDestroy(Ctx*);
+UCFD_EXTERN int UCFDMPISizeofFint(void);
 
 #if defined(__cplusplus)
 }

@@ -6,12 +6,14 @@ ucfd_status_t UCFDMatInit(SpMat *mat)
     SpMat m = (SpMat)calloc(1, sizeof(*m));
     UCFDCheckNull(m, "Matrix allocation failed\n");
 
-    m->type_name    = NULL;
-    m->data         = NULL;
-    m->ops->spmv    = NULL;
-    m->ops->destroy = NULL;
-    m->ops->update  = NULL;
-    *mat            = m;
+    m->type_name        = NULL;
+    m->data             = NULL;
+    m->ops->spmv        = NULL;
+    m->ops->destroy     = NULL;
+    m->ops->update      = NULL;
+    m->ops->cppattern   = NULL;
+    m->ops->cpvalues    = NULL;
+    *mat                = m;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -40,6 +42,14 @@ ucfd_status_t UCFDMatUpdateValues(SpMat mat, UCFDReal *val)
     UCFDCheckNull(mat->ops->update, "Matrix has no update function\n");
 #endif
     UCFDCall(mat->ops->update(mat, val));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
 
+ucfd_status_t UCFDMatCopyPattern(SpMat mat, UCFDInt **rp, UCFDInt **ci, UCFDReal **va)
+{
+#if defined(DEBUG)
+    UCFDCheckNull(mat->ops->cppattern, "Matrix has no copy pattern function\n");
+#endif
+    UCFDCall(mat->ops->cppattern(mat, rp, ci, va));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

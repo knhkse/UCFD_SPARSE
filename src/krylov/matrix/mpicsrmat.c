@@ -378,8 +378,7 @@ static ucfd_status_t UCFDSplitCSR(UCFDInt n, const UCFDInt *rp, const UCFDInt *c
 }
 
 
-static ucfd_status_t UCFDMatUpdateValues(SpMat mat,
-                                         UCFDReal *new_values)
+static ucfd_status_t UCFDCSRMatUpdate(SpMat mat, UCFDReal *new_values)
 {
     MPICSR *csr = (MPICSR *)mat->data;
     UCFDReal *restrict dst = csr->split_values;
@@ -393,10 +392,30 @@ static ucfd_status_t UCFDMatUpdateValues(SpMat mat,
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDMatCreateMPICSR(Ctx *ctx, SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+static ucfd_status_t UCFDCSRCopyPattern(SpMat mat,
+                                        UCFDInt **rp_dest,
+                                        UCFDInt **ci_dest,
+                                        UCFDReal **val_dest)
 {
-    Ctx c = *ctx;
+    MPICSR *csr = (MPICSR *)mat->data;
+    *rp_dest = csr->A.rowptr;
+    *ci_dest = csr->A.colidx;
+    *val_dest = malloc((size_t)csr->nnz * sizeof(**val_dest));
+    UCFDCheckNull(*val_dest, "MPICSR value allocation failed\n");
 
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static inline ucfd_status_t UCFDCSRCopyValues(SpMat mat, UCFDReal *restrict values)
+{
+    MPICSR *csr = (MPICSR *)mat->data;
+    memcpy(values, csr->A.values, csr->nnz*sizeof(UCFDReal));
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDMatCreateMPICSR(SpMat *mat, Ctx ctx, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+{
     /* Initialize matrix object */
     UCFDCall(UCFDMatInit(mat));
     SpMat m = *mat;
@@ -405,17 +424,17 @@ ucfd_status_t UCFDMatCreateMPICSR(Ctx *ctx, SpMat *mat, UCFDInt n, UCFDInt *rowp
     MPICSR *csr = (MPICSR *)calloc(1, sizeof(*csr));
     UCFDCheckNull(csr, "MPICSR matrix creation failed\n");
 
-    ContextNextTag(c, &csr->spmvctx.tag);
-    csr->spmvctx.comm = c->comm;
+    ContextNextTag(ctx, &csr->spmvctx.tag);
+    csr->spmvctx.comm = ctx->comm;
 
     /* Prepare : Get range */
     int size=0, rank=0;
-    MPI_Comm_size(c->comm, &size);
-    MPI_Comm_rank(c->comm, &rank);
+    MPI_Comm_size(ctx->comm, &size);
+    MPI_Comm_rank(ctx->comm, &rank);
     UCFDInt *range = malloc((size_t)(size + 1)*sizeof(*range));
 
     csr->n_local = n;
-    build_range(c->comm, n, range);
+    build_range(ctx->comm, n, range);
 
     /* Split matrix with interior/boundary region */
     UCFDCall(UCFDSplitCSR(
@@ -427,10 +446,12 @@ ucfd_status_t UCFDMatCreateMPICSR(Ctx *ctx, SpMat *mat, UCFDInt n, UCFDInt *rowp
 
     free(range);
 
-    m->data         = csr;
-    m->ops->spmv    = SpMV_MPICSR;
-    m->ops->destroy = UCFDMPIMatDestroy;
-    m->ops->update  = UCFDMatUpdateValues;
+    m->data             = csr;
+    m->ops->spmv        = SpMV_MPICSR;
+    m->ops->destroy     = UCFDMPIMatDestroy;
+    m->ops->update      = UCFDCSRMatUpdate;
+    m->ops->cppattern   = UCFDCSRCopyPattern;
+    m->ops->cpvalues    = UCFDCSRCopyValues;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

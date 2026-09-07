@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "sparsemat.h"
 
@@ -29,6 +30,14 @@ static ucfd_status_t SpMV_CSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal b
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+static inline ucfd_status_t UCFDCSRCopyValues(SpMat mat, UCFDReal *restrict values)
+{
+    BaseCSR *csr = (BaseCSR *)mat->data;
+    const UCFDInt nnz = csr->rowptr[csr->n];
+    memcpy(values, csr->values, nnz*sizeof(UCFDReal));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
 ucfd_status_t UCFDMatCreateCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
     UCFDCall(UCFDMatInit(mat));
@@ -45,10 +54,10 @@ ucfd_status_t UCFDMatCreateCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *
     m->data             = csr;
     m->ops->spmv        = SpMV_CSR;
     m->ops->destroy     = UCFDEmptyKernel;
+    m->ops->cpvalues    = UCFDCSRCopyValues;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
-
 
 
 /** 
@@ -100,6 +109,15 @@ static ucfd_status_t SpMV_BSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal b
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+static inline ucfd_status_t UCFDBSRCopyValues(SpMat mat, UCFDReal *restrict values)
+{
+    BaseBSR *bsr = (BaseBSR *)mat->data;
+    const UCFDInt nnzb = bsr->basemat.rowptr[bsr->bn];
+    const UCFDInt block = bsr->block;
+    memcpy(values, bsr->basemat.values, nnzb*block*block*sizeof(UCFDReal));
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
 
 ucfd_status_t UCFDMatCreateBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
@@ -120,6 +138,7 @@ ucfd_status_t UCFDMatCreateBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *row
     m->data                     = bsr;
     m->ops->spmv                = SpMV_BSR;
     m->ops->destroy             = UCFDEmptyKernel;
+    m->ops->cpvalues            = UCFDBSRCopyValues;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

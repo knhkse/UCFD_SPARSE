@@ -16,6 +16,7 @@ ucfd_status_t UCFDSolverInit(Solver *solver)
     s->stat             = INITIALIZED;
     s->hist_residual    = NULL;
     s->data             = NULL;
+
     *solver             = s;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -33,9 +34,9 @@ ucfd_status_t UCFDSolverDestroy(Solver *solver)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
+ucfd_status_t UCFDSolve(Ctx ctx, Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
 {
-    UCFDCall((solver->ops->solve)(solver, pc, A, x, b));
+    UCFDCall((solver->ops->solve)(ctx, solver, pc, A, x, b));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
@@ -47,23 +48,30 @@ ucfd_status_t UCFDSolverGetResult(Solver solver, UCFDInt *stat, UCFDInt *iter, U
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-UCFD_INTERN inline ucfd_status_t UCFDSolverStoreResidual(Solver solver, UCFDInt iter, UCFDReal res)
+UCFD_INTERN inline ucfd_status_t UCFDSolverStoreResidual(Solver solver, UCFDInt rank, UCFDInt iter, UCFDReal res)
 {
-    solver->hist_residual[iter] = res;
+    if (rank == 0)
+        solver->hist_residual[iter] = res;
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDSolverTraceResidualHistory(Solver solver)
+ucfd_status_t UCFDSolverTraceResidualHistory(Ctx ctx, Solver solver)
 {
-    solver->hist_residual   = (UCFDReal *)calloc((size_t)solver->maxiter, sizeof(UCFDReal));
+    if (ctx->rank == 0)
+        solver->hist_residual   = (UCFDReal *)calloc((size_t)solver->maxiter, sizeof(UCFDReal));
     solver->ops->record     = UCFDSolverStoreResidual;
+    MPI_Barrier(ctx->comm);
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDSolverGetResidualHistory(Solver solver, UCFDReal *hist)
+ucfd_status_t UCFDSolverGetResidualHistory(Ctx ctx, Solver solver, UCFDReal *hist)
 {
-    UCFDCheckNull(solver->hist_residual, "Tracing residual unset\n");
-    memcpy(hist, solver->hist_residual, solver->maxiter*sizeof(UCFDReal));
+    if (ctx->rank == 0) {
+        UCFDCheckNull(solver->hist_residual, "Tracing residual unset\n");
+        memcpy(hist, solver->hist_residual, solver->maxiter*sizeof(UCFDReal));
+    }
+    MPI_Barrier(ctx->comm);
+
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

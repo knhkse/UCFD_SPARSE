@@ -10,6 +10,8 @@
 
 struct _Ctx {
     MPI_Comm    comm;
+    UCFDInt     rank;
+    UCFDInt     size;
     UCFDInt     next_tag;
     UCFDInt     tag_bound;
 };

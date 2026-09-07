@@ -31,11 +31,9 @@ UCFD_EXTERN ucfd_status_t UCFDMatMult(UCFDReal, SpMat, UCFDReal*, UCFDReal, UCFD
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 
-#if defined(USE_MPI)
-UCFD_EXTERN ucfd_status_t UCFDMatCreateMPICSR(Ctx*, SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
-UCFD_EXTERN ucfd_status_t UCFDMatCreateMPIBSR(Ctx*, SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDMatCreateMPICSR(SpMat*, Ctx, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDMatCreateMPIBSR(SpMat*, Ctx, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatUpdateValues(SpMat, UCFDReal*);
-#endif
 
 #if defined(USE_MKL)
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMKLCSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);

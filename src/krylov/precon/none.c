@@ -20,6 +20,7 @@ ucfd_status_t UCFDPreconCreateNone(Precon *precon)
     pc->rowptr          = NULL;
     pc->colidx          = NULL;
     pc->diagslots       = NULL;
+    pc->values          = NULL;
     pc->data            = NULL;
     pc->ops->prepare    = NonePreconFunction;
     pc->ops->apply      = NonePreconApply;

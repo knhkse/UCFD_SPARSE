@@ -71,7 +71,7 @@ apply_prev_givens(const UCFDInt m, const UCFDInt j,
         h1 = H[i + offset];
         h2 = H[i+1 + offset];
         H[i + offset] = c*h1 + s*h2;
-        H[i+1 + offset] = -s*h2 + c*h2;
+        H[i+1 + offset] = -s*h1 + c*h2;
     }
 }
 
@@ -137,17 +137,16 @@ update_solution(const UCFDInt n, const UCFDInt k,
 }
 
 
-static ucfd_status_t
+extern "C" static ucfd_status_t
 GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
 {
 #if defined(DEBUG)
     CheckCUDAPointer(x);
     CheckCUDAPointer(b);
-#endif
     UCFDCheckNull(solver->type_name, "Solver must be initialized\n");
     UCFDCheckNull(pc->type_name, "Preconditioner must be initialized\n");
     UCFDCheckNull(A->type_name, "Matrix must be constructed\n");
-
+#endif
     Solver_CUDAGMRES *gmres = (Solver_CUDAGMRES *)solver->data;
     CUBLASCall(cublasSetPointerMode(gmres->handle, CUBLAS_POINTER_MODE_HOST));
 
