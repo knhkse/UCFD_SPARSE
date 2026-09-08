@@ -48,11 +48,11 @@ struct _SolverOps {
 
 struct _Solver {
     SolverType          type_name;
-    UCFDReal            tol;
+    UCFDReal            rtol, atol, dtol;
     UCFDReal            haptol;
     UCFDInt             maxiter;
     UCFDInt             itnum;
-    UCFDReal            residual;
+    UCFDReal            residual, true_residual;
     ucfd_solver_t       stat;
     UCFDReal            *hist_residual;
     void                *data;

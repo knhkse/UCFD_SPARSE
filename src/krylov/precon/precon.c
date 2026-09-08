@@ -21,7 +21,7 @@ static void set_diagslots(const UCFDInt n, const UCFDInt *rowptr,
     }
 }
 
-ucfd_status_t UCFDPreconCreatefromArrays(Precon *precon, UCFDInt nnz, UCFDInt *rowptr, UCFDInt *colidx, UCFDInt *diagslots)
+ucfd_status_t UCFDPreconCreatefromArrays(Precon *precon, UCFDInt n, UCFDInt nnz, UCFDInt *rowptr, UCFDInt *colidx)
 {
     Precon pc = (Precon)calloc(1, sizeof(*pc));
     UCFDCheckNull(pc, "Precon allocation failed\n");
@@ -30,7 +30,8 @@ ucfd_status_t UCFDPreconCreatefromArrays(Precon *precon, UCFDInt nnz, UCFDInt *r
     pc->nnz         = nnz;
     pc->rowptr      = rowptr;
     pc->colidx      = colidx;
-    pc->diagslots   = diagslots;
+    pc->diagslots   = malloc((size_t)n * sizeof(UCFDInt));
+    set_diagslots(n, pc->rowptr, pc->colidx, pc->diagslots);
     pc->values      = NULL;
     pc->data        = NULL;
     *precon         = pc;
@@ -43,8 +44,9 @@ ucfd_status_t UCFDPreconCreatefromArrays(Precon *precon, UCFDInt nnz, UCFDInt *r
  * n : number of (block) rows;
  *      In BSR format, `bn` should be passed
  * nnz : length of `colidx` array
+ *      In BSR format, `bnnz` should be passed
  */
-ucfd_status_t UCFDPreconCreatefromMatrix(Precon *precon, SpMat mat, UCFDInt n, UCFDInt nnz)
+ucfd_status_t UCFDPreconCreatefromMatrix(Precon *precon, UCFDInt n, UCFDInt nnz, SpMat mat)
 {
     Precon pc = (Precon)calloc(1, sizeof(*pc));
     UCFDCheckNull(pc, "Precon allocation failed\n");
@@ -56,6 +58,7 @@ ucfd_status_t UCFDPreconCreatefromMatrix(Precon *precon, SpMat mat, UCFDInt n, U
     /* Construct local-pattern diagslots */
     pc->diagslots       = malloc((size_t)n * sizeof(UCFDInt));
     set_diagslots(n, pc->rowptr, pc->colidx, pc->diagslots);
+    pc->values          = NULL;
     pc->data            = NULL;
     *precon             = pc;
 
@@ -83,6 +86,7 @@ ucfd_status_t UCFDPreconDestroy(Precon *precon)
     UCFDCall((*precon)->ops->destroy(*precon));
     free((*precon)->data);
     free((*precon)->values);
+    free((*precon)->diagslots);
     free(*precon);
     *precon = NULL;
     

@@ -8,16 +8,32 @@ ucfd_status_t UCFDSolverInit(Solver *solver)
     UCFDCheckNull(s, "Solver allocation failed\n");
 
     s->type_name        = NULL;
-    s->tol              = 1e-5;
-    s->haptol           = 1e-12;
-    s->maxiter          = -1;
+    s->rtol             = 1e-5;
+    s->atol             = 1e-50;
+    s->dtol             = 1e5;
+    s->haptol           = 1e-30;
+    s->maxiter          = 1000;
     s->itnum            = 0;
     s->residual         = 0.0;
+    s->true_residual    = 0.0;
     s->stat             = INITIALIZED;
     s->hist_residual    = NULL;
     s->data             = NULL;
 
     *solver             = s;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDSolverSetOptions(Solver *solver,
+                                   UCFDReal atol, UCFDReal rtol,
+                                   UCFDReal dtol, UCFDInt maxiter)
+{
+    Solver s        = *solver;
+    s->atol         = atol;
+    s->rtol         = rtol;
+    s->dtol         = dtol;
+    s->maxiter      = maxiter;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

@@ -19,12 +19,15 @@ typedef enum
 
 typedef enum
 {
-    INITIALIZED      = -1,
-    CONVERGED        = 0,
-    HAPPYBREAKDOWN   = 1,
-    REACH_ITERMAX    = 2,
-    RHOBREAKDOWN     = 3,
-    PIBREAKDOWN      = 4
+    INITIALIZED         = -2,
+    ITERATING           = -1,
+    CONVERGED           = 0,
+    HAPPYBREAKDOWN      = 1,
+    REACH_ITERMAX       = 2,
+    DIVERGED_BREAKDOWN  = 3,
+    DIVERGED_DTOL       = 4,
+    RHO_BREAKDOWN        = 5,
+    PI_BREAKDOWN         = 6
 } ucfd_solver_t;
 
 typedef enum

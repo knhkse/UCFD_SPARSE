@@ -26,6 +26,7 @@ extern "C" {
 UCFD_EXTERN ucfd_status_t UCFDMatInit(SpMat*);
 UCFD_EXTERN ucfd_status_t UCFDMatDestroy(SpMat*);
 UCFD_EXTERN ucfd_status_t UCFDMatMult(UCFDReal, SpMat, UCFDReal*, UCFDReal, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDMatUpdateValues(SpMat, UCFDReal*);
 
 /* Matrix Setting API */
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
@@ -33,7 +34,6 @@ UCFD_EXTERN ucfd_status_t UCFDMatCreateBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, U
 
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMPICSR(SpMat*, Ctx, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMPIBSR(SpMat*, Ctx, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
-UCFD_EXTERN ucfd_status_t UCFDMatUpdateValues(SpMat, UCFDReal*);
 
 #if defined(USE_MKL)
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMKLCSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);

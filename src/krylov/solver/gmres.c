@@ -94,33 +94,68 @@ static UCFDReal start_cycle(Solver solver, Precon pc, MPI_Comm comm, UCFDInt n,
 
 static ucfd_status_t GMRESSolve(Ctx ctx, Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
 {
+#if defined(DEBUG)
     UCFDCheckNull(solver->type_name, "Solver must be initialized\n");
     UCFDCheckNull(pc->type_name, "Preconditioner must be initialized\n");
     UCFDCheckNull(A->type_name, "Matrix must be constructed\n");
-
+#endif
     Solver_GMRES *gmres = (Solver_GMRES *)solver->data;
-    const UCFDInt maxiter = solver->maxiter;
-    const UCFDReal tol = solver->tol, haptol = solver->haptol;
+
     const UCFDInt n = gmres->n, m = gmres->restart;
+    const UCFDInt maxiter = solver->maxiter;
+    const UCFDInt maxcycle = gmres->maxcycle;   // maxcycle = (maxiter + m - 1)/m
+    const UCFDInt ld = m + 1;
+
+    /* Tolerances */
+    const UCFDReal rtol = solver->rtol;
+    const UCFDReal atol = solver->atol;
+    const UCFDReal dtol = solver->dtol;
+    const UCFDReal haptol = solver->haptol;
+
     UCFDReal *r = gmres->r, *V = gmres->V, *y = gmres->y;
     UCFDReal *cs = gmres->cs, *sn = gmres->sn, *H = gmres->H;
 
-    const UCFDInt ld = m + 1;
-    UCFDInt iter = 0, j, k;
+    UCFDInt cycle = 0, totit=0, j, k;
     UCFDReal wnorm, beta, *Hcol;
-    UCFDReal abeta = 0.0; /* Absolute residual */
+
+    UCFDReal beta0 = 0.0;   /* ||M^-1 r_0||, frozen for the whole solve  */
+    UCFDReal ttol  = 0.0;   /* the ONE threshold, computed exactly once  */
+    UCFDReal rnorm = 0.0;   /* current preconditioned residual estimate  */
+
+    solver->stat = ITERATING;
 
     /* Initial residual */
     UCFDCall(prepare_precon(pc, A));
     UCFDCall(calc_residual(solver, A, n, x, b, r));
 
-    while (iter < maxiter)
+    while (cycle < maxcycle)
     {
         beta = start_cycle(solver, pc, ctx->comm, n, gmres->r, gmres->V);
         y[0] = beta;
 
+        if (cycle == 0) {
+            beta0 = beta;
+            ttol  = rtol * beta0;
+            if (ttol < atol) ttol = atol;
+
+            rnorm = beta;
+            solver->ops->record(solver, ctx->rank, 0, rnorm);
+
+            if (rnorm <= ttol) {            /* converged on entry */
+                solver->stat = CONVERGED;
+                break;
+            }
+        } else {
+            if (fabs(beta - rnorm) > 0.1 * beta0) {
+                solver->stat = DIVERGED_BREAKDOWN;
+                break;
+            }
+            rnorm = beta;
+            solver->ops->record(solver, ctx->rank, totit, rnorm);
+        }
+
         k = 0;
-        for (j=0; j<m; ++j)
+        for (j=0; j<m && totit < maxiter; ++j)
         {
             /* Arnoldi iteration */
             UCFDCall(arnoldi_cgs2(
@@ -137,12 +172,15 @@ static ucfd_status_t GMRESSolve(Ctx ctx, Solver solver, Precon pc, SpMat A, UCFD
             y[j] = cs[j] * y[j];
 
             k = j + 1;
-            if (wnorm < haptol * beta) {
-                solver->stat = HAPPYBREAKDOWN;
-                break;
-            }
-            if (fabs(y[j+1]) < tol * beta) {
-                solver->stat = CONVERGED;
+            totit++;
+            rnorm = fabs(y[j+1]);
+
+            solver->ops->record(solver, ctx->rank, totit, rnorm);
+
+            if (wnorm < haptol) { solver->stat = HAPPYBREAKDOWN; break; }
+            if (rnorm < ttol) { solver->stat = CONVERGED; break; }
+            if (dtol > 0.0 && rnorm > dtol*beta0) {
+                solver->stat = DIVERGED_DTOL;
                 break;
             }
         }
@@ -154,20 +192,16 @@ static ucfd_status_t GMRESSolve(Ctx ctx, Solver solver, Precon pc, SpMat A, UCFD
         solver->ops->dgemvcol(n, k, n, 1.0, V, y, 1.0, x);
 
         UCFDCall(calc_residual(solver, A, n, x, b, r));
-        abeta = solver->ops->dnorm2(ctx->comm, n, r);
-        solver->ops->record(solver, ctx->rank, iter, abeta);
 
-        /* Convergence check */
-        if (abeta <= tol) {
-            solver->stat = CONVERGED;
-            break;
-        }
-
-        iter++;
+        cycle++;
+        if (solver->stat != ITERATING) break;
     }
-    if (iter == maxiter) solver->stat = REACH_ITERMAX;
-    solver->residual = abeta;
-    solver->itnum = iter;
+
+    if (solver->stat == ITERATING) solver->stat = REACH_ITERMAX;
+
+    solver->residual        = rnorm;
+    solver->true_residual   = solver->ops->dnorm2(ctx->comm, n, r);
+    solver->itnum           = totit;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -194,7 +228,7 @@ static struct _SolverOps GMRESOps = {
     UCFDEmptyKernel
 };
 
-ucfd_status_t UCFDSolverCreateGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxiter, UCFDReal tol)
+ucfd_status_t UCFDSolverCreateGMRES(Solver *solver, UCFDInt n, UCFDInt m)
 {
     UCFDCall(UCFDSolverInit(solver));
     Solver s            = *solver;
@@ -214,9 +248,8 @@ ucfd_status_t UCFDSolverCreateGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDIn
     gmres->r        = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
     gmres->n        = n;
     gmres->restart  = m;
+    gmres->maxcycle = (s->maxiter + m - 1)/m;
 
-    s->tol          = tol;
-    s->maxiter      = maxiter;
     s->data         = gmres;
     s->ops[0]       = GMRESOps;
 
