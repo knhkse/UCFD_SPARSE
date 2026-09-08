@@ -467,15 +467,11 @@ static ucfd_status_t UCFDBSRMatUpdate(SpMat mat, UCFDReal *new_values)
 
 static ucfd_status_t UCFDBSRCopyPattern(SpMat mat,
                                         UCFDInt **rp_dest,
-                                        UCFDInt **ci_dest,
-                                        UCFDReal **val_dest)
+                                        UCFDInt **ci_dest)
 {
     MPIBSR *bsr = (MPIBSR *)mat->data;
     *rp_dest = bsr->A.basemat.rowptr;
     *ci_dest = bsr->A.basemat.colidx;
-    UCFDInt val_count = bsr->nnzb * bsr->A.block * bsr->A.block;
-    *val_dest = malloc((size_t)val_count * sizeof(**val_dest));
-    UCFDCheckNull(*val_dest, "MPIBSR value allocation failed\n");
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

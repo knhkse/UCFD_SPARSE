@@ -36,20 +36,11 @@ ucfd_status_t UCFDMatDestroy(SpMat *mat)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDMatUpdateValues(SpMat mat, UCFDReal *val)
+ucfd_status_t UCFDMatUpdateValues(SpMat mat, UCFDReal *new_values)
 {
 #if defined(DEBUG)
     UCFDCheckNull(mat->ops->update, "Matrix has no update function\n");
 #endif
-    UCFDCall(mat->ops->update(mat, val));
-    UCFDFunctionReturn(UCFD_SUCCESS);
-}
-
-ucfd_status_t UCFDMatCopyPattern(SpMat mat, UCFDInt **rp, UCFDInt **ci, UCFDReal **va)
-{
-#if defined(DEBUG)
-    UCFDCheckNull(mat->ops->cppattern, "Matrix has no copy pattern function\n");
-#endif
-    UCFDCall(mat->ops->cppattern(mat, rp, ci, va));
+    UCFDCall(mat->ops->update(mat, new_values));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

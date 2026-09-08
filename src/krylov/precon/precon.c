@@ -21,29 +21,37 @@ static void set_diagslots(const UCFDInt n, const UCFDInt *rowptr,
     }
 }
 
-ucfd_status_t UCFDPreconCreatefromArrays(Precon *precon, UCFDInt *rowptr, UCFDInt *colidx, UCFDInt *diagslots, UCFDReal *values)
+ucfd_status_t UCFDPreconCreatefromArrays(Precon *precon, UCFDInt nnz, UCFDInt *rowptr, UCFDInt *colidx, UCFDInt *diagslots)
 {
     Precon pc = (Precon)calloc(1, sizeof(*pc));
     UCFDCheckNull(pc, "Precon allocation failed\n");
 
     pc->type_name   = NULL;
+    pc->nnz         = nnz;
     pc->rowptr      = rowptr;
     pc->colidx      = colidx;
     pc->diagslots   = diagslots;
-    pc->values      = values;
+    pc->values      = NULL;
     pc->data        = NULL;
     *precon         = pc;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDPreconCreatefromMPIMat(Precon *precon, SpMat mat, UCFDInt n)
+/**
+ * Preconditioner from matrix attributes
+ * n : number of (block) rows;
+ *      In BSR format, `bn` should be passed
+ * nnz : length of `colidx` array
+ */
+ucfd_status_t UCFDPreconCreatefromMatrix(Precon *precon, SpMat mat, UCFDInt n, UCFDInt nnz)
 {
     Precon pc = (Precon)calloc(1, sizeof(*pc));
     UCFDCheckNull(pc, "Precon allocation failed\n");
 
     pc->type_name   = NULL;
-    UCFDCall(UCFDMatCopyPattern(mat, &pc->rowptr, &pc->colidx, &pc->values));
+    pc->nnz         = nnz;
+    mat->ops->cppattern(mat, &pc->rowptr, &pc->colidx);
 
     /* Construct local-pattern diagslots */
     pc->diagslots       = malloc((size_t)n * sizeof(UCFDInt));

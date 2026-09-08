@@ -5,6 +5,9 @@
 #include "sparsemat.h"
 
 
+static inline ucfd_status_t UCFDMatUpdate(SpMat mat, UCFDReal *new_values)
+{ UCFDFunctionReturn(UCFD_SUCCESS); }
+
 /**
  * CSR Matrix Format
  */
@@ -27,6 +30,14 @@ static ucfd_status_t SpMV_CSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal b
         }
         y[i] = alpha*s + beta*y[i];
     }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static inline ucfd_status_t UCFDMatCopyPattern(SpMat mat, UCFDInt **rp_dest, UCFDInt **ci_dest)
+{
+    BaseCSR *csr = (BaseCSR *)mat->data;
+    *rp_dest = csr->rowptr;
+    *ci_dest = csr->colidx;
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
@@ -54,6 +65,8 @@ ucfd_status_t UCFDMatCreateCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *
     m->data             = csr;
     m->ops->spmv        = SpMV_CSR;
     m->ops->destroy     = UCFDEmptyKernel;
+    m->ops->update      = UCFDMatUpdate;
+    m->ops->cppattern   = UCFDMatCopyPattern;
     m->ops->cpvalues    = UCFDCSRCopyValues;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -138,6 +151,8 @@ ucfd_status_t UCFDMatCreateBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *row
     m->data                     = bsr;
     m->ops->spmv                = SpMV_BSR;
     m->ops->destroy             = UCFDEmptyKernel;
+    m->ops->update              = UCFDMatUpdate;
+    m->ops->cppattern           = UCFDMatCopyPattern;
     m->ops->cpvalues            = UCFDBSRCopyValues;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -160,6 +175,15 @@ static ucfd_status_t Destroy_MKL(SpMat mat)
     if (!mat) UCFDFunctionReturn(UCFD_SUCCESS);
     MKLWrapper *handle = (MKLWrapper *)mat->data;
     MKLCall(mkl_sparse_destroy(handle->op));
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static inline ucfd_status_t UCFDMKLBSRCopyPattern(SpMat mat, UCFDInt **rp_dest, UCFDInt **ci_dest)
+{
+    MKLBSR *bsr = (MKLBSR *)mat->data;
+    *rp_dest = bsr->mat.basemat.rowptr;
+    *ci_dest = bsr->mat.basemat.colidx;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -202,10 +226,22 @@ ucfd_status_t UCFDMatCreateMKLBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *
     m->data                     = bsr;
     m->ops->spmv                = SpMV_MKL;
     m->ops->destroy             = Destroy_MKL;
+    m->ops->update              = UCFDMatUpdate;
+    m->ops->cppattern           = UCFDMKLBSRCopyPattern;
+    m->ops->cpvalues            = UCFDBSRCopyValues;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+
+static inline ucfd_status_t UCFDMKLCSRCopyPattern(SpMat mat, UCFDInt **rp_dest, UCFDInt **ci_dest)
+{
+    MKLCSR *csr = (MKLCSR *)mat->data;
+    *rp_dest = csr->mat.rowptr;
+    *ci_dest = csr->mat.colidx;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
 
 ucfd_status_t UCFDMatCreateMKLCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
 {
@@ -242,6 +278,9 @@ ucfd_status_t UCFDMatCreateMKLCSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDIn
     m->data                     = csr;
     m->ops->spmv                = SpMV_MKL;
     m->ops->destroy             = Destroy_MKL;
+    m->ops->update              = UCFDMatUpdate;
+    m->ops->cppattern           = UCFDMKLCSRCopyPattern;
+    m->ops->cpvalues            = UCFDCSRCopyValues;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

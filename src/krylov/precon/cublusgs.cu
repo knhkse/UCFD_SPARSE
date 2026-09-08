@@ -324,6 +324,7 @@ UCFDPreconSetCUDABLUSGS(Precon *precon, UCFDInt bn, UCFDInt block, UCFDInt ncolo
     CUDACall(cudaMalloc((void**)&cudablusgs->base.diagvalues, (size_t)(bn*block*block)*sizeof(UCFDReal)));
 
     pc->type_name       = CUDABLUSGS;
+    CUDACall(cudaMalloc(&pc->values, pc->nnz*block*block*sizeof(UCFDReal)));
     pc->data            = cudablusgs;
     pc->ops->prepare    = CUDABLUSGSPreconPrepare;
     pc->ops->apply      = CUDABLUSGSPreconApply;

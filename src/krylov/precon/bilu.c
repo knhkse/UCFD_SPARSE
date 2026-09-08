@@ -164,6 +164,7 @@ ucfd_status_t UCFDPreconSetBILU(Precon *precon, UCFDInt bn, UCFDInt block)
     for (UCFDInt i = 0; i < bn; ++i) bilu->iw[i] = -1;
 
     pc->type_name       = BILU;
+    pc->values          = malloc(pc->nnz*block*block*sizeof(UCFDReal));
     pc->data            = bilu;
     pc->ops->prepare    = BILUPreconPrepare;
     pc->ops->apply      = BILUPreconApply;

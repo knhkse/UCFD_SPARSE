@@ -73,9 +73,10 @@ static inline ucfd_status_t prepare_precon(Precon precon, SpMat mat)
 #endif
 
     // 1) Copy system matrix values -> precon values
-    UCFDCall(mat->ops->cpvalues(mat, precon->values));
+    if (precon->values != NULL)
+        UCFDCall(mat->ops->cpvalues(mat, precon->values));
 
-    // 2) Prepare preconditioner
+    // 2) Prepare preconditioner values
     UCFDCall(precon->ops->prepare(precon));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

@@ -428,6 +428,7 @@ UCFDPreconSetCUDABILU(Precon *precon, UCFDInt bn, UCFDInt block, UCFDInt ncolors
     cudabilu->icolors                      = icolors;
 
     pc->type_name                       = CUDABILU;
+    CUDACall(cudaMalloc(&pc->values, pc->nnz*block*block*sizeof(UCFDReal)));
     pc->data                            = cudabilu;
     pc->ops->prepare                    = CUDABILUPreconPrepare;
     pc->ops->apply                      = CUDABILUPreconApply;

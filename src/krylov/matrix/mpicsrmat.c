@@ -394,14 +394,11 @@ static ucfd_status_t UCFDCSRMatUpdate(SpMat mat, UCFDReal *new_values)
 
 static ucfd_status_t UCFDCSRCopyPattern(SpMat mat,
                                         UCFDInt **rp_dest,
-                                        UCFDInt **ci_dest,
-                                        UCFDReal **val_dest)
+                                        UCFDInt **ci_dest)
 {
     MPICSR *csr = (MPICSR *)mat->data;
     *rp_dest = csr->A.rowptr;
     *ci_dest = csr->A.colidx;
-    *val_dest = malloc((size_t)csr->nnz * sizeof(**val_dest));
-    UCFDCheckNull(*val_dest, "MPICSR value allocation failed\n");
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

@@ -123,6 +123,7 @@ ucfd_status_t UCFDPreconSetILU(Precon *precon, UCFDInt n)
     for (UCFDInt i=0; i<n; ++i) ilu->iw[i] = -1;
 
     pc->type_name       = ILU;
+    pc->values          = malloc(pc->nnz*sizeof(UCFDReal));
     pc->data            = ilu;
     pc->ops->prepare    = ILUPreconPrepare;
     pc->ops->apply      = ILUPreconApply;

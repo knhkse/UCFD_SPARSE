@@ -116,6 +116,7 @@ ucfd_status_t UCFDPreconSetPBLUSGS(Precon *precon, UCFDInt bn, UCFDInt block, UC
     pblu->icolors                           = icolors;
 
     pc->type_name       = PBLUSGS;
+    pc->values          = malloc(pc->nnz*block*block*sizeof(UCFDReal));
     pc->data            = pblu;
     pc->ops->prepare    = BLUSGSPreconPrepare;
     pc->ops->apply      = PBLUSGSPreconApply;

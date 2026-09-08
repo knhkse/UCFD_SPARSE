@@ -133,6 +133,7 @@ ucfd_status_t UCFDPreconSetBLUSGS(Precon *precon, UCFDInt bn, UCFDInt block)
     blu->diagvalues     = (UCFDReal *)calloc((size_t)bn*block*block, sizeof(UCFDReal));
 
     pc->type_name       = BLUSGS;
+    pc->values          = malloc(pc->nnz*block*block*sizeof(UCFDReal));
     pc->data            = blu;
     pc->ops->prepare    = BLUSGSPreconPrepare;
     pc->ops->apply      = BLUSGSPreconApply;

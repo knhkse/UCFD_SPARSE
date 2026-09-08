@@ -13,6 +13,7 @@ struct _PreconOps {
 
 struct _Precon {
     PreconType type_name;
+    UCFDInt nnz;
     UCFDInt *rowptr;
     UCFDInt *colidx;
     UCFDInt *diagslots;

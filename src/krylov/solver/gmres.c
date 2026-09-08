@@ -141,6 +141,10 @@ static ucfd_status_t GMRESSolve(Ctx ctx, Solver solver, Precon pc, SpMat A, UCFD
                 solver->stat = HAPPYBREAKDOWN;
                 break;
             }
+            if (fabs(y[j+1]) < tol * beta) {
+                solver->stat = CONVERGED;
+                break;
+            }
         }
 
         /* Back substitution */
