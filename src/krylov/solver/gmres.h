@@ -5,7 +5,6 @@
 typedef struct {
     UCFDInt     n;
     UCFDInt     restart;    // Restart number
-    UCFDInt     maxcycle;   // Maximum outer iteration
     UCFDReal    *H, *V, *y, *w, *sn, *cs, *htmp, *r;      // Working arrays
 } Solver_GMRES;
 

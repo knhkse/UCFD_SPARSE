@@ -103,7 +103,7 @@ static ucfd_status_t GMRESSolve(Ctx ctx, Solver solver, Precon pc, SpMat A, UCFD
 
     const UCFDInt n = gmres->n, m = gmres->restart;
     const UCFDInt maxiter = solver->maxiter;
-    const UCFDInt maxcycle = gmres->maxcycle;   // maxcycle = (maxiter + m - 1)/m
+    const UCFDInt maxcycle = (maxiter + m - 1)/m;
     const UCFDInt ld = m + 1;
 
     /* Tolerances */
@@ -248,7 +248,6 @@ ucfd_status_t UCFDSolverCreateGMRES(Solver *solver, UCFDInt n, UCFDInt m)
     gmres->r        = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
     gmres->n        = n;
     gmres->restart  = m;
-    gmres->maxcycle = (s->maxiter + m - 1)/m;
 
     s->data         = gmres;
     s->ops[0]       = GMRESOps;
