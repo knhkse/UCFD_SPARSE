@@ -1,81 +1,99 @@
-# Krylov subspace methods library Makefile
+# Krylov subspace methods library
+.DEFAULT_GOAL := all
+.DELETE_ON_ERROR:
 
-# =================================
-# Configuration Variables
-# =================================
-CC ?= icx
-include $(UCFD_PATH)/Makefile.inc
+# Resolve paths from this Makefile, including when invoked with make -f.
+THIS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
+SRCDIR := $(patsubst %/,%,$(dir $(THIS_MAKEFILE)))
 
-# =================================
-# Derived Settings
-# =================================
-ifeq ($(MKLROOT),)
-  $(error Intel MKL root directory must be defined)
-else
-  IFLAGS += -I$(MKLROOT)/include
+# Get configuration from `Makefile.inc`
+include $(UCFDPATH)/Makefile.inc
+
+# Default compiler - Recommend Intel compiler
+CC ?= mpiicx
+OPTFLAGS ?= -O3 -ffast-math
+BUILD_DIR ?= $(abspath $(SRCDIR)/../../build)
+CFLAGS := -Wall $(OPTFLAGS) -fPIC -fvisibility=hidden
+
+# Multi-threading flag
+ifeq ($(USE_OMP), 1)
+	ifneq ($(findstring icx,$(CC))$(findstring icc,$(CC)),)
+		OMPFLAG := -qopenmp
+	else
+		OMPFLAG := -fopenmp
+	endif
+	CFLAGS += $(OMPFLAG)
+	MACROS += -DUSE_OMP
 endif
 
-ifeq ($(MKLFLAGS),)
-  $(error MKL flags must be defined)
+# Additional flags
+ifeq ($(USE_INT64), 1)
+	MACROS += -DUCFD_INT64
 endif
 
-# Block size : Required
-ifeq ($(BLOCK),)
-  $(error `BLOCK` must be defined)
-else
-  CFLAGS += -DBLOCK=$(BLOCK)
+ifeq ($(USE_FLOAT32), 1)
+	MACROS += -DUCFD_FLOAT32
 endif
 
-ifeq ($(EPS),)
-  $(info Machine epsilon undefined::Default value is 2.22e-16)
-else
-  CFLAGS += -DEPS=$(EPS)
+# Default MKL flags with static linking
+ifeq ($(USE_MKL), 1)
+	MKL_CPPFLAGS := -DUSE_MKL -I"$(MKLROOT)/include"
+	MKL_LIBDIR := $(MKLROOT)/lib
+	MKLFLAGS ?= -Wl,--start-group "$(MKL_LIBDIR)/libmkl_intel_lp64.a" \
+		"$(MKL_LIBDIR)/libmkl_intel_thread.a" "$(MKL_LIBDIR)/libmkl_core.a" \
+		-Wl,--end-group -liomp5 -lpthread -lm -ldl
 endif
 
-# =================================
-# Build Targets
-# =================================
-SLIB = libkrylov.a
-DLIB = libkrylov.so
 
-OBJDIR = ./obj
-INCDIR = ./include
-IFLAGS += -I$(INCDIR)
+BUILDDIR := $(BUILD_DIR)/krylov
+COMMON_CPPFLAGS := $(MACROS) $(addprefix -I,$(addprefix $(SRCDIR)/,utils include include/impl))
 
-KRYLOV = $(OBJDIR)/krylov.o
-PRECON = $(OBJDIR)/precon.o
-INVERSE = $(OBJDIR)/inverse.o
+# Discover library sources only; root-level test programs are separate executables.
+SOURCE_DIRS := $(addprefix $(SRCDIR)/,matrix precon solver utils)
+SRCS := $(sort $(shell find $(SOURCE_DIRS) -type f -name '*.c'))
 
-# Build object(.o) files
-$(INVERSE) : inverse.c $(INCDIR)/inverse.h $(CONFIG) $(TYPES)
-	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
+# Replace the absolute source prefix instead of prepending to it.
+OBJS := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRCS))
+DEPS := $(OBJS:.o=.d)
+SLIB := $(BUILDDIR)/libucfdkrylov.a
+DLIB := $(BUILDDIR)/libucfdkrylov.so
 
-$(KRYLOV) : krylov.c $(INCDIR)/krylov.h $(INCDIR)/precon.h $(CONFIG) $(TYPES)
-	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
+# Only matrix files include Intel MKL
+# MKL_OBJS := $(addprefix $(BUILDDIR)/matrix/,sparsemat.o mpicsrmat.o mpibsrmat.o)
+MKL_SRCS := $(wildcard $(SRCDIR)/matrix/*.c)
+MKL_OBJS := $(patsubst $(SRCDIR)/matrix/%.c,$(BUILDDIR)/matrix/%.o,$(MKL_SRCS))
 
-$(PRECON) : precon.c $(INCDIR)/precon.h $(CONFIG) $(TYPES)
-	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
+$(MKL_OBJS): PRIVATE_MKL_CPPFLAGS = $(MKL_CPPFLAGS)
 
-# Build library files
-$(SLIB) : $(KRYLOV) $(PRECON) $(INVERSE)
-	ar rcs $@ $^
-	cp $@ $(UCFD_PATH)/lib
+# The source's directory supplies its individual include path.
+$(BUILDDIR)/%.o: $(SRCDIR)/%.c $(THIS_MAKEFILE) | check-mkl
+	@mkdir -p "$(@D)"
+	$(CC) $(CFLAGS) $(COMMON_CPPFLAGS) -I"$(dir $<)" $(PRIVATE_MKL_CPPFLAGS) -MMD -MP -c "$<" -o "$@"
 
-$(DLIB) : $(KRYLOV) $(PRECON) $(INVERSE)
-	$(CC) $(CFLAGS) -fPIC -shared $(MKLFLAGS) -o $@ $^
-	cp $@ $(UCFD_PATH)/lib
+$(SLIB): $(OBJS) $(THIS_MAKEFILE) | check-mkl
+	$(RM) "$@"
+	$(AR) rcs "$@" $(OBJS)
+	cp $(SLIB) /home/jante/lib_pybaram/.
+
+$(DLIB): $(OBJS) $(THIS_MAKEFILE) | check-mkl
+	$(CC) $(LDFLAGS) -shared -o "$@" $(OBJS) $(MKLFLAGS) $(LDLIBS)
+	cp $(DLIB) /home/jante/lib_pybaram/.
 
 
+.PHONY: all static dynamic clean check-mkl
 all : $(SLIB) $(DLIB)
-	@echo All libraries are created
 
 static : $(SLIB)
-	@echo Static library is created
 
-dynamic : $(DLIB)
-	@echo Dynamic library is created
+dynamic: $(DLIB)
 
-.PHONY : clean
-clean :
-	rm -rf $(OBJDIR)
-	rm -f $(SLIB) $(DLIB)
+clean:
+	$(RM) $(OBJS) $(DEPS) $(SLIB) $(DLIB)
+
+check-mkl:
+ifeq ($(USE_MKL), 1)
+	@test -n "$(strip $(MKLROOT))" || { echo "MKLROOT must be set when USE_MKL=1" >&2; exit 1; }
+endif
+
+# auto-generated header dependencies (from -MMD -MP)
+-include $(DEPS)
