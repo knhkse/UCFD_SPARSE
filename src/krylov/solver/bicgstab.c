@@ -21,7 +21,7 @@ static ucfd_status_t fused_reduction(UCFDInt n, UCFDReal *restrict rt, UCFDReal 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static ucfd_status_t BICGSTABSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
+static ucfd_status_t BICGSTABSolve(Ctx ctx, Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
 {
     UCFDCheckNull(solver->type_name, "Solver must be initialized\n");
     UCFDCheckNull(pc->type_name, "Preconditioner must be initialized\n");
@@ -29,7 +29,7 @@ static ucfd_status_t BICGSTABSolve(Solver solver, Precon pc, SpMat A, UCFDReal *
 
     Solver_BICGSTAB *bcs = (Solver_BICGSTAB *)solver->data;
     const UCFDInt maxiter = solver->maxiter, n = bcs->n;
-    const UCFDReal tol = solver->tol, haptol = solver->haptol;
+    const UCFDReal tol = solver->rtol;
     UCFDReal *restrict r = bcs->r, *restrict rt = bcs->rt, *restrict p = bcs->p, \
              *restrict v = bcs->v, *restrict pt = bcs->pt, *restrict s = bcs->s, \
              *restrict shat = bcs->shat, *restrict t = bcs->t;
@@ -38,26 +38,22 @@ static ucfd_status_t BICGSTABSolve(Solver solver, Precon pc, SpMat A, UCFDReal *
     UCFDReal rho, rhoprev, alpha, beta, omega;
     UCFDReal pi, phi, rtt, ts, tt, ss, rho_new, resnorm=0.0;
 
-    /**
-     * Initial residual 
-     * 1) r := b
-     * 2) r := -A@x + r (b-A@x)
-     */
-    solver->ops->dcopy(n, r, b);
-    UCFDCall(UCFDSpMV(-1.0, A, x, 1.0, r));
+    /* Initial residual */
+    UCFDCall(prepare_precon(pc, A));
+    UCFDCall(calc_residual(solver, A, n, x, b, r));
 
     /* rt := r */
     solver->ops->dcopy(n, rt, r);
 
     /* rho_0 = (rt, r0) */
-    rho = solver->ops->ddot(n, rt, r);
+    rho = solver->ops->ddot(ctx->comm, n, rt, r);
     rhoprev = 1.0;
     alpha = 1.0;
     omega = 1.0;
 
     /* rho breakdown */
     if (fabs(rho) < 1e-30) {
-        solver->stat = RHOBREAKDOWN;
+        solver->stat = RHO_BREAKDOWN;
         goto done;
     }
 
@@ -75,12 +71,12 @@ static ucfd_status_t BICGSTABSolve(Solver solver, Precon pc, SpMat A, UCFDReal *
 
         /* pt := inv(M) * p */
         solver->ops->dcopy(n, pt, p);
-        UCFDCall(UCFDPreconApply(pc, pt));
-        UCFDCall(UCFDSpMV(1.0, A, pt, 0.0, v));
+        UCFDCall(apply_precon(pc, pt));
+        UCFDCall(matrix_spmv(1.0, A, pt, 0.0, v));
 
-        pi = solver->ops->ddot(n, rt, v);
+        pi = solver->ops->ddot(ctx->comm, n, rt, v);
         if (fabs(pi) < 1e-30) {
-            solver->stat = PIBREAKDOWN;
+            solver->stat = PI_BREAKDOWN;
             break;
         }
         alpha = rho/pi;
@@ -91,8 +87,8 @@ static ucfd_status_t BICGSTABSolve(Solver solver, Precon pc, SpMat A, UCFDReal *
 
         /* shat := inv(M)*s */
         solver->ops->dcopy(n, shat, s);
-        UCFDCall(UCFDPreconApply(pc, shat));
-        UCFDCall(UCFDSpMV(1.0, A, shat, 0.0, t));
+        UCFDCall(apply_precon(pc, shat));
+        UCFDCall(matrix_spmv(1.0, A, shat, 0.0, t));
 
         /* Sync 2 : single fused length-5 reduction */
         UCFDCall(fused_reduction(
@@ -110,7 +106,7 @@ static ucfd_status_t BICGSTABSolve(Solver solver, Precon pc, SpMat A, UCFDReal *
 
         rho_new = phi - omega*rtt;
         resnorm = sqrt(fabs(ss - 2.0*omega*ts + omega*omega*tt));
-        solver->ops->record(solver, iter, resnorm);
+        solver->ops->record(solver, ctx->rank, iter, resnorm);
 
         if (resnorm < tol) {
             solver->stat = CONVERGED;
@@ -153,7 +149,7 @@ static struct _SolverOps BICGSTABOps = {
     UCFDEmptyKernel
 };
 
-ucfd_status_t UCFDSolverCreateBICGSTAB(Solver *solver, UCFDInt n, UCFDInt maxiter, UCFDReal tol)
+ucfd_status_t UCFDSolverCreateBICGSTAB(Solver *solver, UCFDInt n)
 {
     UCFDCall(UCFDSolverInit(solver));
     Solver s = *solver;
@@ -171,8 +167,6 @@ ucfd_status_t UCFDSolverCreateBICGSTAB(Solver *solver, UCFDInt n, UCFDInt maxite
     bcs->t          = (UCFDReal *)calloc((size_t)n, sizeof(UCFDReal));
     bcs->n          = n;
 
-    s->tol          = tol;
-    s->maxiter      = maxiter;
     s->data         = bcs;
     s->ops[0]       = BICGSTABOps;
     
