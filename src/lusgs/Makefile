@@ -5,7 +5,6 @@
 # Resolve paths from this Makefile, including when invoked with make -f.
 THIS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
 SRCDIR := $(patsubst %/,%,$(dir $(THIS_MAKEFILE)))
-COMDIR := $(UCFDPATH)/src/common
 INCDIR := $(UCFDPATH)/include
 
 # Get configuration from `Makefile.inc`
@@ -38,7 +37,7 @@ ifeq ($(USE_FLOAT32), 1)
 endif
 
 BUILDDIR := $(BUILD_DIR)/lusgs
-CPPFLAGS := $(MACROS) -I$(COMDIR) -I$(INCDIR)
+CPPFLAGS := $(MACROS) -I$(INCDIR)
 SRCS := $(sort $(shell find $(SRCDIR) -type f -name '*.c'))
 
 # Replace the absolute source prefix instead of prepending to it.
