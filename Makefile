@@ -1,39 +1,39 @@
 include Makefile.inc
 
-CUDA ?= 0
+# TBU
+# CUDA ?= 0
 
-ifeq ($(CUDA),1)
-  LUSGS_CUDA_BUILD = cd src/lusgs/cuda; mkdir -p obj; make all
-endif
+# ifeq ($(CUDA),1)
+#   LUSGS_CUDA_BUILD = cd src/lusgs/cuda; mkdir -p obj; make all
+# endif
 
 lib :
 	mkdir -p lib
-	cd src/krylov; mkdir -p obj; make all
-	cd src/lusgs; mkdir -p obj; make all
-	$(LUSGS_CUDA_BUILD)
+	make -C src/lusgs all
+	make -C src/krylov all
 
 lusgs :
 	mkdir -p lib
-	cd src/lusgs; mkdir -p obj; make all
-	$(LUSGS_CUDA_BUILD)
+	make -C src/lusgs all
 
 krylov :
 	mkdir -p lib
-	cd src/krylov; mkdir -p obj; make all
+	make -C src/krylov all
 
 example :
-	cd examples; mkdir -p obj; make all
+	mkdir -p examples/obj
+	make -C examples
 
 all :
 	mkdir -p lib
-	cd src/krylov; mkdir -p obj; make all
-	cd src/lusgs; mkdir -p obj; make all
-	$(LUSGS_CUDA_BUILD)
+	make -C src/lusgs all
+	make -C src/krylov all
 	cd examples; mkdir -p obj; make all
+
 
 .PHONY : clean
 clean :
-	cd src/krylov; make clean
-	cd src/lusgs; make clean
-	rm -rf $(UCFD_PATH)/lib
-	cd examples; make clean
+	make -C src/krylov clean
+	make -C src/lusgs clean
+	make -C examples clean
+	rm -rf $(UCFDPATH)/lib

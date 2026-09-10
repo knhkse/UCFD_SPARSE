@@ -1,148 +1,76 @@
-# LU-SGS library Makefile
+# LU-SGS type methods library
+.DEFAULT_GOAL := all
+.DELETE_ON_ERROR:
 
-# =================================
-# Configuration Variables
-# =================================
-# Default values
-CC ?= gcc
-INT64 ?= 0
-FLOAT32 ?= 0
-OMPFLAG ?= -fopenmp
+# Resolve paths from this Makefile, including when invoked with make -f.
+THIS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
+SRCDIR := $(patsubst %/,%,$(dir $(THIS_MAKEFILE)))
+COMDIR := $(UCFDPATH)/src/common
+INCDIR := $(UCFDPATH)/include
 
 # Get configuration from `Makefile.inc`
-include $(UCFD_PATH)/Makefile.inc
+include $(UCFDPATH)/Makefile.inc
 
-# =================================
-# Derived Settings
-# =================================
-# Integer type (Default is int32)
-ifeq ($(INT64), 1)
-  CFLAGS += -DUCFD_INT64
-  $(info 64-bit integer type enabled)
+# Default compiler - Recommend Intel compiler
+CC ?= mpiicx
+OPTFLAGS ?= -O3 -ffast-math
+BUILD_DIR ?= $(abspath $(SRCDIR)/../../build)
+CFLAGS := -Wall $(OPTFLAGS) -fPIC -fvisibility=hidden
+
+# Multi-threading flag
+ifeq ($(USE_OMP), 1)
+	ifneq ($(findstring icx,$(CC))$(findstring icc,$(CC)),)
+		OMPFLAG := -qopenmp
+	else
+		OMPFLAG := -fopenmp
+	endif
+	CFLAGS += $(OMPFLAG)
+	MACROS += -DUSE_OMP
 endif
 
-# Real type (Default is float64)
-ifeq ($(FLOAT32), 1)
-  CFLAGS += -DUCFD_FLOAT32
-  $(info 32-bit float type enabled)
+# Additional flags
+ifeq ($(USE_INT64), 1)
+	MACROS += -DUCFD_INT64
 endif
 
-# Basic flow variables
-ifeq ($(NVARS),)
-  $(error `NVARS` must be defined)
-else
-  CFLAGS += -DNVARS=$(NVARS)
+ifeq ($(USE_FLOAT32), 1)
+	MACROS += -DUCFD_FLOAT32
 endif
 
-ifeq ($(NFVARS),)
-  $(error `NFVARS` must be defined)
-else
-  CFLAGS += -DNFVARS=$(NFVARS)
-endif
+BUILDDIR := $(BUILD_DIR)/lusgs
+CPPFLAGS := $(MACROS) -I$(COMDIR) -I$(INCDIR)
+SRCS := $(sort $(shell find $(SRCDIR) -type f -name '*.c'))
 
-ifeq ($(NTURBVARS),)
-  $(info `NTURBVARS` is not defined, Auto setting...)
-  TEMP = $(shell expr $(NVARS) - $(NFVARS))
-  ifeq ($(TEMP), 0)
-    $(info N-S equations mode; Do not use rans-prefixed functions.)
-    NTURBVARS = 1
-  else
-    NTURBVARS = $TEMP
-  endif
-  CFLAGS += -DNTURBVARS=$(NTURBVARS)
-else ifeq ($(filter $(NTURBVARS), 0 1 2),)
-  $(error `NTURBVARS` must be defined as 0, 1 or 2)
-else
-  CFLAGS += -DNTURBVARS=$(NTURBVARS)
-endif
+# Replace the absolute source prefix instead of prepending to it.
+OBJS := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRCS))
+DEPS := $(OBJS:.o=.d)
+SLIB := $(BUILDDIR)/libucfdlusgs.a
+DLIB := $(BUILDDIR)/libucfdlusgs.so
 
-ifeq ($(NDIMS),)
-  $(error `NDIMS` must be defined)
-else
-  CFLAGS += -DNDIMS=$(NDIMS)
-endif
+# The source's directory supplies its individual include path.
+$(BUILDDIR)/%.o: $(SRCDIR)/%.c $(THIS_MAKEFILE)
+	@mkdir -p "$(@D)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) -I"$(dir $<)" -MMD -MP -c "$<" -o "$@"
 
-# Constants
-ifneq ($(GAMMA),)
-  CFLAGS += -DGAMMA=$(GAMMA)
-endif
+$(SLIB): $(OBJS) $(THIS_MAKEFILE)
+	$(RM) "$@"
+	$(AR) rcs "$@" $(OBJS)
+	cp $(SLIB) $(UCFDPATH)/lib/$(notdir $(SLIB))
 
-ifneq ($(PMIN),)
-  CFLAGS += -DPMIN=$(PMIN)
-endif
-
-ifneq ($(BETAST),)
-  CFLAGS += -DBETAST=$(BETAST)
-endif
+$(DLIB): $(OBJS) $(THIS_MAKEFILE)
+	$(CC) $(LDFLAGS) -shared -o "$@" $(OBJS)
+	cp $(DLIB) $(UCFDPATH)/lib/$(notdir $(DLIB))
 
 
-# =================================
-# Build Targets
-# =================================
-SLIB = liblusgs.a
-SCLIB = libclusgs.a
-DLIB = liblusgs.so
-DCLIB = libclusgs.so
+.PHONY: all static dynamic clean
+all : $(SLIB) $(DLIB)
 
-OBJDIR = ./obj
-INCDIR = ./include
-IFLAGS += -I$(INCDIR)
+static : $(SLIB)
 
-LUSGS = $(OBJDIR)/lusgs.o
-BLUSGS = $(OBJDIR)/blusgs.o
-CLUSGS = $(OBJDIR)/coloredlusgs.o
-CBLUSGS = $(OBJDIR)/coloredblusgs.o
-FLUX = $(OBJDIR)/flux.o
-INVERSE = $(OBJDIR)/inverse.o
+dynamic: $(DLIB)
 
-# Build object(.o) files
-$(FLUX) : flux.c $(INCDIR)/flux.h $(CONFIG) $(TYPES)
-	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
+clean:
+	$(RM) $(OBJS) $(DEPS) $(SLIB) $(DLIB)
 
-$(INVERSE) : inverse.c $(INCDIR)/inverse.h $(CONFIG) $(TYPES)
-	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
-
-$(LUSGS) : lusgs.c $(INCDIR)/lusgs.h $(INCDIR)/flux.h $(CONFIG) $(TYPES)
-	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
-
-$(CLUSGS) : coloredlusgs.c $(INCDIR)/coloredlusgs.h $(INCDIR)/flux.h $(CONFIG) $(TYPES)
-	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
-
-$(BLUSGS) : blusgs.c $(INCDIR)/blusgs.h $(INCDIR)/flux.h $(INVERSEH) $(CONFIG) $(TYPES)
-	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
-
-$(CBLUSGS) : coloredblusgs.c $(INCDIR)/coloredblusgs.h $(INCDIR)/flux.h $(INVERSEH) $(CONFIG) $(TYPES)
-	$(CC) $(CFLAGS) -fPIC $(IFLAGS) -c $< -o $@
-
-
-# Build library files
-$(SLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE)
-	ar rcs $@ $^
-	cp $@ $(UCFD_PATH)/lib
-
-$(SCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE)
-	ar rcs $@ $^
-	cp $@ $(UCFD_PATH)/lib
-
-$(DLIB) : $(LUSGS) $(BLUSGS) $(FLUX) $(INVERSE)
-	$(CC) -fPIC -shared -o $@ $^
-	cp $@ $(UCFD_PATH)/lib
-
-$(DCLIB) : $(CLUSGS) $(CBLUSGS) $(FLUX) $(INVERSE)
-	$(CC) $(OMPFLAG) -fPIC -shared -o $@ $^
-	cp $@ $(UCFD_PATH)/lib
-
-
-all : $(SLIB) $(SCLIB) $(DLIB) $(DCLIB)
-	@echo "All libraries are created"
-
-static : $(SLIB) $(SCLIB)
-	@echo "Static libraries are created"
-
-dynamic : $(DLIB) $(DCLIB)
-	@echo "Dynamic libraries are created"
-
-.PHONY : clean
-clean :
-	rm -rf $(OBJDIR)
-	rm -f $(SLIB) $(SCLIB) $(DLIB) $(DCLIB)
+# auto-generated header dependencies (from -MMD -MP)
+-include $(DEPS)

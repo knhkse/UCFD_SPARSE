@@ -109,6 +109,8 @@ mpirun -np 8 python omp3d.x $(UCFD_PATH)/run/input.dat $(UCFD_PATH)/lib/liblusgs
 # Folder structure
 - `example` : Simple examples for using UCFD_SPARSE module. There are two different examples, using MPI and MPI+OpenMP hybrid case.
 - `src` : Source files of UCFD_SPARSE
+    - `krylov` : Source files for Krylov subspaces methods
+    - `lusgs` : Source files for LU-SGS methods
 - `lib` : Static libraries of LU-SGS and Colored LU-SGS are created after building.
 - `obj` : Object files for each source file are created after building.
 - `run` : Executable file for the example problem is created after building.

@@ -1,27 +1,21 @@
-# Common files
-SRCDIR = $(UCFD_PATH)/src/common
-CONFIG = $(SRCDIR)/config.h
-TYPES = $(SRCDIR)/ucfd_types.h
-IFLAGS = -I$(SRCDIR)
+# Build directory
+BUILD_DIR = $(UCFDPATH)/build
 
+# Optimization flags
+OPTFLAGS = -O3 -ffast-math
+
+# Multi-threading
+USE_OMP = 1
+
+# Use Intel MKL (Recommended)
+USE_MKL = 1
 
 # Compiler setting
 ## Intel oneAPI (Recommended)
-CC = icx
-CFLAGS = -Wall -O3 -ffast-math -qopenmp
-OMPFLAG = -qopenmp
+CC = mpiicx
 
 ## GCC or Clang
 # CC = mpicc
-# CFLAGS = -Wall -O3 -ffast-math -fopenmp
-# OMPFLAG = -fopenmp
-
-# LU-SGS macros
-## Equation parameters
-NVARS = 7
-NFVARS = 5
-NTURBVARS = 2
-NDIMS = 3
 
 ## Constants (Optional)
 # GAMMA = 1.4
@@ -29,14 +23,5 @@ NDIMS = 3
 # BETAST = 0.09
 
 ## Data types (Optional)
-# FLOAT32 = 0
-# INT64 = 0
-
-
-# Krylov macros
-## Block size
-BLOCK = 4
-
-## SDL command line
-MKLFLAGS = -L${MKLROOT}/lib -lmkl_rt -lpthread -lm -ldl
-
+# USE_FLOAT32 = 0
+# USE_INT64 = 0

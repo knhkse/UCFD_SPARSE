@@ -3,40 +3,89 @@
  * @brief       Header file for solver configuration
  * 
  */
-#ifndef CONFIG
-#define CONFIG
+#pragma once
+
+#include <stdbool.h>
 #include <stdint.h>
 #include <float.h>
 #include <inttypes.h>
-
-// TODO : Auto-generation by Makefile
+#include <mpi.h>
 
 /**
  * Integer type designation
  */
 #if defined(UCFD_INT64)
-    typedef int64_t UCFD_INT;
+    typedef int64_t UCFDInt;
 #else
-    typedef int32_t UCFD_INT;
+    typedef int32_t UCFDInt;
 #endif
 
 /**
  * Float type designation
  */
 #if defined(UCFD_FLOAT32)
-    typedef float UCFD_FLOAT;
+    typedef float UCFDReal;
+    #define MPI_REALTYPE MPI_FLOAT
 #else
-    typedef double UCFD_FLOAT;
+    typedef double UCFDReal;
+    #define MPI_REALTYPE MPI_DOUBLE
+#endif
+
+typedef int8_t UCFDInt8;
+typedef bool UCFDBool;
+
+/**
+ * Intel MKL configuration
+ */
+#if defined(USE_MKL)
+    #include <mkl.h>
+    #if defined(MKL_MEMTYPE_AGGRESIVE)
+        #define MKL_MEMTYPE SPARSE_MEMORY_AGGRESSIVE
+    #else
+        #define MKL_MEMTYPE SPARSE_MEMORY_NONE
+    #endif
+
+    #if defined(UCFD_FLOAT32)
+        #define mkl_create_csr mkl_sparse_s_create_csr
+        #define mkl_create_bsr mkl_sparse_s_create_bsr
+        #define mkl_spmv mkl_sparse_s_mv
+        #define mkl_bsr_update mkl_sparse_s_update_values
+    #else
+        #define mkl_create_csr mkl_sparse_d_create_csr
+        #define mkl_create_bsr mkl_sparse_d_create_bsr
+        #define mkl_spmv mkl_sparse_d_mv
+        #define mkl_bsr_update mkl_sparse_d_update_values
+    #endif
 #endif
 
 /**
- * ? If below is written from bespoke generation,
- * ? no need to compile with -DNVARS=7... ? => YES!
+ * CUDA configuration
+ * Import cuBLAS automatically
+ * Currently, Krylov subspace methods for CUDA computation
+ * require cuBLAS functions
  */
-// #define NVARS 7
-// #define NFVARS 5
-// #define NTURBVARS 2
-// #define NDIMS 3
-// #define BLOCK 5
+#if defined(__CUDACC__)
+    #include <cuda_runtime.h>
+    #include <cublas_v2.h>
+    #include <cusparse.h>
 
+    #if !defined(TPB)
+        #define TPB 128         // Default Threads-per-block size
+    #endif
+
+    #if defined(UCFD_INT64)
+        #define CUSPARSE_INTTYPE CUSPARSE_INDEX_64I
+    #else
+        #define CUSPARSE_INTTYPE CUSPARSE_INDEX_32I
+    #endif
+
+    #if defined(UCFD_FLOAT32)
+        #define CUSPARSE_REALTYPE CUDA_R_32F
+    #else
+        #define CUSPARSE_REALTYPE CUDA_R_64F
+    #endif
+#endif
+
+#if defined(DEBUG)
+    #include <assert.h>
 #endif

@@ -1,0 +1,46 @@
+#include "ucfdmatimpl.h"
+
+
+ucfd_status_t UCFDMatInit(SpMat *mat)
+{
+    SpMat m = (SpMat)calloc(1, sizeof(*m));
+    UCFDCheckNull(m, "Matrix allocation failed\n");
+
+    m->type_name        = NULL;
+    m->data             = NULL;
+    m->ops->spmv        = NULL;
+    m->ops->destroy     = NULL;
+    m->ops->update      = NULL;
+    m->ops->cppattern   = NULL;
+    m->ops->cpvalues    = NULL;
+    *mat                = m;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDMatMult(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
+{
+    UCFDCheckNull(mat->type_name, "Matrix type must be set\n");
+    UCFDCall(mat->ops->spmv(alpha, mat, x, beta, y));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDMatDestroy(SpMat *mat)
+{
+    if (!mat || !*mat) UCFDFunctionReturn(UCFD_SUCCESS);
+    UCFDCall((*mat)->ops->destroy(*mat));
+    free((*mat)->data);
+    free(*mat);
+    *mat = NULL;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDMatUpdateValues(SpMat mat, UCFDReal *new_values)
+{
+#if defined(DEBUG)
+    UCFDCheckNull(mat->ops->update, "Matrix has no update function\n");
+#endif
+    UCFDCall(mat->ops->update(mat, new_values));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}

@@ -1,0 +1,454 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "mpisparsemat.h"
+#include "mpihelper.h"
+
+
+static ucfd_status_t UCFDSetCSRMPIContext(UCFDSpMVContext *c,
+                                          const UCFDInt *range,
+                                          const UCFDInt *garray,
+                                          UCFDInt n_ghost)
+{
+    int size;
+    MPI_Comm_size(c->comm, &size);
+    c->nghost = n_ghost;
+    c->blocksize = 0;
+
+    /* Receive side: requested counts and owner-local request indices. */
+    int *req_to = calloc((size_t)size, sizeof(*req_to));
+    UCFDInt *req_local =
+        malloc((size_t)(n_ghost ? n_ghost : 1) * sizeof(*req_local));
+
+    for (UCFDInt k = 0; k < n_ghost; ++k)
+    {
+        const int p = owner(range, size, garray[k]);
+        req_local[k] = garray[k] - range[p];
+        ++req_to[p];
+    }
+
+    c->nrecv = 0;
+    for (int p = 0; p < size; ++p) c->nrecv += (req_to[p] != 0);
+
+    c->recv_nei =
+        malloc((size_t)(c->nrecv ? c->nrecv : 1) * sizeof(*c->recv_nei));
+    c->recv_count =
+        malloc((size_t)(c->nrecv ? c->nrecv : 1) * sizeof(*c->recv_count));
+    c->recv_off =
+        malloc((size_t)(c->nrecv ? c->nrecv : 1) * sizeof(*c->recv_off));
+
+    for (int p = 0, j = 0, off = 0; p < size; ++p)
+    {
+        if (req_to[p])
+        {
+            c->recv_nei[j] = p;
+            c->recv_count[j] = req_to[p];
+            c->recv_off[j] = off;
+            off += req_to[p];
+            ++j;
+        }
+    }
+
+    /* Discover send side: who requests from me, and how much */
+    int *req_from = malloc((size_t)size * sizeof(*req_from));
+    MPI_Alltoall(req_to, 1, MPI_INT, req_from, 1, MPI_INT, c->comm);
+
+    c->nsend = 0;
+    for (int p = 0; p < size; ++p)
+        c->nsend += (req_from[p] != 0);
+
+    c->send_nei =
+        malloc((size_t)(c->nsend ? c->nsend : 1) * sizeof(*c->send_nei));
+    c->send_count =
+        malloc((size_t)(c->nsend ? c->nsend : 1) * sizeof(*c->send_count));
+    c->send_off =
+        malloc((size_t)(c->nsend ? c->nsend : 1) * sizeof(*c->send_off));
+
+    c->send_total = 0;
+    for (int p = 0, j = 0; p < size; ++p)
+    {
+        if (req_from[p])
+        {
+            c->send_nei[j] = p;
+            c->send_count[j] = req_from[p];
+            c->send_off[j] = c->send_total;
+            c->send_total += req_from[p];
+            ++j;
+        }
+    }
+
+    c->send_idx =
+        malloc((size_t)(c->send_total ? c->send_total : 1) * sizeof(*c->send_idx));
+
+    /* Exchange index lists once */
+    {
+        const int nrq = c->nrecv + c->nsend;
+        MPI_Request *rq =
+            malloc((size_t)(nrq ? nrq : 1) * sizeof(*rq));
+        int r = 0;
+
+        for (int j = 0; j < c->nsend; ++j)
+            MPI_Irecv(c->send_idx + c->send_off[j],
+                      c->send_count[j],
+                      MPI_INT,
+                      c->send_nei[j],
+                      c->tag,
+                      c->comm,
+                      &rq[r++]);
+
+        for (int j = 0; j < c->nrecv; ++j)
+            MPI_Isend(req_local + c->recv_off[j],
+                      c->recv_count[j],
+                      MPI_INT,
+                      c->recv_nei[j],
+                      c->tag,
+                      c->comm,
+                      &rq[r++]);
+
+        if (r) MPI_Waitall(r, rq, MPI_STATUSES_IGNORE);
+        free(rq);
+    }
+    free(req_local);
+    free(req_to);
+    free(req_from);
+
+    c->sbuf =
+        malloc((size_t)(c->send_total ? c->send_total : 1) * sizeof(*c->sbuf));
+    c->lvec =
+        malloc((size_t)(n_ghost ? n_ghost : 1) * sizeof(*c->lvec));
+
+    c->nreq = c->nrecv + c->nsend;
+    c->reqs =
+        malloc((size_t)(c->nreq ? c->nreq : 1) * sizeof(*c->reqs));
+
+    for (int j = 0; j < c->nrecv; ++j)
+        MPI_Recv_init(c->lvec + c->recv_off[j],
+                      c->recv_count[j],
+                      MPI_DOUBLE,
+                      c->recv_nei[j],
+                      c->tag,
+                      c->comm,
+                      &c->reqs[j]);
+
+    for (int j = 0; j < c->nsend; ++j)
+        MPI_Send_init(c->sbuf + c->send_off[j],
+                      c->send_count[j],
+                      MPI_DOUBLE,
+                      c->send_nei[j],
+                      c->tag,
+                      c->comm,
+                      &c->reqs[c->nrecv + j]);
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+/* Destroy function */
+ucfd_status_t UCFDSpMVContextDestroy(UCFDSpMVContext *c)
+{
+    for (int j = 0; j < c->nreq; ++j)
+        MPI_Request_free(&c->reqs[j]);
+    free(c->reqs);
+    free(c->sbuf);
+    free(c->lvec);
+    free(c->recv_nei);
+    free(c->recv_count);
+    free(c->recv_off);
+    free(c->send_nei);
+    free(c->send_count);
+    free(c->send_off);
+    free(c->send_idx);
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t UCFDMPIMatDestroy(SpMat mat)
+{
+    if (!mat) UCFDFunctionReturn(UCFD_SUCCESS);
+    MPICSR *csr = (MPICSR *)mat->data;
+    UCFDSpMVContext ctx = csr->spmvctx;
+
+    UCFDCall(UCFDSpMVContextDestroy(&ctx));
+    free(csr->value_dest);
+    free(csr->split_values);
+    free(csr->garray);
+    free(csr->boundary_rows);
+    free(csr->A.rowptr);
+    free(csr->A.colidx);
+    free(csr->B.rowptr);
+    free(csr->B.colidx);
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+/**
+ * Halo exchange between processors
+ */
+static inline void halo_start(UCFDSpMVContext *c, const UCFDReal *restrict x_local)
+{
+    if (c->nrecv) MPI_Startall(c->nrecv, c->reqs);
+    UCFDReal *restrict sbuf = c->sbuf;
+    const UCFDInt *restrict send_idx = c->send_idx;
+    for (int k = 0; k < c->send_total; ++k)
+        sbuf[k] = x_local[send_idx[k]];
+    if (c->nsend) MPI_Startall(c->nsend, c->reqs + c->nrecv);
+}
+
+
+
+/**
+ * Local CSR-type SpMV kernel
+ */
+static inline void interior_spmv(UCFDReal alpha,
+                                 const BaseCSR *restrict M,
+                                 const UCFDReal *restrict x,
+                                 UCFDReal beta,
+                                 UCFDReal *restrict y)
+{
+    const UCFDInt *restrict rowptr = M->rowptr;
+    const UCFDInt *restrict colidx = M->colidx;
+    const UCFDReal *restrict val = M->values;
+    const UCFDInt n = M->n;
+    UCFDInt i, k;
+
+    OMPWrapper(k)
+    for (i=0; i<n; ++i)
+    {
+        const UCFDInt st = rowptr[i];
+        const UCFDInt end = rowptr[i + 1];
+        UCFDReal sum = 0.0;
+
+        for (k=st; k<end; ++k)
+            sum += val[k] * x[colidx[k]];
+        y[i] = alpha*sum + beta*y[i];
+    }
+}
+
+static inline void boundary_spmv(UCFDReal alpha,
+                                 const BaseCSR *restrict M,
+                                 const UCFDInt *restrict boundary_rows,
+                                 UCFDInt n_boundary,
+                                 const UCFDReal *restrict x,
+                                 UCFDReal *restrict y)
+{
+    const UCFDInt *restrict rowptr = M->rowptr;
+    const UCFDInt *restrict colidx = M->colidx;
+    const UCFDReal *restrict val = M->values;
+    UCFDInt q, i, k;
+
+    OMPWrapper(i, k)
+    for (q = 0; q < n_boundary; ++q)
+    {
+        i = boundary_rows[q];
+        const UCFDInt st = rowptr[i];
+        const UCFDInt end = rowptr[i + 1];
+        UCFDReal sum = 0.0;
+
+        for (k=st; k<end; ++k)
+            sum += val[k] * x[colidx[k]];
+        y[i] += alpha*sum;
+    }
+}
+
+static ucfd_status_t SpMV_MPICSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
+{
+    MPICSR *csr = (MPICSR *)mat->data;
+
+    halo_start(&csr->spmvctx, x);
+    interior_spmv(alpha, &csr->A, x, beta, y);
+    halo_wait(&csr->spmvctx);
+    boundary_spmv(alpha, &csr->B, csr->boundary_rows, csr->n_boundary,
+                  csr->spmvctx.lvec, y);
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t UCFDSplitCSR(UCFDInt n, const UCFDInt *rp, const UCFDInt *ci, const UCFDReal *va,
+                                  UCFDInt cstart, UCFDInt cend, MPICSR *mat)
+{
+    const UCFDInt nnz = rp[n];
+    UCFDInt *Arp = malloc((size_t)(n + 1) * sizeof(*Arp));
+    UCFDInt *Brp = malloc((size_t)(n + 1) * sizeof(*Brp));
+    UCFDInt *rem = malloc((size_t)(nnz ? nnz : 1) * sizeof(*rem));
+    UCFDInt nrem = 0;
+
+    /* Pass 1: count per-row A/B nonzeros and collect remote columns */
+    for (UCFDInt i = 0; i < n; ++i)
+    {
+        UCFDInt na = 0;
+        UCFDInt nb = 0;
+
+        for (UCFDInt k = rp[i]; k < rp[i + 1]; ++k)
+        {
+            const UCFDInt g = ci[k];
+            if (g >= cstart && g < cend)
+                ++na;
+            else
+            {
+                ++nb;
+                rem[nrem++] = g;
+            }
+        }
+        Arp[i + 1] = na;
+        Brp[i + 1] = nb;
+    }
+
+    /* Build garray by sorting and uniquing the remote global columns. */
+    qsort(rem, (size_t)nrem, sizeof(*rem), cmp_idx);
+    UCFDInt ng = 0;
+    for (UCFDInt k = 0; k < nrem; ++k)
+        if (k == 0 || rem[k] != rem[k - 1])
+            rem[ng++] = rem[k];
+
+    UCFDInt *garray = malloc((size_t)(ng ? ng : 1) * sizeof(*garray));
+    if (ng) memcpy(garray, rem, (size_t)ng * sizeof(*garray));
+    free(rem);
+
+    /* Build boundary rows */
+    UCFDInt n_boundary_rows = 0;
+    for (UCFDInt i = 0; i < n; ++i)
+        n_boundary_rows += (Brp[i + 1] != 0);
+
+    UCFDInt *boundary_rows =
+        malloc((size_t)(n_boundary_rows ? n_boundary_rows : 1) * sizeof(*boundary_rows));
+    for (UCFDInt i = 0, j = 0; i < n; ++i)
+        if (Brp[i + 1] != 0)
+            boundary_rows[j++] = i;
+
+    /* Convert per-row counts to CSR prefix sums. */
+    Arp[0] = 0;
+    Brp[0] = 0;
+    for (UCFDInt i = 0; i < n; ++i)
+    {
+        Arp[i + 1] += Arp[i];
+        Brp[i + 1] += Brp[i];
+    }
+
+    const UCFDInt nA = Arp[n];
+    const UCFDInt nB = Brp[n];
+    UCFDInt *Aci = malloc((size_t)(nA ? nA : 1) * sizeof(*Aci));
+    UCFDInt *Bci = malloc((size_t)(nB ? nB : 1) * sizeof(*Bci));
+    UCFDInt *value_dest =
+        malloc((size_t)(nnz ? nnz : 1) * sizeof(*value_dest));
+
+    UCFDReal *split_values =
+        malloc((size_t)(nnz ? nnz : 1) * sizeof(*split_values));
+    UCFDReal *Av = split_values;
+    UCFDReal *Bv = split_values + nA;
+
+    /*
+     * Pass 2: fill the fixed column patterns and remember where every value
+     * from the original CSR belongs in the combined [A values | B values]
+     * allocation.  value_dest is a permutation of [0, nnz).
+     */
+    UCFDInt ap = 0;
+    UCFDInt bp = 0;
+    for (UCFDInt i = 0; i < n; ++i)
+    {
+        for (UCFDInt k = rp[i]; k < rp[i + 1]; ++k)
+        {
+            const UCFDInt g = ci[k];
+            if (g >= cstart && g < cend)
+            {
+                Aci[ap] = g - cstart;
+                value_dest[k] = ap;
+                ++ap;
+            }
+            else
+            {
+                Bci[bp] = bsearch_idx(garray, ng, g);
+                value_dest[k] = nA + bp;
+                ++bp;
+            }
+        }
+    }
+
+    mat->A = (BaseCSR){n, Arp, Aci, Av};
+    mat->B = (BaseCSR){n, Brp, Bci, Bv};
+    mat->nnz = nnz;
+    mat->value_dest = value_dest;
+    mat->split_values = split_values;
+    mat->garray = garray;
+    mat->n_ghost = ng;
+    mat->boundary_rows = boundary_rows;
+    mat->n_boundary = n_boundary_rows;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+static ucfd_status_t UCFDCSRMatUpdate(SpMat mat, UCFDReal *new_values)
+{
+    MPICSR *csr = (MPICSR *)mat->data;
+    UCFDReal *restrict dst = csr->split_values;
+    const UCFDInt *restrict value_dest = csr->value_dest;
+    const UCFDInt nnz = csr->nnz;
+
+    OMPFOR
+    for (UCFDInt k=0; k<nnz; ++k)
+        dst[value_dest[k]] = new_values[k];
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t UCFDCSRCopyPattern(SpMat mat,
+                                        UCFDInt **rp_dest,
+                                        UCFDInt **ci_dest)
+{
+    MPICSR *csr = (MPICSR *)mat->data;
+    *rp_dest = csr->A.rowptr;
+    *ci_dest = csr->A.colidx;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static inline ucfd_status_t UCFDCSRCopyValues(SpMat mat, UCFDReal *restrict values)
+{
+    MPICSR *csr = (MPICSR *)mat->data;
+    memcpy(values, csr->A.values, csr->nnz*sizeof(UCFDReal));
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDMatCreateMPICSR(SpMat *mat, Ctx ctx, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+{
+    /* Initialize matrix object */
+    UCFDCall(UCFDMatInit(mat));
+    SpMat m = *mat;
+    m->type_name = CSRMPI;
+
+    MPICSR *csr = (MPICSR *)calloc(1, sizeof(*csr));
+    UCFDCheckNull(csr, "MPICSR matrix creation failed\n");
+
+    ContextNextTag(ctx, &csr->spmvctx.tag);
+    csr->spmvctx.comm = ctx->comm;
+
+    /* Prepare : Get range */
+    int size=0, rank=0;
+    MPI_Comm_size(ctx->comm, &size);
+    MPI_Comm_rank(ctx->comm, &rank);
+    UCFDInt *range = malloc((size_t)(size + 1)*sizeof(*range));
+
+    csr->n_local = n;
+    build_range(ctx->comm, n, range);
+
+    /* Split matrix with interior/boundary region */
+    UCFDCall(UCFDSplitCSR(
+        n, rowptr, colidx, values,
+        range[rank], range[rank+1], csr));
+    UCFDCall(UCFDSetCSRMPIContext(
+        &csr->spmvctx, range, csr->garray, csr->n_ghost
+    ));
+
+    free(range);
+
+    m->data             = csr;
+    m->ops->spmv        = SpMV_MPICSR;
+    m->ops->destroy     = UCFDMPIMatDestroy;
+    m->ops->update      = UCFDCSRMatUpdate;
+    m->ops->cppattern   = UCFDCSRCopyPattern;
+    m->ops->cpvalues    = UCFDCSRCopyValues;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
