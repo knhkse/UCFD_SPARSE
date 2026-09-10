@@ -39,6 +39,7 @@ UCFD_EXTERN ucfd_status_t UCFDMatCreateMPIBSR(SpMat*, Ctx, UCFDInt, UCFDInt, UCF
 #if defined(USE_MKL)
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMKLCSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateMKLBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDMatCreateMPIMKLBSR(SpMat*, Ctx, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 #endif
 
 #if defined(__CUDACC__)
