@@ -5,6 +5,8 @@
 # Resolve paths from this Makefile, including when invoked with make -f.
 THIS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
 SRCDIR := $(patsubst %/,%,$(dir $(THIS_MAKEFILE)))
+COMDIR := $(UCFDPATH)/src/common
+INCDIR := $(UCFDPATH)/include
 
 # Get configuration from `Makefile.inc`
 include $(UCFDPATH)/Makefile.inc
@@ -46,7 +48,7 @@ endif
 
 
 BUILDDIR := $(BUILD_DIR)/krylov
-COMMON_CPPFLAGS := $(MACROS) $(addprefix -I,$(addprefix $(SRCDIR)/,utils include include/impl))
+COMMON_CPPFLAGS := $(MACROS) $(addprefix -I,$(addprefix $(SRCDIR)/,utils impl)) -I$(COMDIR) -I$(INCDIR)
 
 # Discover library sources only; root-level test programs are separate executables.
 SOURCE_DIRS := $(addprefix $(SRCDIR)/,matrix precon solver utils)
@@ -73,11 +75,11 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%.c $(THIS_MAKEFILE) | check-mkl
 $(SLIB): $(OBJS) $(THIS_MAKEFILE) | check-mkl
 	$(RM) "$@"
 	$(AR) rcs "$@" $(OBJS)
-	cp $(SLIB) /home/jante/lib_pybaram/.
+	cp $(SLIB) $(UCFDPATH)/lib/$(notdir $(SLIB))
 
 $(DLIB): $(OBJS) $(THIS_MAKEFILE) | check-mkl
 	$(CC) $(LDFLAGS) -shared -o "$@" $(OBJS) $(MKLFLAGS) $(LDLIBS)
-	cp $(DLIB) /home/jante/lib_pybaram/.
+	cp $(DLIB) $(UCFDPATH)/lib/$(notdir $(DLIB))
 
 
 .PHONY: all static dynamic clean check-mkl
