@@ -442,7 +442,6 @@ static ucfd_status_t UCFDSplitBSR(UCFDInt bn, UCFDInt blk,
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
 static ucfd_status_t UCFDBSRMatUpdate(SpMat mat, UCFDReal *new_values)
 {
     MPIBSR *bsr = (MPIBSR *)mat->data;
@@ -527,3 +526,277 @@ ucfd_status_t UCFDMatCreateMPIBSR(SpMat *mat, Ctx ctx,
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
+
+#if defined(USE_MKL)
+static ucfd_status_t UCFDMPIMKLMatDestroy(SpMat mat)
+{
+    if (!mat) UCFDFunctionReturn(UCFD_SUCCESS);
+    MPIMKLBSR *bsr = (MPIMKLBSR *)mat->data;
+    UCFDSpMVContext ctx = bsr->spmvctx;
+
+    UCFDCall(UCFDSpMVContextDestroy(&ctx));
+    free(bsr->value_dest);
+    free(bsr->split_values);
+    free(bsr->garray);
+    free(bsr->boundary_rows);
+    MKLCall(mkl_sparse_destroy(bsr->A.handle.op));
+    free(bsr->A.mat.basemat.rowptr);
+    free(bsr->A.mat.basemat.colidx);
+    free(bsr->B.basemat.rowptr);
+    free(bsr->B.basemat.colidx);
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t SpMV_MPIMKLBSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
+{
+    MPIMKLBSR *bsr = (MPIMKLBSR *)mat->data;
+
+    halo_start(&bsr->spmvctx, x);
+    MKLCall(mkl_spmv(
+        SPARSE_OPERATION_NON_TRANSPOSE, alpha, bsr->A.handle.op,
+        bsr->A.handle.desc, x, beta, y
+    ));
+    halo_wait(&bsr->spmvctx);
+    boundary_spmv(alpha, &bsr->B, bsr->boundary_rows, bsr->n_boundary,
+                  bsr->spmvctx.lvec, y);
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t UCFDSplitMKLBSR(UCFDInt bn, UCFDInt blk,
+                                  const UCFDInt *rp, const UCFDInt *ci,
+                                  const UCFDReal *va, UCFDInt cstart,
+                                  UCFDInt cend, MPIMKLBSR *mat)
+{
+    const UCFDInt nnzb = rp[bn];
+    const size_t block_elems = (size_t)blk * (size_t)blk;
+    UCFDInt *Arp = malloc((size_t)(bn + 1) * sizeof(*Arp));
+    UCFDInt *Brp = malloc((size_t)(bn + 1) * sizeof(*Brp));
+    UCFDInt *remote = malloc((size_t)(nnzb ? nnzb : 1) * sizeof(*remote));
+    UCFDInt nremote = 0;
+
+    /* Pass 1: count local/remote nonzero BLOCKS and collect ghost blocks. */
+    for (UCFDInt ib = 0; ib < bn; ++ib)
+    {
+        UCFDInt na = 0;
+        UCFDInt nb = 0;
+        for (UCFDInt kb = rp[ib]; kb < rp[ib + 1]; ++kb)
+        {
+            const UCFDInt gblock = ci[kb];
+            if (gblock >= cstart && gblock < cend)
+                ++na;
+            else
+            {
+                ++nb;
+                remote[nremote++] = gblock;
+            }
+        }
+        Arp[ib + 1] = na;
+        Brp[ib + 1] = nb;
+    }
+
+    /* Sorted unique global block columns define compact ghost block slots. */
+    qsort(remote, (size_t)nremote, sizeof(*remote), cmp_idx);
+    UCFDInt ng = 0;
+    for (UCFDInt k = 0; k < nremote; ++k)
+        if (k == 0 || remote[k] != remote[k - 1])
+            remote[ng++] = remote[k];
+
+    UCFDInt *garray = malloc((size_t)(ng ? ng : 1) * sizeof(*garray));
+    if (ng) memcpy(garray, remote, (size_t)ng * sizeof(*garray));
+    free(remote);
+
+    UCFDInt n_boundary_block_rows = 0;
+    for (UCFDInt ib = 0; ib < bn; ++ib)
+        n_boundary_block_rows += (Brp[ib + 1] != 0);
+
+    UCFDInt *boundary_block_rows =
+        malloc((size_t)(n_boundary_block_rows ? n_boundary_block_rows : 1) *
+               sizeof(*boundary_block_rows));
+    for (UCFDInt ib = 0, q = 0; ib < bn; ++ib)
+        if (Brp[ib + 1] != 0)
+            boundary_block_rows[q++] = ib;
+
+    /* Convert nonzero-block counts to BSR row offsets. */
+    Arp[0] = 0;
+    Brp[0] = 0;
+    for (UCFDInt ib = 0; ib < bn; ++ib)
+    {
+        Arp[ib + 1] += Arp[ib];
+        Brp[ib + 1] += Brp[ib];
+    }
+
+    const UCFDInt nnzb_A = Arp[bn];
+    const UCFDInt nnzb_B = Brp[bn];
+    UCFDInt *Aci = malloc((size_t)(nnzb_A ? nnzb_A : 1) * sizeof(*Aci));
+    UCFDInt *Bci = malloc((size_t)(nnzb_B ? nnzb_B : 1) * sizeof(*Bci));
+    UCFDInt *value_dest = 
+        malloc((size_t)(nnzb ? nnzb : 1)*sizeof(*value_dest));
+
+    /* A.val and B.val are views of one [A blocks | B blocks] allocation. */
+    const size_t value_count = (size_t)nnzb * block_elems;
+    UCFDReal *split_values =
+        malloc((value_count ? value_count : 1) * sizeof(*split_values));
+    UCFDReal *Aval = split_values;
+    UCFDReal *Bval = split_values + (size_t)nnzb_A * block_elems;
+
+    /*
+     * Pass 2: remap block columns and build a permanent original-block to
+     * split-block permutation while copying the initial dense blocks.
+     */
+    UCFDInt ap = 0;
+    UCFDInt bp = 0;
+    for (UCFDInt ib = 0; ib < bn; ++ib)
+    {
+        for (UCFDInt kb = rp[ib]; kb < rp[ib + 1]; ++kb)
+        {
+            const UCFDInt gblock = ci[kb];
+            const UCFDReal *src = va + (size_t)kb * block_elems;
+            if (gblock >= cstart && gblock < cend)
+            {
+                Aci[ap] = gblock - cstart;
+                value_dest[kb] = ap;
+                ++ap;
+            }
+            else
+            {
+                Bci[bp] = bsearch_idx(garray, ng, gblock);
+                value_dest[kb] = nnzb_A + bp;
+                ++bp;
+            }
+            memcpy(split_values + (size_t)value_dest[kb] * block_elems,
+                   src, block_elems * sizeof(*split_values));
+        }
+    }
+
+    UCFDInt n = bn*blk;
+
+    /* Set A matrix with Intel MKL BSR format */
+    mat->A.mat.basemat.n = n;
+    mat->A.mat.basemat.rowptr = Arp;
+    mat->A.mat.basemat.colidx = Aci;
+    mat->A.mat.basemat.values = Aval;
+    mat->A.mat.bn = bn;
+    mat->A.mat.block = blk;
+
+    mat->A.handle.desc.type = SPARSE_MATRIX_TYPE_GENERAL;
+    mat->A.handle.desc.mode = 0;
+    mat->A.handle.desc.diag = 0;
+
+    MKLCall(mkl_create_bsr(
+        &mat->A.handle.op, SPARSE_INDEX_BASE_ZERO, SPARSE_LAYOUT_ROW_MAJOR,
+        bn, cend-cstart, blk, Arp, Arp+1, Aci, Aval
+    ));
+    MKLCall(mkl_sparse_set_memory_hint(mat->A.handle.op, SPARSE_MEMORY_AGGRESSIVE));
+
+    /* Optimization if `EXPECTED_SPMV_COUNT is passed */
+#if defined(EXPECTED_SPMV_COUNT)
+    MKLCall(mkl_sparse_set_mv_hint(
+        mat->A.handle.op, SPARSE_OPERATION_NON_TRANSPOSE, mat->A.handle.desc, EXPECTED_SPMV_COUNT
+    ));
+#endif
+    MKLCall(mkl_sparse_optimize(mat->A.handle.op));
+
+    mat->B = (BaseBSR){{n, Brp, Bci, Bval}, bn, blk};
+    mat->nnzb = nnzb;
+    mat->value_dest = value_dest;
+    mat->split_values = split_values;
+    mat->garray = garray;
+    mat->n_ghost = ng;
+    mat->boundary_rows = boundary_block_rows;
+    mat->n_boundary = n_boundary_block_rows;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t UCFDMKLBSRMatUpdate(SpMat mat, UCFDReal *new_values)
+{
+    MPIMKLBSR *bsr = (MPIMKLBSR *)mat->data;
+
+    const size_t dim2                   = (size_t)bsr->B.block * (size_t)bsr->B.block;
+    UCFDReal *restrict dst              = bsr->split_values;
+    const UCFDInt *restrict value_dest  = bsr->value_dest;
+    const UCFDInt nnzb                  = bsr->nnzb;
+
+    OMPFOR
+    for (UCFDInt kb = 0; kb < nnzb; ++kb)
+    {
+        const UCFDReal *restrict src_block =
+            new_values + (size_t)kb * dim2;
+        UCFDReal *restrict dst_block =
+            dst + (size_t)value_dest[kb] * dim2;
+
+        memcpy(dst_block, src_block, dim2 * sizeof(*dst_block));
+    }
+
+    /* MKL matrix update */
+    MKLCall(mkl_bsr_update(bsr->A.handle.op, 0, NULL, NULL, dst));
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t UCFDMKLBSRCopyPattern(SpMat mat,
+                                           UCFDInt **rp_dest,
+                                           UCFDInt **ci_dest)
+{
+    MPIMKLBSR *bsr = (MPIMKLBSR *)mat->data;
+    *rp_dest = bsr->A.mat.basemat.rowptr;
+    *ci_dest = bsr->A.mat.basemat.colidx;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static inline ucfd_status_t UCFDMKLBSRCopyValues(SpMat mat, UCFDReal *restrict values)
+{
+    MPIMKLBSR *bsr = (MPIMKLBSR *)mat->data;
+    const UCFDInt val_count = bsr->nnzb * bsr->B.block * bsr->B.block;
+    memcpy(values, bsr->A.mat.basemat.values, val_count*sizeof(UCFDReal));
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDMatCreateMPIMKLBSR(SpMat *mat, Ctx ctx,
+                                     UCFDInt bn, UCFDInt blk,
+                                     UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+{
+    UCFDCall(UCFDMatInit(mat));
+    SpMat m = *mat;
+    m->type_name = BSRMPIMKL;
+
+    MPIMKLBSR *bsr = (MPIMKLBSR *)calloc(1, sizeof(*bsr));
+    UCFDCheckNull(bsr, "MPIBSR matrix creation failed\n");
+
+    ContextNextTag(ctx, &bsr->spmvctx.tag);
+    bsr->spmvctx.comm = ctx->comm;
+
+    /* Prepare : Get range */
+    int size=0, rank=0;
+    MPI_Comm_size(ctx->comm, &size);
+    MPI_Comm_rank(ctx->comm, &rank);
+    UCFDInt *range = malloc((size_t)(size + 1)*sizeof(*range));
+
+    bsr->n_local = bn*blk;
+    build_range(ctx->comm, bn, range);
+
+    /* Split matrix with interior/boundary region */
+    UCFDCall(UCFDSplitMKLBSR(
+        bn, blk, rowptr, colidx, values,
+        range[rank], range[rank+1], bsr));
+    UCFDCall(UCFDSetBSRMPIContext(
+        &bsr->spmvctx, range, bsr->garray, bsr->n_ghost, blk
+    ));
+
+    free(range);
+
+    m->data             = bsr;
+    m->ops->spmv        = SpMV_MPIMKLBSR;
+    m->ops->destroy     = UCFDMPIMKLMatDestroy;
+    m->ops->update      = UCFDMKLBSRMatUpdate;
+    m->ops->cppattern   = UCFDMKLBSRCopyPattern;
+    m->ops->cpvalues    = UCFDMKLBSRCopyValues;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+#endif
+

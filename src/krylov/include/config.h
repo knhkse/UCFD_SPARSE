@@ -49,10 +49,12 @@ typedef bool UCFDBool;
         #define mkl_create_csr mkl_sparse_s_create_csr
         #define mkl_create_bsr mkl_sparse_s_create_bsr
         #define mkl_spmv mkl_sparse_s_mv
+        #define mkl_bsr_update mkl_sparse_s_update_values
     #else
         #define mkl_create_csr mkl_sparse_d_create_csr
         #define mkl_create_bsr mkl_sparse_d_create_bsr
         #define mkl_spmv mkl_sparse_d_mv
+        #define mkl_bsr_update mkl_sparse_d_update_values
     #endif
 #endif
 

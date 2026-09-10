@@ -16,6 +16,7 @@ typedef const char *SpMatType;
 #define BSRCUSPARSE     "cusparsebsr"
 #define CSRMPI          "mpicsr"
 #define BSRMPI          "mpibsr"
+#define BSRMPIMKL       "mpimklbsr"
 
 
 #if defined(__cplusplus)

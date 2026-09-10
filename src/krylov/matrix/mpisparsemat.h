@@ -6,7 +6,7 @@
 
 typedef struct {
     MPI_Comm        comm;
-    UCFDInt         blocksize;                          // Only used in BSR
+    UCFDInt         blocksize; // Only used in BSR
     UCFDInt         nrecv, tag;
     UCFDInt         *recv_nei, *recv_count, *recv_off;
     
@@ -46,6 +46,19 @@ typedef struct {
     UCFDInt         *boundary_rows;
 } MPIBSR;
 
+#if defined(USE_MKL)
+typedef struct {
+    UCFDSpMVContext  spmvctx;
+    MKLBSR          A;
+    BaseBSR         B;
+    UCFDInt         nnzb;
+    UCFDInt         *value_dest;
+    UCFDReal        *split_values;
+    UCFDInt         n_local, n_ghost, n_boundary;
+    UCFDInt         *garray;
+    UCFDInt         *boundary_rows;
+} MPIMKLBSR;
+#endif
 
 #if defined(__cplusplus)
 extern "C" {
