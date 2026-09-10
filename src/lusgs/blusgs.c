@@ -15,7 +15,7 @@
  * Pack & update kernels => per-element execution
  */
 static ucfd_status_t
-rank_blusgs_pack(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+rank_blusgs_pack(const UCFDInt neles, const UCFDInt nvars,
                  const UCFDInt nfvars, const UCFDReal a0,
                  const UCFDInt *restrict cell_ids,
                  const UCFDReal *restrict rhs,
@@ -50,7 +50,7 @@ ucfd_status_t UCFDBLUSGS_Pack(FlowSys sys, UCFDInt eidx, UCFDReal a0)
     FlowElem *e  = &sys->eles[eidx];
     
     UCFDCall(rank_blusgs_pack(
-        sys->nlocal, e->neles, sys->nvars, sys->nfvars, a0,
+        e->neles, sys->nvars, sys->nfvars, a0,
         e->cell_ids, e->rhs, e->dt, blusgs->rhs, blusgs->diag
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -58,14 +58,14 @@ ucfd_status_t UCFDBLUSGS_Pack(FlowSys sys, UCFDInt eidx, UCFDReal a0)
 
 
 static ucfd_status_t
-rank_tblusgs_pack(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
-                        const UCFDInt nfvars, const UCFDReal a0, const UCFDReal factor,
-                        srcjacobian dsrcf,
-                        const UCFDInt *restrict cell_ids,
-                        const UCFDReal *restrict uptsb,
-                        const UCFDReal *restrict dsrc,
-                        const UCFDReal *restrict dt,
-                        UCFDReal *restrict diag)
+rank_tblusgs_pack(const UCFDInt neles, const UCFDInt nvars,
+                  const UCFDInt nfvars, const UCFDReal a0, const UCFDReal factor,
+                  srcjacobian dsrcf,
+                  const UCFDInt *restrict cell_ids,
+                  const UCFDReal *restrict uptsb,
+                  const UCFDReal *restrict dsrc,
+                  const UCFDReal *restrict dt,
+                  UCFDReal *restrict diag)
 {
     UCFDInt idx, ridx, kdx, row, col;
     const UCFDInt nturbvars = nvars - nfvars;
@@ -100,7 +100,7 @@ ucfd_status_t UCFDBLUSGS_KWSST_Pack(FlowSys sys, UCFDInt eidx, UCFDReal turb_fac
     FlowElem *e  = &sys->eles[eidx];
 
     UCFDCall(rank_tblusgs_pack(
-        sys->nlocal, e->neles, sys->nvars, sys->nfvars, a0, turb_factor,
+        e->neles, sys->nvars, sys->nfvars, a0, turb_factor,
         dsrcf, e->cell_ids, e->uptsb, e->dsrc, e->dt, blusgs->tdiag
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -113,7 +113,7 @@ ucfd_status_t UCFDBLUSGS_SA_Pack(FlowSys sys, UCFDInt eidx, UCFDReal turb_factor
     FlowElem *e  = &sys->eles[eidx];
 
     UCFDCall(rank_tblusgs_pack(
-        sys->nlocal, e->neles, sys->nvars, sys->nfvars, a0, turb_factor,
+        e->neles, sys->nvars, sys->nfvars, a0, turb_factor,
         dsrcf, e->cell_ids, e->uptsb, e->dsrc, e->dt, blusgs->tdiag
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -124,7 +124,7 @@ ucfd_status_t UCFDBLUSGS_SA_Pack(FlowSys sys, UCFDInt eidx, UCFDReal turb_factor
  * Update
  */
 static ucfd_status_t
-rank_blusgs_update(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+rank_blusgs_update(const UCFDInt neles, const UCFDInt nvars,
                    const UCFDInt *restrict cell_ids,
                    const UCFDReal *restrict rank_du,
                    UCFDReal *restrict upts)
@@ -148,7 +148,7 @@ ucfd_status_t UCFDBLUSGS_Update(FlowSys sys, UCFDInt eidx)
     FlowElem *e  = &sys->eles[eidx];
 
     UCFDCall(rank_blusgs_update(
-        sys->nlocal, e->neles, sys->nvars,
+        e->neles, sys->nvars,
         e->cell_ids, blusgs->du, e->uptsb
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -159,7 +159,7 @@ ucfd_status_t UCFDBLUSGS_Update(FlowSys sys, UCFDInt eidx)
  * Inner iteration residual
  */
 static ucfd_status_t
-rank_sub_residual(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+rank_sub_residual(const UCFDInt neles, const UCFDInt nvars,
                   const UCFDInt *restrict cell_ids,
                   const UCFDReal *restrict vol,
                   const UCFDReal *restrict du,
@@ -190,7 +190,7 @@ ucfd_status_t UCFDBLUSGS_SubResidual(FlowSys sys, UCFDInt eidx)
     FlowElem *e  = &sys->eles[eidx];
 
     UCFDCall(rank_sub_residual(
-        sys->nlocal, e->neles, sys->nvars, e->cell_ids,
+        e->neles, sys->nvars, e->cell_ids,
         e->vol, blusgs->du, blusgs->dup, e->resid_out
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -435,6 +435,46 @@ ucfd_status_t UCFDBLUSGS_Reset(FlowSys sys)
 
     memset(blusgs->du, 0, nlocal*nvars*sizeof(UCFDReal));
     memset(blusgs->dup, 0, nlocal*nvars*sizeof(UCFDReal));
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+static ucfd_status_t BLUSGSDestroy(FlowSys sys)
+{
+    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    free(blusgs->rhs);
+    free(blusgs->du);
+    free(blusgs->dup);
+    free(blusgs->diag);
+    free(blusgs->tdiag);
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDFlowSysSetBLUSGS(FlowSys *sys, UCFDReal *jmat, UCFDReal *tjmat)
+{
+    FlowSys s       = *sys;
+    BLUSGSSys *blu  = (BLUSGSSys *)calloc(1, sizeof(*blu));
+    UCFDInt nlocal  = s->nlocal;
+    UCFDInt nvars   = s->nvars;
+    UCFDInt nfvars  = s->nfvars;
+    UCFDInt ntvars  = s->nturbvars;
+
+    blu->rhs        = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
+    blu->du         = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
+    blu->dup        = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
+
+    /* diag : [nlocal, nfvars, nfvars] */
+    blu->diag       = (UCFDReal *)malloc(nlocal*nfvars*nfvars*sizeof(UCFDReal));
+    if (ntvars != 0)
+        blu->tdiag  = (UCFDReal *)malloc(nlocal*ntvars*ntvars*sizeof(UCFDReal));
+    else blu->tdiag = NULL;
+
+    blu->jmat       = jmat;
+    blu->tjmat      = tjmat;
+
+    s->data         = blu;
+    s->destroy      = BLUSGSDestroy;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

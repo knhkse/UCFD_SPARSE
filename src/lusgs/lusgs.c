@@ -319,3 +319,32 @@ ucfd_status_t UCFDLUSGS_RANSUpperSweep(FlowSys sys, UCFDReal kappa)
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
+
+
+static ucfd_status_t LUSGSDestroy(FlowSys sys)
+{
+    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    free(lusgs->u);
+    free(lusgs->du);
+    free(lusgs->diag);
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+ucfd_status_t UCFDFlowSysSetLUSGS(FlowSys *sys, UCFDReal *fspr, UCFDReal *tfspr)
+{
+    FlowSys s       = *sys;
+    LUSGSSys *lusgs = (LUSGSSys *)calloc(1, sizeof(*lusgs));
+    UCFDInt nlocal  = s->nlocal;
+    UCFDInt nvars   = s->nvars;
+
+    lusgs->u        = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
+    lusgs->du       = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
+    lusgs->diag     = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
+    lusgs->fspr     = fspr;
+    lusgs->tfspr    = tfspr;
+
+    s->data         = lusgs;
+    s->destroy      = LUSGSDestroy;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}

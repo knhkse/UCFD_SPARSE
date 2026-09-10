@@ -3,10 +3,15 @@
 #include "flowsys.h"
 
 
-ucfd_status_t UCFDFlowSysDestroy(FlowSys *sys)
+/**
+ * rank-order mesh
+ */
+ucfd_status_t UCFDPFlowSysDestroy(PFlowSys *sys)
 {
     if (!sys || !*sys) UCFDFunctionReturn(UCFD_SUCCESS);
     UCFDCall((*sys)->destroy(*sys));
+
+    free((*sys)->data);
     free((*sys)->eles);
     free(*sys);
     *sys = NULL;
@@ -14,6 +19,18 @@ ucfd_status_t UCFDFlowSysDestroy(FlowSys *sys)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+ucfd_status_t UCFDFlowSysDestroy(FlowSys *sys)
+{
+    if (!sys || !*sys) UCFDFunctionReturn(UCFD_SUCCESS);
+    UCFDCall((*sys)->destroy(*sys));
+
+    free((*sys)->data);
+    free((*sys)->eles);
+    free(*sys);
+    *sys = NULL;
+    
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
 
 ucfd_status_t UCFDFlowSysCreate(FlowSys *sys,
                                 UCFDInt nlocal, UCFDInt nvars, UCFDInt nfvars,
@@ -45,7 +62,7 @@ ucfd_status_t UCFDFlowSysCreate(FlowSys *sys,
     s->destroy          = NULL;
 
     /* Elements allocation */
-    s->eles = calloc(nelem, sizeof(FlowElem));
+    s->eles = (FlowElem *)calloc(nelem, sizeof(FlowElem));
 
     /* Return the newly created system to the caller. */
     *sys = s;
@@ -53,78 +70,14 @@ ucfd_status_t UCFDFlowSysCreate(FlowSys *sys,
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-
-static ucfd_status_t LUSGSDestroy(FlowSys sys)
-{
-    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
-    free(lusgs->diag);
-    UCFDFunctionReturn(UCFD_SUCCESS);
-}
-
-ucfd_status_t UCFDFlowSysSetLUSGS(FlowSys *sys, UCFDReal *fspr, UCFDReal *tfspr)
-{
-    FlowSys s       = *sys;
-    LUSGSSys *lusgs = (LUSGSSys *)calloc(1, sizeof(*lusgs));
-    UCFDInt nlocal  = s->nlocal;
-    UCFDInt nvars   = s->nvars;
-
-    lusgs->u        = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
-    lusgs->du       = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
-    lusgs->diag     = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
-    lusgs->fspr     = fspr;
-    lusgs->tfspr    = tfspr;
-
-    s->data         = lusgs;
-    s->destroy      = LUSGSDestroy;
-
-    UCFDFunctionReturn(UCFD_SUCCESS);
-}
-
-static ucfd_status_t BLUSGSDestroy(FlowSys sys)
-{
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
-    free(blusgs->diag);
-    free(blusgs->tdiag);
-    UCFDFunctionReturn(UCFD_SUCCESS);
-}
-
-ucfd_status_t UCFDFlowSysSetBLUSGS(FlowSys *sys, UCFDReal *jmat, UCFDReal *tjmat)
-{
-    FlowSys s       = *sys;
-    BLUSGSSys *blu  = (BLUSGSSys *)calloc(1, sizeof(*blu));
-    UCFDInt nlocal  = s->nlocal;
-    UCFDInt nvars   = s->nvars;
-    UCFDInt nfvars  = s->nfvars;
-    UCFDInt ntvars  = s->nturbvars;
-
-    blu->rhs        = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
-    blu->du         = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
-    blu->dup        = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
-
-    /* diag : [nlocal, nfvars, nfvars] */
-    blu->diag       = (UCFDReal *)malloc(nlocal*nfvars*nfvars*sizeof(UCFDReal));
-    if (ntvars != 0)
-        blu->tdiag  = (UCFDReal *)malloc(nlocal*ntvars*ntvars*sizeof(UCFDReal));
-    else blu->tdiag = NULL;
-
-    blu->jmat       = jmat;
-    blu->tjmat      = tjmat;
-
-    s->data         = blu;
-    s->destroy      = BLUSGSDestroy;
-
-    UCFDFunctionReturn(UCFD_SUCCESS);
-}
-
-
-ucfd_status_t UCFDFlowSysSetElement(FlowSys *sys, UCFDInt eidx,
+ucfd_status_t UCFDFlowSysSetElement(FlowSys sys, UCFDInt eidx,
                                     UCFDInt neles, UCFDInt nface, UCFDInt *cell_ids,
                                     UCFDReal *uptsb, UCFDReal *rhs,
                                     UCFDReal *dt, UCFDReal *dsrc,
                                     UCFDReal *vol, UCFDReal *resid_out)
 {
-    FlowSys s = *sys;
-    FlowElem *e = &s->eles[eidx];
+    FlowElem *eles = sys->eles;
+    FlowElem *e = &eles[eidx];
 
     e->neles        = neles;
     e->nface        = nface;
@@ -135,6 +88,37 @@ ucfd_status_t UCFDFlowSysSetElement(FlowSys *sys, UCFDInt eidx,
     e->dsrc         = dsrc;
     e->vol          = vol;
     e->resid_out    = resid_out;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+
+/**
+ * rank-coloring mesh
+ */
+ucfd_status_t UCFDPFlowSysCreate(PFlowSys *sys,
+                                 UCFDInt nlocal, UCFDInt nvars, UCFDInt nfvars,
+                                 UCFDInt ndims, UCFDInt nfaces, UCFDInt nelem)
+{
+    PFlowSys s = (PFlowSys)calloc(1, sizeof(*s));
+    UCFDCheckNull(s, "Parallel Flow system allocation failed\n");
+
+    /* Get from input arguments */
+    s->nlocal           = nlocal;
+    s->nelem            = nelem;
+    s->nvars            = nvars;
+    s->nfvars           = nfvars;
+    s->nturbvars        = nvars - nfvars;
+    s->ndims            = ndims;
+    s->nfaces           = nfaces;
+    s->data             = NULL;
+    s->destroy          = NULL;
+
+    /* Element allocation */
+    s->eles = calloc(nelem, sizeof(PFlowElem));
+
+    /* Return the newly created system to the caller. */
+    *sys = s;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
