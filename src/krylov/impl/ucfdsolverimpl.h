@@ -60,11 +60,6 @@ struct _Solver {
 };
 
 
-// ! CUDA -> *restrict (X) *__restrict__ (O) => Need separated function
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 /* Encapsulated functions */
 static inline ucfd_status_t prepare_precon(Precon precon, SpMat mat)
 {
@@ -81,14 +76,14 @@ static inline ucfd_status_t prepare_precon(Precon precon, SpMat mat)
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static inline ucfd_status_t apply_precon(Precon precon, UCFDReal *restrict b)
+static inline ucfd_status_t apply_precon(Precon precon, UCFDReal *__restrict__ b)
 {
     UCFDCall(precon->ops->apply(precon, b));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static inline ucfd_status_t matrix_spmv(UCFDReal alpha, SpMat A, UCFDReal *restrict x,
-                                        UCFDReal beta, UCFDReal *restrict y)
+static inline ucfd_status_t matrix_spmv(UCFDReal alpha, SpMat A, UCFDReal *__restrict__ x,
+                                        UCFDReal beta, UCFDReal *__restrict__ y)
 {
     UCFDCall(A->ops->spmv(alpha, A, x, beta, y));
     UCFDFunctionReturn(UCFD_SUCCESS);
@@ -96,7 +91,7 @@ static inline ucfd_status_t matrix_spmv(UCFDReal alpha, SpMat A, UCFDReal *restr
 
 /* Computes r := b - A@x */
 static inline ucfd_status_t calc_residual(Solver s, SpMat A, UCFDInt n,
-                                          UCFDReal *restrict x, UCFDReal *restrict b, UCFDReal *restrict r)
+                                          UCFDReal *__restrict__ x, UCFDReal *__restrict__ b, UCFDReal *__restrict__ r)
 {
     s->ops->dcopy(n, r, b);
     UCFDCall(matrix_spmv(-1.0, A, x, 1.0, r));
@@ -105,7 +100,3 @@ static inline ucfd_status_t calc_residual(Solver s, SpMat A, UCFDInt n,
 
 static inline ucfd_status_t UCFDEmptyKernel(Solver solver, UCFDInt rank, UCFDInt iter, UCFDReal res)
 {UCFDFunctionReturn(UCFD_SUCCESS);}
-
-#if defined(__cplusplus)
-}
-#endif

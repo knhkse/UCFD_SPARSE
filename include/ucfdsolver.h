@@ -27,7 +27,7 @@ UCFD_EXTERN ucfd_status_t UCFDSolverCreateGMRES(Solver*, UCFDInt, UCFDInt);
 UCFD_EXTERN ucfd_status_t UCFDSolverCreateBICGSTAB(Solver*, UCFDInt);
 
 #if defined(__CUDACC__)
-UCFD_EXTERN ucfd_status_t UCFDSolverCreateCUDAGMRES(Solver*, UCFDInt, UCFDInt, UCFDInt, UCFDReal);
+UCFD_EXTERN ucfd_status_t UCFDSolverCreateCUDAGMRES(Solver*, UCFDInt, UCFDInt);
 #endif
 
 #if defined(__cplusplus)

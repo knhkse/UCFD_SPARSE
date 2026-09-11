@@ -58,36 +58,31 @@ arnoldi_cgs2(Solver solver, Precon pc, SpMat A, UCFDInt j, UCFDReal *wnorm)
 
 
 static void
-apply_prev_givens(const UCFDInt m, const UCFDInt j,
+apply_prev_givens(const UCFDInt j,
                   const UCFDReal *__restrict__ g,
-                  UCFDReal *__restrict__ H)
+                  UCFDReal *__restrict__ Hcol)
 {
-    const size_t offset = (size_t)j*(m+1);
     UCFDInt i;
-    UCFDReal c, s, h1, h2;
+    UCFDReal c, s, t;
     for (i=0; i<j; ++i)
     {
         c = g[i*2]; s = g[i*2+1];
-        h1 = H[i + offset];
-        h2 = H[i+1 + offset];
-        H[i + offset] = c*h1 + s*h2;
-        H[i+1 + offset] = -s*h1 + c*h2;
+        t = c*Hcol[i] + s*Hcol[i+1];
+        Hcol[i+1] = -s * Hcol[i] + c*Hcol[i+1];
+        Hcol[i] = t;
     }
 }
 
 static void
-generate_givens(const UCFDInt m, const UCFDInt j,
+givens_generate(const UCFDInt j,
                 UCFDReal *__restrict__ g,
-                UCFDReal *__restrict__ H)
+                UCFDReal *__restrict__ Hcol)
 {
-    const size_t offset = (size_t)j*(m+1);
-    UCFDReal h1 = H[j + offset], h2 = H[j+1 + offset];
+    UCFDReal h1 = Hcol[j], h2 = Hcol[j+1];
     UCFDReal rr = hypot(h1, h2);
-    UCFDReal c, s;
-    if (rr == 0.0) { c = 1.0; s = 0.0; }    /* Degenerate guard */
-    else { c = h1/rr; s = h2/rr; }
-    g[j*2] = c; g[j*2 + 1] = s;
-    H[j + offset] = rr; H[j+1 + offset] = 0.0;
+    g[j*2] = h1/rr; g[j*2+1] = h2/rr;
+    Hcol[j] = g[j*2] * Hcol[j] + g[j*2+1] * Hcol[j+1];
+    Hcol[j+1] = 0.0;
 }
 
 static void
@@ -102,17 +97,15 @@ update_rhs(const UCFDInt j,
 }
 
 static void
-back_substitute(const UCFDInt m, const UCFDInt k,
+back_substitute(const UCFDInt k, const UCFDInt ld,
                 const UCFDReal *__restrict__ H,
                 UCFDReal *__restrict__ y)
 {
-    UCFDInt idx, jdx;
-    for (idx=k-1; idx>=0; --idx)
-    {
+    for (UCFDInt idx=k-1; idx>=0; --idx) {
         UCFDReal sum = y[idx];
-        for (jdx=idx+1; jdx<k; ++jdx)
-            sum -= H[idx + (size_t)jdx*(m+1)] * y[jdx];
-        y[idx] = sum/H[idx + (size_t)idx*(m+1)];
+        for (UCFDInt jdx=idx+1; jdx<k; ++jdx)
+            sum -= H[idx + jdx*ld] * y[jdx];
+        y[idx] = sum/H[idx + idx*ld];
     }
 }
 
@@ -136,9 +129,23 @@ update_solution(const UCFDInt n, const UCFDInt k,
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+static UCFDReal start_cycle(Solver_CUDAGMRES *gmres, Precon pc, MPI_Comm comm, UCFDInt n,
+                            UCFDReal *__restrict__ d_r, UCFDReal *__restrict__ d_V)
+{
+    UCFDReal beta, inv;
+
+    CUBLASCall(cublasDcopy(gmres->handle, n, d_r, 1, gmres->d_V, 1));
+    apply_precon(pc, d_V);
+    CUBLASCall(cublasDnrm2(gmres->handle, n, d_V, 1, &beta));
+    inv = 1.0/beta;
+    CUBLASCall(cublasDscal(gmres->handle, n, &inv, gmres->d_V, 1));
+
+    return beta;
+}
+
 
 extern "C" static ucfd_status_t
-GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
+GMRESSolve(Ctx ctx, Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
 {
 #if defined(DEBUG)
     CheckCUDAPointer(x);
@@ -150,75 +157,103 @@ GMRESSolve(Solver solver, Precon pc, SpMat A, UCFDReal *x, UCFDReal *b)
     Solver_CUDAGMRES *gmres = (Solver_CUDAGMRES *)solver->data;
     CUBLASCall(cublasSetPointerMode(gmres->handle, CUBLAS_POINTER_MODE_HOST));
 
-    const UCFDInt maxiter = solver->maxiter;
-    const UCFDReal tol = solver->tol, haptol = solver->haptol;
     const UCFDInt n = gmres->n, m = gmres->restart, ldv = gmres->ldv;
-    UCFDReal *H = gmres->H, *g = gmres->g, *y = gmres->y;
-
+    const UCFDInt maxiter = solver->maxiter;
+    const UCFDInt maxcycle = (maxiter + m - 1)/m;
     const UCFDInt ld = m + 1;
-    UCFDInt iter = 0, j, k;
-    UCFDReal wnorm, beta, inv, abeta = 0.0;
-    size_t offset;
+    
+    /* Tolerances */
+    const UCFDReal rtol = solver->rtol;
+    const UCFDReal atol = solver->atol;
+    const UCFDReal dtol = solver->dtol;
+    const UCFDReal haptol = solver->haptol;
+    
+    UCFDReal *H = gmres->H, *g = gmres->g, *y = gmres->y;
+    UCFDReal *d_r = gmres->d_r;
 
-    while (iter < maxiter)
+    UCFDInt cycle = 0, totit=0, j, k;
+    UCFDReal wnorm, beta, c, s, *Hcol;
+
+    UCFDReal beta0 = 0.0;   /* ||M^-1 r_0||, frozen for the whole solve  */
+    UCFDReal ttol  = 0.0;   /* the ONE threshold, computed exactly once  */
+    UCFDReal rnorm = 0.0;   /* current preconditioned residual estimate  */
+
+    solver->stat = ITERATING;
+
+    /* Initial residual */
+    UCFDCall(prepare_precon(pc, A));
+    UCFDCall(calc_residual(solver, A, n, x, b, d_r));
+
+    while (cycle < maxcycle)
     {
-        /* Compute residual */
-        CUBLASCall(cublasDcopy(gmres->handle, n, b, 1, gmres->d_r, 1));
-        UCFDCall(matrix_spmv(-1.0, A, x, 1.0, gmres->d_r));
+        beta = start_cycle(gmres, pc, ctx->comm, n, d_r, gmres->d_V);
+        y[0] = beta;
 
-        /* Convergence check */
-        CUBLASCall(cublasDnrm2(gmres->handle, n, gmres->d_r, 1, &abeta));
-        solver->ops->record(solver, iter, abeta);
-        if (abeta <= tol) {
-            solver->stat = CONVERGED;
-            break;
+        if (cycle == 0) {
+            beta0 = beta;
+            ttol  = rtol * beta0;
+            if (ttol < atol) ttol = atol;
+
+            rnorm = beta;
+            solver->ops->record(solver, ctx->rank, 0, rnorm);
+
+            if (rnorm <= ttol) {            /* converged on entry */
+                solver->stat = CONVERGED;
+                break;
+            }
+        } else {
+            if (fabs(beta - rnorm) > 0.1 * beta0) {
+                solver->stat = DIVERGED_BREAKDOWN;
+                break;
+            }
+            rnorm = beta;
+            solver->ops->record(solver, ctx->rank, totit, rnorm);
         }
 
-        /* Start cycle */
-        UCFDCall(apply_precon(pc, gmres->d_r));
-        CUBLASCall(cublasDnrm2(gmres->handle, n, gmres->d_r, 1, &beta));
-        gmres->y[0] = beta;
-        inv = 1.0/beta;
-        CUBLASCall(cublasDcopy(gmres->handle, n, gmres->d_r, 1, gmres->d_V, 1));
-        CUBLASCall(cublasDscal(gmres->handle, n, &inv, gmres->d_V, 1));
-
-        k = m;
-        for (j=0; j<m; ++j)
+        k = 0;
+        for (j=0; j<m && totit < maxiter; ++j)
         {
             /* Arnoldi iteration */
             UCFDCall(arnoldi_cgs2(solver, pc, A, j, &wnorm));
 
             /* Givens rotation */
-            offset = (size_t)j*ld;
-
-            /* Apply previous givens */
-            apply_prev_givens(m, j, g, H);
-
-            /* Generate givens */
-            generate_givens(m, j, g, H);
+            Hcol = H + (size_t)j * ld;
+            apply_prev_givens(j, g, Hcol);
+            givens_generate(j, g, Hcol);
 
             /* Update rhs */
-            update_rhs(j, g, y);
+            c = g[j*2]; s = g[j*2+1];
+            y[j+1] = -s*y[j];
+            y[j] = c*y[j];
 
-            /* Check convergence */
-            if (wnorm < haptol * beta) {
-                k = j + 1;
-                solver->stat = HAPPYBREAKDOWN;
+            k = j + 1;
+            totit++;
+            rnorm = fabs(y[j+1]);
+            solver->ops->record(solver, ctx->rank, totit, rnorm);
+
+            if (wnorm < haptol) { solver->stat = HAPPYBREAKDOWN; break; }
+            if (rnorm < ttol) { solver->stat = CONVERGED; break; }
+            if (dtol > 0.0 && rnorm > dtol*beta0) {
+                solver->stat = DIVERGED_DTOL;
                 break;
             }
         }
 
         /* Back substitution */
-        back_substitute(m, k, H, y);
+        back_substitute(k, ld, H, y);
 
         /* Update solution */
         UCFDCall(update_solution(n, k, gmres, x));
 
-        iter++;
+        UCFDCall(calc_residual(solver, A, n, x, b, d_r));
+
+        cycle++;
+        if (solver->stat != ITERATING) break;
     }
-    if (iter == maxiter) solver->stat = REACH_ITERMAX;
-    solver->residual     = abeta;
-    solver->itnum        = iter;
+    if (solver->stat == ITERATING) solver->stat = REACH_ITERMAX;
+    solver->residual        = rnorm;
+    CUBLASCall(cublasDnrm2(gmres->handle, n, d_r, 1, &solver->true_residual));
+    solver->itnum           = totit;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -250,11 +285,12 @@ static inline UCFDInt pad_to_16B(UCFDInt n, size_t elem_bytes)
 }
 
 extern "C" ucfd_status_t
-UCFDSolverCreateCUDAGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxiter, UCFDReal tol)
+UCFDSolverCreateCUDAGMRES(Solver *solver, UCFDInt n, UCFDInt m)
 {
     UCFDCall(UCFDSolverInit(solver));
     Solver s = *solver;
     s->type_name = GMRES;
+
     Solver_CUDAGMRES *gmres = (Solver_CUDAGMRES *)calloc(1, sizeof(*gmres));
     UCFDCheckNull(gmres, "GMRES solver allocation failed\n");
 
@@ -280,11 +316,11 @@ UCFDSolverCreateCUDAGMRES(Solver *solver, UCFDInt n, UCFDInt m, UCFDInt maxiter,
     gmres->n                = n;
     gmres->restart          = m;
     gmres->ldv              = ldv;
-    s->tol                  = tol;
-    s->maxiter              = maxiter;
+
     s->data                 = gmres;
     s->ops->solve           = GMRESSolve;
     s->ops->destroy         = UCFDDestroyGMRES;
+    s->ops->record          = UCFDEmptyKernel;
 
     // ! Currently, cuBLAS functions are used in default
     s->ops->dcopy           = NULL;
