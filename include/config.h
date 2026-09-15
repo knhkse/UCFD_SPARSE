@@ -16,8 +16,10 @@
  */
 #if defined(UCFD_INT64)
     typedef int64_t UCFDInt;
+    #define INTMAX INT64_MAX
 #else
     typedef int32_t UCFDInt;
+    #define INTMAX INT32_MAX
 #endif
 
 /**
@@ -81,8 +83,10 @@ typedef bool UCFDBool;
 
     #if defined(UCFD_FLOAT32)
         #define CUSPARSE_REALTYPE CUDA_R_32F
+        typedef struct { float x, y; } real2;
     #else
         #define CUSPARSE_REALTYPE CUDA_R_64F
+        #define real2 double2
     #endif
 #endif
 

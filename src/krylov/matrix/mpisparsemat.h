@@ -3,17 +3,19 @@
 #include "sparsemat.h"
 #include "mpicontext.h"
 
-
-typedef struct {
-    MPI_Comm        comm;
-    UCFDInt         blocksize; // Only used in BSR
-    UCFDInt         nrecv, tag;
-    UCFDInt         *recv_nei, *recv_count, *recv_off;
-    
-    UCFDInt         nsend;
-    UCFDInt         *send_nei, *send_count, *send_off;
+#define BASECONTEXT                                     \
+    MPI_Comm        comm;                               \
+    UCFDInt         rank, size;                         \
+    UCFDInt         blocksize;                          \
+    UCFDInt         nrecv, tag;                         \
+    UCFDInt         *recv_nei, *recv_count, *recv_off;  \
+\
+    UCFDInt         nsend;                              \
+    UCFDInt         *send_nei, *send_count, *send_off;  \
     UCFDInt         send_total, *send_idx;
 
+typedef struct {
+    BASECONTEXT
     UCFDReal        *sbuf;
     UCFDReal        *lvec;
     UCFDInt         nghost;
@@ -22,7 +24,7 @@ typedef struct {
 } UCFDSpMVContext;
 
 typedef struct {
-    UCFDSpMVContext  spmvctx;
+    UCFDSpMVContext spmvctx;
     BaseCSR         A;
     BaseCSR         B;
     UCFDInt         nnz;
@@ -35,7 +37,7 @@ typedef struct {
 
 
 typedef struct {
-    UCFDSpMVContext  spmvctx;
+    UCFDSpMVContext spmvctx;
     BaseBSR         A;
     BaseBSR         B;
     UCFDInt         nnzb;
@@ -48,7 +50,7 @@ typedef struct {
 
 #if defined(USE_MKL)
 typedef struct {
-    UCFDSpMVContext  spmvctx;
+    UCFDSpMVContext spmvctx;
     MKLBSR          A;
     BaseBSR         B;
     UCFDInt         nnzb;

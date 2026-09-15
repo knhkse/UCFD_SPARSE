@@ -31,9 +31,10 @@
 
 #define UCFDWarning(msg) fprintf(stderr, "%s", msg);
 
-#define UCFDRaiseError(stat, msg)                                           \
+#define UCFDRaiseError(fmt, ...)                                            \
     do {                                                                    \
-        fprintf(stderr, "Error code [%d] : %s", stat, msg);                 \
+        fprintf(stderr, "[Error] %s:%d " fmt "\n",                          \
+                __FILE__, __LINE__, ##__VA_ARGS__);                         \
         exit(EXIT_FAILURE);                                                 \
     } while (0)
 
@@ -84,6 +85,18 @@
             fprintf(stderr, "[MKL]   %s:%d  status %d\n",                   \
                     __FILE__, __LINE__, (int)st_);                          \
             exit(EXIT_FAILURE);                                             \
+        }                                                                   \
+    } while (0)
+
+#define MPICall(call)                                                       \
+    do {                                                                    \
+        if (call != MPI_SUCCESS) {                                          \
+            char reason[MPI_MAX_ERROR_STRING];                              \
+            int length;                                                     \
+            MPI_Error_string(call, reason, &length);                        \
+            fprintf(stderr, "[MPI] %s:%d  %.*s\n",                          \
+                    __FILE__, __LINE__, length, reason);                    \
+            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);                        \
         }                                                                   \
     } while (0)
 

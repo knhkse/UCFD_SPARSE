@@ -57,10 +57,3 @@ ucfd_mpi_t UCFDMPIContextDestroy(Ctx *ctx)
     UCFDFunctionReturn(UCFD_MPI_SUCCESS);
 }
 
-
-inline void ContextNextTag(Ctx ctx, UCFDInt *tag_out)
-{
-    if (ctx->next_tag > ctx->tag_bound)
-        UCFDRaiseError(UCFD_MPI_ERROR, "Tag space exhausted\n");
-    *tag_out = ctx->next_tag++;
-}

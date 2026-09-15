@@ -10,11 +10,14 @@
 
 struct _Ctx {
     MPI_Comm    comm;
-    UCFDInt     rank;
-    UCFDInt     size;
+    int         rank, size;
     UCFDInt     next_tag;
     UCFDInt     tag_bound;
 };
 
-UCFD_INTERN void ContextNextTag(Ctx ctx, UCFDInt *tag_out);
-
+static inline void ContextNextTag(Ctx ctx, UCFDInt *tag_out)
+{
+    if (ctx->next_tag > ctx->tag_bound)
+        UCFDRaiseError("Tag space exhausted\n");
+    *tag_out = ctx->next_tag++;
+}

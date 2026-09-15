@@ -17,6 +17,7 @@ typedef const char *SpMatType;
 #define CSRMPI          "mpicsr"
 #define BSRMPI          "mpibsr"
 #define BSRMPIMKL       "mpimklbsr"
+#define BSRCUDAMPI      "mpicudabsr"
 
 
 #if defined(__cplusplus)
@@ -45,9 +46,11 @@ UCFD_EXTERN ucfd_status_t UCFDMatCreateMPIMKLBSR(SpMat*, Ctx, UCFDInt, UCFDInt, 
 #if defined(__CUDACC__)
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCUDACSR(SpMat*, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCUDABSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
-
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCUSPCSR(SpMat*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCUSPBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
+UCFD_EXTERN ucfd_status_t UCFDMatCreateCUDAMPIBSR(SpMat*, Ctx, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*, UCFDInt, UCFDInt);
+
+UCFD_EXTERN ucfd_status_t UCFDMatUpdateDeviceValues(SpMat, UCFDReal*, void*);
 #endif
 
 #if defined(__cplusplus)
