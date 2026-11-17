@@ -6,8 +6,8 @@
 #include "ucfdmatimpl.h"
 
 
-static void set_diagslots(const UCFDInt n, const UCFDInt *rowptr,
-                          const UCFDInt *colidx, UCFDInt *diagslots)
+static void set_diagslots(const UCFDInt n, const UCFDInt *restrict rowptr,
+                          const UCFDInt *restrict colidx, UCFDInt *restrict diagslots)
 {
     for (UCFDInt i=0; i<n; ++i) {
         UCFDInt st = rowptr[i];
@@ -85,7 +85,6 @@ ucfd_status_t UCFDPreconDestroy(Precon *precon)
     if (!precon || !*precon) UCFDFunctionReturn(UCFD_SUCCESS);
     UCFDCall((*precon)->ops->destroy(*precon));
     free((*precon)->data);
-    free((*precon)->values);
     free((*precon)->diagslots);
     free(*precon);
     *precon = NULL;

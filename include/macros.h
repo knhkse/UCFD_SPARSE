@@ -34,7 +34,7 @@
 #define UCFDRaiseError(fmt, ...)                                            \
     do {                                                                    \
         fprintf(stderr, "[Error] %s:%d " fmt "\n",                          \
-                __FILE__, __LINE__, ##__VA_ARGS__);                         \
+                __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__);              \
         exit(EXIT_FAILURE);                                                 \
     } while (0)
 

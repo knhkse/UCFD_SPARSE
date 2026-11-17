@@ -72,85 +72,85 @@ CUDABILUPreconPreparePerColor(const UCFDInt interval, const UCFDInt nstart,
 static ucfd_status_t
 CUDABILUPreconPrepare(Precon precon)
 {
-    Precon_PBILU *pbilu = (Precon_PBILU *)precon->data;
+    Precon_CUBILU *cubilu = (Precon_CUBILU *)precon->data;
     UCFDInt i, nstart, interval, bpg;
-    const UCFDInt ncolors = pbilu->ncolors;
+    const UCFDInt ncolors = cubilu->ncolors;
 
-    switch (pbilu->base.block) {
+    switch (cubilu->base.block) {
         case 1:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconPreparePerColor<1><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
-                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
+                CUDABILUPreconPreparePerColor<1><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
+                    cubilu->d_colidx, cubilu->d_diagslots, precon->values, cubilu->base.iw 
                 );
             }
             break;
         case 2:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconPreparePerColor<2><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
-                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
+                CUDABILUPreconPreparePerColor<2><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
+                    cubilu->d_colidx, cubilu->d_diagslots, precon->values, cubilu->base.iw 
                 );
             }
             break;
         case 3:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconPreparePerColor<3><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
-                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
+                CUDABILUPreconPreparePerColor<3><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
+                    cubilu->d_colidx, cubilu->d_diagslots, precon->values, cubilu->base.iw 
                 );
             }
             break;
         case 4:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconPreparePerColor<4><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
-                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
+                CUDABILUPreconPreparePerColor<4><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
+                    cubilu->d_colidx, cubilu->d_diagslots, precon->values, cubilu->base.iw 
                 );
             }
             break;
         case 5:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconPreparePerColor<5><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
-                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
+                CUDABILUPreconPreparePerColor<5><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
+                    cubilu->d_colidx, cubilu->d_diagslots, precon->values, cubilu->base.iw 
                 );
             }
             break;
         case 6:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconPreparePerColor<6><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
-                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
+                CUDABILUPreconPreparePerColor<6><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
+                    cubilu->d_colidx, cubilu->d_diagslots, precon->values, cubilu->base.iw 
                 );
             }
             break;
         case 7:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconPreparePerColor<7><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
-                    precon->colidx, precon->diagslots, precon->values, pbilu->base.iw 
+                CUDABILUPreconPreparePerColor<7><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
+                    cubilu->d_colidx, cubilu->d_diagslots, precon->values, cubilu->base.iw 
                 );
             }
             break;
@@ -203,7 +203,7 @@ __global__ static void
 CUDABILUPreconUpperApply(const UCFDInt interval, const UCFDInt nstart,
                          const UCFDInt *__restrict__ rowptr,
                          const UCFDInt *__restrict__ colidx,
-                         const UCFDReal *__restrict__ values,
+                         UCFDReal *__restrict__ values,
                          const UCFDInt *__restrict__ diagslots,
                          UCFDReal *__restrict__ b)
 {
@@ -243,148 +243,148 @@ CUDABILUPreconUpperApply(const UCFDInt interval, const UCFDInt nstart,
 static ucfd_status_t
 CUDABILUPreconApply(Precon precon, UCFDReal *b)
 {
-    Precon_PBILU *pbilu = (Precon_PBILU *)precon->data;
+    Precon_CUBILU *cubilu = (Precon_CUBILU *)precon->data;
     UCFDInt i, nstart, interval, bpg;
-    const UCFDInt ncolors = pbilu->ncolors;
+    const UCFDInt ncolors = cubilu->ncolors;
 
 
-    switch (pbilu->base.block) {
+    switch (cubilu->base.block) {
         case 1:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconLowerApply<1><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconLowerApply<1><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconUpperApply<1><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconUpperApply<1><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             break;
         case 2:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconLowerApply<2><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconLowerApply<2><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconUpperApply<2><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconUpperApply<2><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             break;
         case 3:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconLowerApply<3><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconLowerApply<3><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconUpperApply<3><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconUpperApply<3><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             break;
         case 4:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconLowerApply<4><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconLowerApply<4><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconUpperApply<4><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconUpperApply<4><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             break;
         case 5:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconLowerApply<5><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconLowerApply<5><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconUpperApply<5><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconUpperApply<5><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             break;
         case 6:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconLowerApply<6><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconLowerApply<6><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconUpperApply<6><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconUpperApply<6><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             break;
         case 7:
             for (i=0; i<ncolors; ++i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconLowerApply<7><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconLowerApply<7><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pbilu->icolors[i];
-                interval = pbilu->icolors[i+1] - nstart;
+                nstart = cubilu->icolors[i];
+                interval = cubilu->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABILUPreconUpperApply<7><<<bpg, TPB>>>(
-                    interval, nstart, precon->rowptr,
+                CUDABILUPreconUpperApply<7><<<bpg, TPB, 0, cubilu->stream>>>(
+                    interval, nstart, cubilu->d_rowptr,
                     precon->colidx, precon->values, precon->diagslots, b
                 );
             }
@@ -399,37 +399,43 @@ CUDABILUPreconApply(Precon precon, UCFDReal *b)
 static ucfd_status_t CUDABILUPreconDestroy(Precon precon)
 {
     if (!precon) UCFDFunctionReturn(UCFD_SUCCESS);
-    Precon_BILU *bilu = (Precon_BILU *)precon->data;
-    cudaFree(bilu->iw);
+    Precon_CUBILU *cubilu = (Precon_CUBILU *)precon->data;
+    CUDACall(cudaFree(precon->values));
+    CUDACall(cudaFree(((Precon_BILU *)cubilu)->iw));
+    CUDACall(cudaFree(cubilu->d_rowptr));
+    CUDACall(cudaFree(cubilu->d_colidx));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 extern "C" ucfd_status_t
-UCFDPreconSetCUDABILU(Precon *precon, UCFDInt bn, UCFDInt block, UCFDInt ncolors, UCFDInt *icolors)
+UCFDPreconSetCUDABILU(Precon *precon, SpMat mat, UCFDInt bn, UCFDInt block, UCFDInt ncolors, UCFDInt *icolors)
 {
+    UCFDCheckNull(*precon, "Preconditioner must be initialized\n");
     Precon pc = *precon;
-
-    CheckCUDAPointer(pc->rowptr);
-    CheckCUDAPointer(pc->colidx);
-    CheckCUDAPointer(pc->values);
-    CheckCUDAPointer(pc->diagslots);
-
-    Precon_PBILU *cudabilu = (Precon_PBILU *)calloc(1, sizeof(*cudabilu));
-    UCFDCheckNull(cudabilu, "CUDA BILU precon allocation failed\n");
+    Precon_CUBILU *cubilu = (Precon_CUBILU *)calloc(1, sizeof(*cubilu));
+    UCFDCheckNull(cubilu, "CUDA BILU precon allocation failed\n");
 
     /* Initialize working array */
-    CUDACall(cudaMalloc((void**)&((Precon_BILU *)cudabilu)->iw, (size_t)bn*sizeof(UCFDInt)));
-    thrust::device_ptr<UCFDInt> dev_ptr(((Precon_BILU *)cudabilu)->iw);
+    CUDACall(cudaMalloc((void**)&((Precon_BILU *)cubilu)->iw, (size_t)bn*sizeof(UCFDInt)));
+    thrust::device_ptr<UCFDInt> dev_ptr(((Precon_BILU *)cubilu)->iw);
     thrust::fill(dev_ptr, dev_ptr+bn, -1);
 
-    ((Precon_BILU *)cudabilu)->bn          = bn;
-    ((Precon_BILU *)cudabilu)->block       = block;
-    cudabilu->ncolors                      = ncolors;
-    cudabilu->icolors                      = icolors;
+    ((Precon_BILU *)cubilu)->bn          = bn;
+    ((Precon_BILU *)cubilu)->block       = block;
+    cubilu->ncolors                      = ncolors;
+    cubilu->icolors                      = icolors;
+    pc->type_name                        = CUDABILU;
 
-    pc->type_name                       = CUDABILU;
+    UCFDCall(UCFDCopyStream(mat, &cubilu->stream));
+    CUDACall(cudaMalloc(&cubilu->d_rowptr, (bn+1)*sizeof(UCFDInt)));
+    CUDACall(cudaMalloc(&cubilu->d_colidx, pc->nnz*sizeof(UCFDInt)));
+    CUDACall(cudaMalloc(&cubilu->d_diagslots, bn*sizeof(UCFDInt)));
     CUDACall(cudaMalloc(&pc->values, pc->nnz*block*block*sizeof(UCFDReal)));
-    pc->data                            = cudabilu;
+    CUDACall(cudaMemcpy(cubilu->d_rowptr, pc->rowptr, (bn+1)*sizeof(UCFDInt), cudaMemcpyHostToDevice));
+    CUDACall(cudaMemcpy(cubilu->d_colidx, pc->colidx, pc->nnz*sizeof(UCFDInt), cudaMemcpyHostToDevice));
+    CUDACall(cudaMemcpy(cubilu->d_diagslots, pc->diagslots, bn*sizeof(UCFDInt), cudaMemcpyHostToDevice));
+
+    pc->data                            = cubilu;
     pc->ops->prepare                    = CUDABILUPreconPrepare;
     pc->ops->apply                      = CUDABILUPreconApply;
     pc->ops->destroy                    = CUDABILUPreconDestroy;

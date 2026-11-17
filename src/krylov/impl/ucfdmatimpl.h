@@ -11,6 +11,9 @@ struct _SpMatOps {
     ucfd_status_t (*update)(SpMat, UCFDReal*);
     ucfd_status_t (*cppattern)(SpMat, UCFDInt**, UCFDInt**);
     ucfd_status_t (*cpvalues)(SpMat, UCFDReal*);
+#if defined(__CUDACC__)
+    ucfd_status_t (*cpstream)(SpMat, cudaStream_t*);
+#endif
 };
 
 struct _SpMat {
@@ -18,3 +21,11 @@ struct _SpMat {
     void                *data;
     struct _SpMatOps    ops[1];
 };
+
+#if defined(__CUDACC__)
+static inline ucfd_status_t UCFDCopyStream(SpMat mat, cudaStream_t *stream)
+{
+    UCFDCall(mat->ops->cpstream(mat, stream));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+#endif

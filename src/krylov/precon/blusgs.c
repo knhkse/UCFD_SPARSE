@@ -116,6 +116,7 @@ ucfd_status_t BLUSGSPreconDestroy(Precon precon)
 {
     if (!precon) UCFDFunctionReturn(UCFD_SUCCESS);
     Precon_BLUSGS *blu = (Precon_BLUSGS *)precon->data;
+    free(precon->values);
     free(blu->diagvalues);
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

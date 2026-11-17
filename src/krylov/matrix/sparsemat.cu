@@ -3,6 +3,14 @@
 #include <cuda_runtime.h>
 
 #include "sparsemat.h"
+#include "mpisparsemat.cuh"
+
+
+static ucfd_status_t UCFDCopyDefaultStream(SpMat mat, cudaStream_t *stream)
+{
+    *stream = cudaStreamLegacy;
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
 
 
 __global__ static void
@@ -32,40 +40,59 @@ _SpMV_CUDACSR(UCFDReal alpha, UCFDInt n,
 static inline ucfd_status_t
 SpMV_CUDACSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
-    BaseCSR *A = (BaseCSR *)mat->data;
+    CUDACSR *A = (CUDACSR *)mat->data;
 #if defined(DEBUG)
     CheckCUDAPointer(x);
     CheckCUDAPointer(y);
     assert(x != y);
     assert(A->n != 0);
 #endif
-    UCFDInt bpg = (A->n + TPB - 1)/TPB;
-    _SpMV_CUDACSR<<<bpg, TPB>>>(alpha, A->n, A->rowptr, A->colidx, A->values, x, beta, y);
+    UCFDInt bpg = (A->mat.n + TPB - 1)/TPB;
+    _SpMV_CUDACSR<<<bpg, TPB>>>(
+        alpha, A->mat.n, A->d_rowptr, A->d_colidx, A->mat.values, x, beta, y
+    );
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static inline ucfd_status_t UCFDCUDACSRCopyValues(SpMat mat, UCFDReal *__restrict__ d_values)
+{
+    BaseCSR *csr = (BaseCSR *)mat->data;
+    const UCFDInt val_count = csr->nnz;
+    CUDACall(cudaMemcpy(
+        d_values, csr->values, val_count*sizeof(UCFDReal), cudaMemcpyDeviceToDevice
+    ));
+
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 extern "C" ucfd_status_t
-UCFDMatCreateCUDACSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+UCFDMatCreateCUDACSR(SpMat *mat, UCFDInt n, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *d_values)
 {
     UCFDCall(UCFDMatInit(mat));
     SpMat m = *mat;
     m->type_name = CSRCUDA;
 
-    BaseCSR *csr = (BaseCSR *)calloc(1, sizeof(*csr));
+    CUDACSR *csr = (CUDACSR *)calloc(1, sizeof(*csr));
     UCFDCheckNull(csr, "CSR matrix creation failed\n");
 
     /* Check if input arrays are allocated in device side */
-    CheckCUDAPointer(rowptr);
-    CheckCUDAPointer(colidx);
-    CheckCUDAPointer(values);
+    CheckCUDAPointer(d_values);
 
-    csr->n              = n;
-    csr->rowptr         = rowptr;
-    csr->colidx         = colidx;
-    csr->values         = values;
+    ((BaseCSR *)csr)->n              = n;
+    ((BaseCSR *)csr)->nnz            = rowptr[n];
+    ((BaseCSR *)csr)->rowptr         = rowptr;
+    ((BaseCSR *)csr)->colidx         = colidx;
+    ((BaseCSR *)csr)->values         = d_values;
+
+    csr->d_rowptr = upload_int(rowptr, (size_t)n + 1);
+    csr->d_colidx = upload_int(colidx, (size_t)csr->mat.nnz);
+
     m->data             = csr;
     m->ops->spmv        = SpMV_CUDACSR;
     m->ops->destroy     = UCFDEmptyKernel;
+    m->ops->cppattern   = UCFDMatCopyPattern;
+    m->ops->cpvalues    = UCFDCUDACSRCopyValues;
+    m->ops->cpstream    = UCFDCopyDefaultStream;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -118,26 +145,36 @@ _SpMV_CUDABSR(UCFDReal alpha, UCFDInt bn,
 static ucfd_status_t
 SpMV_CUDABSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, UCFDReal *y)
 {
-    BaseCSR *A = (BaseCSR *)mat->data;
 #if defined(DEBUG)
     CheckCUDAPointer(x);
     CheckCUDAPointer(y);
     assert(x != y);
     assert(A->bn != 0);
 #endif
-    BaseBSR *bsr = (BaseBSR *)mat->data;
-    UCFDInt bpg = (bsr->bn + TPB - 1)/TPB;
+    CUDABSR *A = (CUDABSR *)mat->data;
+    UCFDInt bpg = (A->mat.bn + TPB - 1)/TPB;
 
-    switch (bsr->block) {
-        case 1: _SpMV_CUDABSR<1><<<bpg, TPB>>>(alpha, bsr->bn, A->rowptr, A->colidx, A->values, x, beta, y); break;
-        case 2: _SpMV_CUDABSR<2><<<bpg, TPB>>>(alpha, bsr->bn, A->rowptr, A->colidx, A->values, x, beta, y); break;
-        case 3: _SpMV_CUDABSR<3><<<bpg, TPB>>>(alpha, bsr->bn, A->rowptr, A->colidx, A->values, x, beta, y); break;
-        case 4: _SpMV_CUDABSR<4><<<bpg, TPB>>>(alpha, bsr->bn, A->rowptr, A->colidx, A->values, x, beta, y); break;
-        case 5: _SpMV_CUDABSR<5><<<bpg, TPB>>>(alpha, bsr->bn, A->rowptr, A->colidx, A->values, x, beta, y); break;
-        case 6: _SpMV_CUDABSR<6><<<bpg, TPB>>>(alpha, bsr->bn, A->rowptr, A->colidx, A->values, x, beta, y); break;
-        case 7: _SpMV_CUDABSR<7><<<bpg, TPB>>>(alpha, bsr->bn, A->rowptr, A->colidx, A->values, x, beta, y); break;
+    switch (A->mat.block) {
+        case 1: _SpMV_CUDABSR<1><<<bpg, TPB>>>(alpha, A->mat.bn, A->d_rowptr, A->d_colidx, A->mat.basemat.values, x, beta, y); break;
+        case 2: _SpMV_CUDABSR<2><<<bpg, TPB>>>(alpha, A->mat.bn, A->d_rowptr, A->d_colidx, A->mat.basemat.values, x, beta, y); break;
+        case 3: _SpMV_CUDABSR<3><<<bpg, TPB>>>(alpha, A->mat.bn, A->d_rowptr, A->d_colidx, A->mat.basemat.values, x, beta, y); break;
+        case 4: _SpMV_CUDABSR<4><<<bpg, TPB>>>(alpha, A->mat.bn, A->d_rowptr, A->d_colidx, A->mat.basemat.values, x, beta, y); break;
+        case 5: _SpMV_CUDABSR<5><<<bpg, TPB>>>(alpha, A->mat.bn, A->d_rowptr, A->d_colidx, A->mat.basemat.values, x, beta, y); break;
+        case 6: _SpMV_CUDABSR<6><<<bpg, TPB>>>(alpha, A->mat.bn, A->d_rowptr, A->d_colidx, A->mat.basemat.values, x, beta, y); break;
+        case 7: _SpMV_CUDABSR<7><<<bpg, TPB>>>(alpha, A->mat.bn, A->d_rowptr, A->d_colidx, A->mat.basemat.values, x, beta, y); break;
         default: fprintf(stderr, "Unsupported block size\n"); UCFDFunctionReturn(UCFD_FAILED);
     }
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static inline ucfd_status_t UCFDCUDABSRCopyValues(SpMat mat, UCFDReal *__restrict__ d_values)
+{
+    BaseBSR *bsr = (BaseBSR *)mat->data;
+    const UCFDInt val_count = bsr->basemat.nnz * bsr->block * bsr->block;
+    CUDACall(cudaMemcpy(
+        d_values, bsr->basemat.values, val_count*sizeof(UCFDReal), cudaMemcpyDeviceToDevice
+    ));
+
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
@@ -166,6 +203,9 @@ UCFDMatCreateCUDABSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt *rowptr, UCFDI
     m->data                     = bsr;
     m->ops->spmv                = SpMV_CUDABSR;
     m->ops->destroy             = UCFDEmptyKernel;
+    m->ops->cppattern           = UCFDMatCopyPattern;
+    m->ops->cpvalues            = UCFDCUDABSRCopyValues;
+    m->ops->cpstream            = UCFDCopyDefaultStream;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -234,12 +274,9 @@ SpMV_CUSPARSE_BSR_Legacy(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal beta, 
 
 
 extern "C" ucfd_status_t
-UCFDMatCreateCUSPCSR(SpMat *mat, UCFDInt n, UCFDInt nnz, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *values)
+UCFDMatCreateCUSPCSR(SpMat *mat, UCFDInt n, UCFDInt nnz, UCFDInt *rowptr, UCFDInt *colidx, UCFDReal *d_values)
 {
-    /* Check if input arrays are allocated in device side */
-    CheckCUDAPointer(rowptr);
-    CheckCUDAPointer(colidx);
-    CheckCUDAPointer(values);
+    CheckCUDAPointer(d_values);
 
     UCFDCall(UCFDMatInit(mat));
     SpMat m = *mat;
@@ -250,9 +287,17 @@ UCFDMatCreateCUSPCSR(SpMat *mat, UCFDInt n, UCFDInt nnz, UCFDInt *rowptr, UCFDIn
     CUSPARSE_CSR *csr = (CUSPARSE_CSR *)calloc(1, sizeof(*csr));
     UCFDCheckNull(csr, "CSR matrix creation failed\n");
 
+    ((BaseCSR *)csr)->n         = n;
+    ((BaseCSR *)csr)->rowptr    = rowptr;
+    ((BaseCSR *)csr)->colidx    = colidx;
+    ((BaseCSR *)csr)->values    = d_values;
+
+    csr->mat.d_rowptr = upload_int(rowptr, (size_t)n + 1);
+    csr->mat.d_colidx = upload_int(colidx, (size_t)csr->mat.nnz);
+
     CUSPARSECall(cusparseCreate(&csr->ctx.handle));
     CUSPARSECall(cusparseCreateCsr(
-        &csr->ctx.op, n, n, nnz, rowptr, colidx, values,
+        &csr->ctx.op, n, n, nnz, csr->mat.d_rowptr, csr->mat.d_colidx, d_values,
         CUSPARSE_INTTYPE, CUSPARSE_INTTYPE, CUSPARSE_INDEX_BASE_ZERO, CUSPARSE_REALTYPE
     ));
 
@@ -276,13 +321,12 @@ UCFDMatCreateCUSPCSR(SpMat *mat, UCFDInt n, UCFDInt nnz, UCFDInt *rowptr, UCFDIn
     ));
 #endif
 
-    ((BaseCSR *)csr)->n         = n;
-    ((BaseCSR *)csr)->rowptr    = rowptr;
-    ((BaseCSR *)csr)->colidx    = colidx;
-    ((BaseCSR *)csr)->values    = values;
     m->data                     = csr;
     m->ops->spmv                = SpMV_CUSPARSE;
     m->ops->destroy             = Destroy_CUSPARSE;
+    m->ops->cppattern           = UCFDMatCopyPattern;
+    m->ops->cpvalues            = UCFDCUDACSRCopyValues;
+    m->ops->cpstream            = UCFDCopyDefaultStream;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -357,6 +401,9 @@ UCFDMatCreateCUSPBSR(SpMat *mat, UCFDInt bn, UCFDInt blk, UCFDInt bnnz, UCFDInt 
     m->ops->spmv                = SpMV_CUSPARSE_BSR_Legacy;
 #endif
     m->ops->destroy             = Destroy_CUSPARSE;
+    m->ops->cppattern           = UCFDMatCopyPattern;
+    m->ops->cpvalues            = UCFDCUDABSRCopyValues;
+    m->ops->cpstream            = UCFDCopyDefaultStream;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

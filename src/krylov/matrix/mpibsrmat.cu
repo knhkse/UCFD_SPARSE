@@ -281,9 +281,16 @@ static ucfd_status_t SpMV_CUDAMPIBSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCF
      * lets the boundary_block_rows kernel overlap the outstanding sends. */
     if (ctx->nsend) MPICall(MPI_Waitall(ctx->nsend, ctx->sends, MPI_STATUSES_IGNORE));
 
+    UCFDSpMVSynchronize(ctx);
+
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
+ucfd_status_t inline UCFDSpMVSynchronize(CUDASpMVContext *ctx)
+{
+    CUDACall(cudaEventSynchronize(ctx->done));
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
 
 /* =========================================================================
  * Host-side A/B split
@@ -564,6 +571,8 @@ static ucfd_status_t UCFDMPIMatDestroy(SpMat mat)
     ctx->comm = MPI_COMM_NULL;
 
     /* BSR matrix destroy */
+    free(bsr->Arp);
+    free(bsr->colidx);
     CUDACall(cudaFree(bsr->A.basemat.rowptr));
     CUDACall(cudaFree(bsr->B.basemat.rowptr));
     CUDACall(cudaFree(bsr->d_split_colidx));
@@ -575,20 +584,42 @@ static ucfd_status_t UCFDMPIMatDestroy(SpMat mat)
 }
 
 extern "C" ucfd_status_t
-UCFDMatUpdateDeviceValues(SpMat mat, UCFDReal *d_values, void *stream_handle)
+UCFDMatUpdateDeviceValues(SpMat mat, UCFDReal *d_values)
 {
     CUDAMPIBSR *bsr = (CUDAMPIBSR *)mat->data;
-
-    CUDACall(cudaEventRecord(bsr->spmvctx.values_ready, (cudaStream_t)stream_handle));
-    CUDACall(cudaStreamWaitEvent(bsr->spmvctx.compute, bsr->spmvctx.values_ready, 0));
     apply_values(bsr, d_values);
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-/* TODO : cppattern, cpvalues */
+static ucfd_status_t UCFDCopyComputeStream(SpMat mat, cudaStream_t *stream)
+{
+    CUDAMPIBSR *bsr = (CUDAMPIBSR *)mat->data;
 
+    *stream = bsr->spmvctx.compute;
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
 
+static ucfd_status_t UCFDBSRCopyPattern(SpMat mat, UCFDInt **rp_dest, UCFDInt **ci_dest)
+{
+    CUDAMPIBSR *bsr = (CUDAMPIBSR *)mat->data;
+    *rp_dest = bsr->Arp;
+    *ci_dest = bsr->colidx;
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
+
+static ucfd_status_t UCFDBSRCopyValues(SpMat mat, UCFDReal *__restrict__ values)
+{
+    CUDAMPIBSR *bsr = (CUDAMPIBSR *)mat->data;
+    const UCFDInt val_count = product((size_t)bsr->nnzb_A, bsr->block_elems);
+    CUDACall(cudaMemcpyAsync(
+        values, bsr->d_split_values, val_count*sizeof(UCFDReal),
+        cudaMemcpyDeviceToDevice, bsr->spmvctx.compute
+    ));
+
+    UCFDFunctionReturn(UCFD_SUCCESS);
+}
 
 /* Collective creation. rp/ci are HOST arrays; d_va is DEVICE storage in
  * original BSR order. va_stream identifies its producer, including stream 0.
@@ -671,9 +702,7 @@ UCFDMatCreateCUDAMPIBSR(SpMat *mat, Ctx ctx,
     c->d_send_idx = upload_int(c->send_idx, c->send_total);
 
     /* Deallocate host arrays */
-    free(bsr->Arp);
     free(bsr->Brp);
-    free(bsr->colidx);
     free(bsr->value_source);
     free(bsr->boundary_rows);
     free(bsr->garray);
@@ -742,9 +771,10 @@ UCFDMatCreateCUDAMPIBSR(SpMat *mat, Ctx ctx,
     m->ops->destroy     = UCFDMPIMatDestroy;
 
     /* TBU */
-    m->ops->update      = NULL;
-    m->ops->cppattern   = NULL;
-    m->ops->cpvalues    = NULL;
+    m->ops->update      = UCFDMatUpdateDeviceValues;
+    m->ops->cppattern   = UCFDBSRCopyPattern;
+    m->ops->cpvalues    = UCFDBSRCopyValues;
+    m->ops->cpstream    = UCFDCopyComputeStream;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

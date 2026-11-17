@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include "mpisparsemat.h"
+#include "mpihelper.h"
 
 
 /* ------------------------------------------------------------ Internal types -- */
@@ -53,6 +54,9 @@ typedef struct {
     UCFDInt             *value_source;
     UCFDInt             *boundary_rows;
     UCFDInt             *garray;
+
+    /* Third-party stream */
+    cudaStream_t        stream;
 } CUDAMPIBSR;
 
 /* ------------------------------------------------------------ allocation -- */
@@ -121,12 +125,12 @@ static inline UCFDInt *upload_int(const UCFDInt *src, size_t n)
     return p;
 }
 
-static UCFDInt is_aligned16(const void *p)
+static inline UCFDInt is_aligned16(const void *p)
 {
     return (((uintptr_t)p) & 15u) == 0u;
 }
 
-static int compare_column_entry(const void *a, const void *b)
+static inline int compare_column_entry(const void *a, const void *b)
 {
     const column_entry_t *x = (const column_entry_t *)a;
     const column_entry_t *y = (const column_entry_t *)b;
@@ -136,15 +140,16 @@ static int compare_column_entry(const void *a, const void *b)
 }
 
 /* Full allocation ranges, not just equal bases, must be disjoint. */
-static int ranges_overlap(const void *a, const void *b, size_t nbytes)
+static inline int ranges_overlap(const void *a, const void *b, size_t nbytes)
 {
     uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
     return nbytes && (x <= y ? y - x < nbytes : x - y < nbytes);
 }
 
 
+/* Header-defined kernels need internal linkage in each CUDA translation unit. */
 #define DEFINE_BSR_KERNEL(NAME, BS, W, BOUNDARY, VEC)                                              \
-    __global__ void NAME(int nrows, int runtime_bs, const int *__restrict__ row_list,              \
+    static __global__ void NAME(int nrows, int runtime_bs, const int *__restrict__ row_list,              \
                          const int *__restrict__ rowptr, const int *__restrict__ colidx,           \
                          const double *__restrict__ a, const double *__restrict__ x, double alpha, \
                          double beta, double *__restrict__ y)                                      \
@@ -290,3 +295,5 @@ static int scalar_count(UCFDInt nblocks, UCFDInt blocksize)
     return as_int(product((size_t)nblocks, (size_t)blocksize));
 }
 
+/* Others */
+UCFD_INTERN ucfd_status_t UCFDSpMVSynchronize(CUDASpMVContext *ctx);

@@ -60,3 +60,19 @@ static inline void halo_wait(UCFDSpMVContext *c)
     if (c->nreq)
         MPI_Waitall(c->nreq, c->reqs, MPI_STATUSES_IGNORE);
 }
+
+#if defined(__CUDACC__)
+extern "C" static void select_device(void)
+{
+    MPI_Comm node;
+    int local_rank = 0, ndev = 0;
+    MPICall(MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0,
+                               MPI_INFO_NULL, &node));
+    MPICall(MPI_Comm_rank(node, &local_rank));
+    MPICall(MPI_Comm_free(&node));
+    CUDACall(cudaGetDeviceCount(&ndev));
+    if (ndev < 1)
+        UCFDRaiseError("no CUDA device visible");
+    CUDACall(cudaSetDevice(local_rank % ndev));
+}
+#endif

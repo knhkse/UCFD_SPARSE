@@ -37,14 +37,14 @@ static ucfd_status_t UCFDSetBSRMPIContext(UCFDSpMVContext *c,
     /* All ranks must have same block size */
     int min_block_size;
     int max_block_size;
-    MPI_Allreduce(&block_size, &min_block_size, 1, MPI_INT, MPI_MIN, c->comm);
-    MPI_Allreduce(&block_size, &max_block_size, 1, MPI_INT, MPI_MAX, c->comm);
+    MPICall(MPI_Allreduce(&block_size, &min_block_size, 1, MPI_INT, MPI_MIN, c->comm));
+    MPICall(MPI_Allreduce(&block_size, &max_block_size, 1, MPI_INT, MPI_MAX, c->comm));
     if (min_block_size <= 0 || min_block_size != max_block_size)
     {
         int rank;
         MPI_Comm_rank(c->comm, &rank);
         UCFDRaiseError(
-            UCFD_MPI_ERROR, "rank %d: block_size must be positive and equal on all ranks\n"
+            "rank %d: block_size must be positive and equal on all ranks", rank
         );
         MPI_Abort(c->comm, MPI_ERR_ARG);
         abort();
@@ -429,8 +429,8 @@ static ucfd_status_t UCFDSplitBSR(UCFDInt bn, UCFDInt blk,
     }
 
     UCFDInt n = bn*blk;
-    mat->A = (BaseBSR){{n, Arp, Aci, Aval}, bn, blk};
-    mat->B = (BaseBSR){{n, Brp, Bci, Bval}, bn, blk};
+    mat->A = (BaseBSR){{n, nnzb_A, Arp, Aci, Aval}, bn, blk};
+    mat->B = (BaseBSR){{n, nnzb_B, Brp, Bci, Bval}, bn, blk};
     mat->nnzb = nnzb;
     mat->value_dest = value_dest;
     mat->split_values = split_values;
@@ -500,8 +500,8 @@ ucfd_status_t UCFDMatCreateMPIBSR(SpMat *mat, Ctx ctx,
 
     /* Prepare : Get range */
     int size=0, rank=0;
-    MPI_Comm_size(ctx->comm, &size);
-    MPI_Comm_rank(ctx->comm, &rank);
+    MPICall(MPI_Comm_size(ctx->comm, &size));
+    MPICall(MPI_Comm_rank(ctx->comm, &rank));
     UCFDInt *range = malloc((size_t)(size + 1)*sizeof(*range));
 
     bsr->n_local = bn*blk;
@@ -698,7 +698,7 @@ static ucfd_status_t UCFDSplitMKLBSR(UCFDInt bn, UCFDInt blk,
 #endif
     MKLCall(mkl_sparse_optimize(mat->A.handle.op));
 
-    mat->B = (BaseBSR){{n, Brp, Bci, Bval}, bn, blk};
+    mat->B = (BaseBSR){{n, nnzb_B, Brp, Bci, Bval}, bn, blk};
     mat->nnzb = nnzb;
     mat->value_dest = value_dest;
     mat->split_values = split_values;

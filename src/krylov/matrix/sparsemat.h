@@ -3,7 +3,7 @@
 
 
 typedef struct {
-    UCFDInt     n;
+    UCFDInt     n, nnz;
     UCFDInt     *rowptr;
     UCFDInt     *colidx;
     UCFDReal    *values;
@@ -40,6 +40,22 @@ typedef struct {
  */
 #if defined(__CUDACC__)
 typedef struct {
+    BaseCSR         mat;
+    UCFDInt         nnz;
+    UCFDInt         *d_rowptr;
+    UCFDInt         *d_colidx;
+    cudaStream_t    stream;
+} CUDACSR;
+
+typedef struct {
+    BaseBSR         mat;
+    UCFDInt         nnz;
+    UCFDInt         *d_rowptr;
+    UCFDInt         *d_colidx;
+    cudaStream_t    stream;
+} CUDABSR;
+
+typedef struct {
     cusparseHandle_t        handle;
     cusparseSpMatDescr_t    op;
     cusparseDnVecDescr_t    vecX, vecY;
@@ -55,7 +71,7 @@ typedef struct {
 
 
 typedef struct {
-    BaseCSR        mat;
+    CUDACSR         mat;
     cuSPARSEContext ctx;
 } CUSPARSE_CSR;
 
@@ -77,6 +93,7 @@ extern "C" {
 
 /* Empty kernel (do nothing) */
 static inline ucfd_status_t UCFDEmptyKernel(SpMat mat) {UCFDFunctionReturn(UCFD_SUCCESS);}
+UCFD_INTERN ucfd_status_t UCFDMatCopyPattern(SpMat mat, UCFDInt **rp_dest, UCFDInt **ci_dest);
 
 #if defined(__cplusplus)
 }

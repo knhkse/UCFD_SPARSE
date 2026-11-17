@@ -364,8 +364,8 @@ static ucfd_status_t UCFDSplitCSR(UCFDInt n, const UCFDInt *rp, const UCFDInt *c
         }
     }
 
-    mat->A = (BaseCSR){n, Arp, Aci, Av};
-    mat->B = (BaseCSR){n, Brp, Bci, Bv};
+    mat->A = (BaseCSR){n, nA, Arp, Aci, Av};
+    mat->B = (BaseCSR){n, nB, Brp, Bci, Bv};
     mat->nnz = nnz;
     mat->value_dest = value_dest;
     mat->split_values = split_values;

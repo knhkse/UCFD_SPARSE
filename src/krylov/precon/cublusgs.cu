@@ -17,20 +17,21 @@ CUDABLUSGSPreconPreparePerColor(UCFDInt bn, UCFDInt block,
     const UCFDInt didx = diagslots[idx];
     UCFDReal *diagblock = &diagvalues[idx*blkdim];
 
-    CUDACall(cudaMemcpy(diagblock, &values[didx*blkdim], blkdim*sizeof(UCFDReal),
-                        cudaMemcpyDeviceToDevice));
+    for (UCFDInt i=0; i<blkdim; ++i)
+        diagblock[i] = values[didx*blkdim + i];
+
     ludcmp(block, diagblock);
 }
 
 static ucfd_status_t
 CUDABLUSGSPreconPrepare(Precon precon)
 {
-    Precon_PBLUSGS *pblusgs = (Precon_PBLUSGS *)precon->data;
-    const UCFDInt bpg = (pblusgs->base.bn + TPB - 1)/TPB;
+    Precon_CUBLUSGS *cublusgs = (Precon_CUBLUSGS *)precon->data;
+    const UCFDInt bpg = (cublusgs->base.bn + TPB - 1)/TPB;
 
-    CUDABLUSGSPreconPreparePerColor<<<bpg, TPB>>>(
-        pblusgs->base.bn, pblusgs->base.block, precon->diagslots,
-        precon->values, pblusgs->base.diagvalues
+    CUDABLUSGSPreconPreparePerColor<<<bpg, TPB, 0, cublusgs->stream>>>(
+        cublusgs->base.bn, cublusgs->base.block, cublusgs->d_diagslots,
+        precon->values, cublusgs->base.diagvalues
     );
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -44,7 +45,7 @@ CUDABLUSGSPreconLowerApply(const UCFDInt interval, const UCFDInt nstart,
                            const UCFDInt *__restrict__ colidx,
                            const UCFDReal *__restrict__ values,
                            const UCFDInt *__restrict__ diagslots,
-                           const UCFDReal *__restrict__ diagvalues,
+                           UCFDReal *__restrict__ diagvalues,
                            UCFDReal *__restrict__ b)
 {
     const UCFDInt _idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -90,7 +91,7 @@ CUDABLUSGSPreconUpperApply(UCFDInt interval, UCFDInt nstart,
                            const UCFDInt *__restrict__ colidx,
                            const UCFDReal *__restrict__ values,
                            const UCFDInt *__restrict__ diagslots,
-                           const UCFDReal *__restrict__ diagvalues,
+                           UCFDReal *__restrict__ diagvalues,
                            UCFDReal *__restrict__ b)
 {
     const UCFDInt _idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -132,162 +133,162 @@ CUDABLUSGSPreconUpperApply(UCFDInt interval, UCFDInt nstart,
 static ucfd_status_t
 CUDABLUSGSPreconApply(Precon precon, UCFDReal *b)
 {
-    Precon_PBLUSGS *pblusgs = (Precon_PBLUSGS *)precon->data;
+    Precon_CUBLUSGS *cublusgs = (Precon_CUBLUSGS *)precon->data;
     UCFDInt i, nstart, interval, bpg;
-    const UCFDInt ncolors = pblusgs->ncolors;
+    const UCFDInt ncolors = cublusgs->ncolors;
 
-    switch (pblusgs->base.block) {
+    switch (cublusgs->base.block) {
         case 1:
             for (i=0; i<ncolors; ++i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconLowerApply<1><<<bpg, TPB>>>(
+                CUDABLUSGSPreconLowerApply<1><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconUpperApply<1><<<bpg, TPB>>>(
+                CUDABLUSGSPreconUpperApply<1><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             break;
         case 2:
             for (i=0; i<ncolors; ++i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconLowerApply<2><<<bpg, TPB>>>(
+                CUDABLUSGSPreconLowerApply<2><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconUpperApply<2><<<bpg, TPB>>>(
+                CUDABLUSGSPreconUpperApply<2><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             break;
         case 3:
             for (i=0; i<ncolors; ++i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconLowerApply<3><<<bpg, TPB>>>(
+                CUDABLUSGSPreconLowerApply<3><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconUpperApply<3><<<bpg, TPB>>>(
+                CUDABLUSGSPreconUpperApply<3><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             break;
         case 4:
             for (i=0; i<ncolors; ++i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconLowerApply<4><<<bpg, TPB>>>(
+                CUDABLUSGSPreconLowerApply<4><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconUpperApply<4><<<bpg, TPB>>>(
+                CUDABLUSGSPreconUpperApply<4><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             break;
         case 5:
             for (i=0; i<ncolors; ++i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconLowerApply<5><<<bpg, TPB>>>(
+                CUDABLUSGSPreconLowerApply<5><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconUpperApply<5><<<bpg, TPB>>>(
+                CUDABLUSGSPreconUpperApply<5><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             break;
         case 6:
             for (i=0; i<ncolors; ++i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconLowerApply<6><<<bpg, TPB>>>(
+                CUDABLUSGSPreconLowerApply<6><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconUpperApply<6><<<bpg, TPB>>>(
+                CUDABLUSGSPreconUpperApply<6><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             break;
         case 7:
             for (i=0; i<ncolors; ++i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconLowerApply<7><<<bpg, TPB>>>(
+                CUDABLUSGSPreconLowerApply<7><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             for (i=ncolors-1; i>=0; --i) {
-                nstart = pblusgs->icolors[i];
-                interval = pblusgs->icolors[i+1] - nstart;
+                nstart = cublusgs->icolors[i];
+                interval = cublusgs->icolors[i+1] - nstart;
                 bpg = (interval + TPB - 1)/TPB;
-                CUDABLUSGSPreconUpperApply<7><<<bpg, TPB>>>(
+                CUDABLUSGSPreconUpperApply<7><<<bpg, TPB, 0, cublusgs->stream>>>(
                     interval, nstart,
-                    precon->rowptr, precon->colidx, precon->values,
-                    precon->diagslots, pblusgs->base.diagvalues, b
+                    cublusgs->d_rowptr, cublusgs->d_colidx, precon->values,
+                    cublusgs->d_diagslots, cublusgs->base.diagvalues, b
                 );
             }
             break;
@@ -305,27 +306,30 @@ static ucfd_status_t CUDABLUSGSPreconDestroy(Precon precon)
 }
 
 extern "C" ucfd_status_t
-UCFDPreconSetCUDABLUSGS(Precon *precon, UCFDInt bn, UCFDInt block, UCFDInt ncolors, UCFDInt *icolors)
+UCFDPreconSetCUDABLUSGS(Precon *precon, SpMat mat, UCFDInt bn, UCFDInt block, UCFDInt ncolors, UCFDInt *icolors)
 {
+    UCFDCheckNull(*precon, "Preconditioner must be initialized\n");
     Precon pc = *precon;
+    Precon_CUBLUSGS *cublusgs = (Precon_CUBLUSGS *)calloc(1, sizeof(*cublusgs));
+    UCFDCheckNull(cublusgs, "CUDA BLUSGS precon allocation failed\n");
 
-    CheckCUDAPointer(pc->rowptr);
-    CheckCUDAPointer(pc->colidx);
-    CheckCUDAPointer(pc->values);
-    CheckCUDAPointer(pc->diagslots);
+    cublusgs->base.bn         = bn;
+    cublusgs->base.block      = block;
+    cublusgs->ncolors         = ncolors;
+    cublusgs->icolors         = icolors;
+    pc->type_name             = CUDABLUSGS;
 
-    Precon_PBLUSGS *cudablusgs = (Precon_PBLUSGS *)calloc(1, sizeof(*cudablusgs));
-    UCFDCheckNull(cudablusgs, "CUDA BLUSGS precon allocation failed\n");
-
-    cudablusgs->base.bn         = bn;
-    cudablusgs->base.block      = block;
-    cudablusgs->ncolors         = ncolors;
-    cudablusgs->icolors         = icolors;
-    CUDACall(cudaMalloc((void**)&cudablusgs->base.diagvalues, (size_t)(bn*block*block)*sizeof(UCFDReal)));
-
-    pc->type_name       = CUDABLUSGS;
+    UCFDCall(UCFDCopyStream(mat, &cublusgs->stream));
+    CUDACall(cudaMalloc(&cublusgs->d_rowptr, (bn+1)*sizeof(UCFDInt)));
+    CUDACall(cudaMalloc(&cublusgs->d_colidx, pc->nnz*sizeof(UCFDInt)));
+    CUDACall(cudaMalloc(&cublusgs->d_diagslots, bn*sizeof(UCFDInt)));
     CUDACall(cudaMalloc(&pc->values, pc->nnz*block*block*sizeof(UCFDReal)));
-    pc->data            = cudablusgs;
+    CUDACall(cudaMalloc(&cublusgs->base.diagvalues, (size_t)(bn*block*block)*sizeof(UCFDReal)));
+    CUDACall(cudaMemcpy(cublusgs->d_rowptr, pc->rowptr, (bn+1)*sizeof(UCFDInt), cudaMemcpyHostToDevice));
+    CUDACall(cudaMemcpy(cublusgs->d_colidx, pc->colidx, pc->nnz*sizeof(UCFDInt), cudaMemcpyHostToDevice));
+    CUDACall(cudaMemcpy(cublusgs->d_diagslots, pc->diagslots, bn*sizeof(UCFDInt), cudaMemcpyHostToDevice));
+
+    pc->data            = cublusgs;
     pc->ops->prepare    = CUDABLUSGSPreconPrepare;
     pc->ops->apply      = CUDABLUSGSPreconApply;
     pc->ops->destroy    = CUDABLUSGSPreconDestroy;

@@ -33,7 +33,7 @@ static ucfd_status_t SpMV_CSR(UCFDReal alpha, SpMat mat, UCFDReal *x, UCFDReal b
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-static inline ucfd_status_t UCFDMatCopyPattern(SpMat mat, UCFDInt **rp_dest, UCFDInt **ci_dest)
+ucfd_status_t UCFDMatCopyPattern(SpMat mat, UCFDInt **rp_dest, UCFDInt **ci_dest)
 {
     BaseCSR *csr = (BaseCSR *)mat->data;
     *rp_dest = csr->rowptr;

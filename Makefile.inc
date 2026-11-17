@@ -13,9 +13,16 @@ USE_MKL = 1
 # Compiler setting
 ## Intel oneAPI (Recommended)
 CC = mpiicx
+CXX = mpiicpx
 
 ## GCC or Clang
 # CC = mpicc
+# CXX = mpicxx
+
+## NVCC
+NVCC = nvcc
+# NVCC = /usr/local/cuda/bin/nvcc
+
 
 ## Constants (Optional)
 # GAMMA = 1.4

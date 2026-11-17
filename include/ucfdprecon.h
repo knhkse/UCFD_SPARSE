@@ -36,8 +36,10 @@ UCFD_EXTERN ucfd_status_t UCFDPreconSetPBILU(Precon*, UCFDInt, UCFDInt, UCFDInt,
 UCFD_EXTERN ucfd_status_t UCFDPreconSetPBLUSGS(Precon*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);
 
 #if defined(__CUDACC__)
-UCFD_EXTERN ucfd_status_t UCFDPreconSetCUDABILU(Precon*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);
-UCFD_EXTERN ucfd_status_t UCFDPreconSetCUDABLUSGS(Precon*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);
+UCFD_EXTERN ucfd_status_t UCFDPreconCreatefromDeviceArrays(Precon*, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*);
+
+UCFD_EXTERN ucfd_status_t UCFDPreconSetCUDABILU(Precon*, SpMat mat, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);
+UCFD_EXTERN ucfd_status_t UCFDPreconSetCUDABLUSGS(Precon*, SpMat mat, UCFDInt, UCFDInt, UCFDInt, UCFDInt*);
 #endif
 
 #if defined(__cplusplus)
