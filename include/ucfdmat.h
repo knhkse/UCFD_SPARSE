@@ -50,7 +50,7 @@ UCFD_EXTERN ucfd_status_t UCFDMatCreateCUSPCSR(SpMat*, UCFDInt, UCFDInt, UCFDInt
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCUSPBSR(SpMat*, UCFDInt, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*);
 UCFD_EXTERN ucfd_status_t UCFDMatCreateCUDAMPIBSR(SpMat*, Ctx, UCFDInt, UCFDInt, UCFDInt*, UCFDInt*, UCFDReal*, UCFDInt, UCFDInt);
 
-UCFD_EXTERN ucfd_status_t UCFDMatUpdateDeviceValues(SpMat, UCFDReal*, void*);
+UCFD_EXTERN ucfd_status_t UCFDMatUpdateDeviceValues(SpMat, UCFDReal*);
 #endif
 
 #if defined(__cplusplus)
