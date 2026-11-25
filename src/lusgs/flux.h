@@ -43,12 +43,6 @@ void rans_flux_container(UCFDInt nfvars, UCFDInt nturbvars, UCFDInt ndims, UCFDR
 void kwsst_src_jacobian(UCFDInt nvars, UCFDInt nturbvars, UCFDReal *uf, UCFDReal *A, UCFDReal *dsrc);
 void sa_src_jacobian(UCFDInt nvars, UCFDInt nturbvars, UCFDReal *uf, UCFDReal *A, UCFDReal *dsrc);
 
-#if defined(__CUDACC__)
-__device__ void cuda_kwsst_src_jacobian(UCFDInt nvars, UCFDInt nturbvars, UCFDReal *uf, UCFDReal *A, UCFDReal *dsrc);
-__device__ void cuda_sa_src_jacobian(UCFDInt nvars, UCFDInt nturbvars, UCFDReal *uf, UCFDReal *A, UCFDReal *dsrc);
-#endif
-
-
 #if defined(__cplusplus)
 }
 #endif

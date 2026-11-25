@@ -3,108 +3,89 @@
 #include "ucfdlusgs.h"
 #include "flux.h"
 
-
-/* LU-SGS system */
-typedef struct {
-    UCFDReal *u, *du;
-    UCFDReal *diag;
-    UCFDReal *fspr, *tfspr;
-} LUSGSSys;
-
-/* Block LU-SGS system */
-typedef struct {
-    UCFDReal *rhs, *du, *dup;
-    UCFDReal *diag, *tdiag;
-    UCFDReal *jmat, *tjmat;
-} BLUSGSSys;
-
-/* CUDA BLU-SGS system */
-typedef struct {
-    UCFDReal *du, *dup;
-    UCFDReal *diag, *tdiag;
-    UCFDReal *jmat, *tjmat;
-} CUBLUSGSSys;
-
-
 /**
- * Serial execution system
+ * Entire system
  */
-typedef struct {
-    /* Input from main program */
-    UCFDInt     neles, nface;
-
-    UCFDInt     *cell_ids;      /* rank_cell_ids */
-    UCFDReal    *uptsb, *rhs;
-    UCFDReal    *dt, *dsrc;
-    UCFDReal    *vol, *resid_out;
-} FlowElem;
-
-struct _FlowSys {
-    /* Basic properties */
-    UCFDInt     nlocal;
-    UCFDInt     nvars, nfvars, nturbvars;
-    UCFDInt     ndims, nfaces;
-
-    /* Sparse matrix format */
-    UCFDInt     *rowptr;            /* rank_face_indptr */
-    UCFDInt     *colidx;            /* rank_face_neighbors */
-    UCFDInt     *slots;             /* rank_face_slots */
-    UCFDInt8    *sides;            /* rank_face_sides */
-    
-    /* Flow attributes */
-    UCFDReal    *face_area;
-    UCFDReal    *face_normal;
-    UCFDReal    *rcp_vol;
-
-    /* Specific relaxation */
-    void        *data;
-
-    /* Elements in own rank */
-    FlowElem    *eles;
-
-    /* Destruction function */
-    ucfd_status_t (*destroy)(FlowSys);
-};
-
-
-/**
- * Parallel execution system
- * use rank-coloring grid
- */
-typedef struct {
-    FlowElem    base;           /* rank_ele_cell_ids */
-
-    /* Coloring attributes */
-    UCFDInt     ncolors, *nblocks;
-    UCFDInt     *face_refs;
-    UCFDReal    *face_factors;
-    UCFDInt     *color_offsets, *color_order;
-
-    /* Colored LU-SGS */
-    UCFDInt     *lower_neighbors, *upper_neighbors;
-    UCFDReal    *face_normal;
-    UCFDReal    *wave_factors;      /* Internal allocation */
-
-    /* Colored BLU-SGS */
-    UCFDInt     *neighbors;
-    /* offdiag : [neles, nface, nfvars, nfvars] */
-    /* turb_offdiag : [neles, nface, nturbvars, nturbvars] */
-    UCFDReal    *flow_offdiag, *turb_offdiag;   /* Internal allocation */
-    
-} PFlowElem;
-
-struct _PFlowSys {
-    /* Basic properties */
+struct _UCFDSys {
+    /* Basic scalar properties */
     UCFDInt     nlocal, nelem;
     UCFDInt     nvars, nfvars, nturbvars;
     UCFDInt     ndims, nfaces;
 
-    /* LU-SGS or BLU-SGS */
-    void        *data;
-
-    /* Elements in own rank */
-    PFlowElem   *eles;
-
-    /* Destruction function */
-    ucfd_status_t (*destroy)(PFlowSys);
+    /* Specific system structure
+        FlowSys or PFlowSys
+    */
+    void        *flowsys;
+    void        *eles;
 };
+
+/**
+ * Serial / parallel system
+ */
+#define BASESYS                                 \
+    /**                                         \
+     * Basic system arrays                      \
+     * LU-SGS : rank_u, rank_du, rank_diag      \
+     * BLU-SGS : rank_du, rank_dup, rank_rhs    \
+     */                                         \
+    UCFDReal    *rank_u, *rank_du, *rank_dup;   \
+    UCFDReal    *rank_diag, *rank_rhs;          \
+\
+    /* LU-SGS */                                \
+    UCFDReal    *fspr, *tfspr;                  \
+\
+    /* BLU-SGS */                               \
+    UCFDReal    *flow_diag, *turb_diag;         \
+    UCFDReal    *jmat, *tjmat;
+
+typedef struct {
+    BASESYS
+    UCFDInt     *face_indptr, *face_slots, *face_neighbors;
+    UCFDInt8    *face_sides;
+    UCFDReal    *face_area, *face_normal, *rcp_vol;
+} FlowSys;
+
+typedef struct {
+    BASESYS
+} PFlowSys;
+
+
+
+
+/**
+ * Note :
+ * Colored element has loop-contained arrays
+ */
+#define BASEELEMENT                             \
+    UCFDInt     neles, nface;                   \
+    UCFDInt     *cell_ids;                      \
+    UCFDReal    *uptsb, *rhs, *resid_out;       \
+    UCFDReal    *dt, *dsrc, *vol;
+
+typedef struct {
+    BASEELEMENT
+} FlowEle;
+
+typedef struct {
+    BASEELEMENT
+    UCFDInt     *face_refs, *neighbors;
+    UCFDReal    *face_factors;
+    UCFDReal    *flow_offdiag, *turb_offdiag;
+
+    /* Coloring properties */
+    UCFDInt     cell_offset;
+    UCFDInt     ncolors, *nblocks;
+    UCFDInt     *color_offset;
+} PFlowEle;
+
+
+/* Internal functions */
+UCFD_INTERN ucfd_status_t _rank_blusgs_update(const UCFDInt, const UCFDInt, const UCFDInt,
+                                              const UCFDInt*, const UCFDReal*, UCFDReal*);
+UCFD_INTERN ucfd_status_t _rank_tblusgs_pack(const UCFDInt, const UCFDInt, const UCFDInt,
+                                            const UCFDInt, const UCFDReal, const UCFDReal,
+                                            srcjacobian, const UCFDInt*, const UCFDReal*,
+                                            const UCFDReal*, const UCFDReal*, UCFDReal*);
+UCFD_INTERN ucfd_status_t _rank_sub_residual(const UCFDInt, const UCFDInt, const UCFDInt,
+                                             const UCFDInt*, const UCFDReal*, const UCFDReal*,
+                                             UCFDReal*, UCFDReal*);

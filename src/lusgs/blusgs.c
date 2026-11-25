@@ -1,120 +1,120 @@
 #include <string.h>
 #include "flowsys.h"
 #include "flux.h"
-#include "inverse.h"
+#include "smallmat.h"
 
 
 /**
- * ! ----------------- array structure -------------
- * rhs, du, dup : [nlocal, nvars]   <- different with pyBaram
- * diag : [nlocal, nfvars, nfvars]
- * tdiag : [nlocal, nturbvars, nturbvars]
+ * ----------------- array structure -------------
+ * rhs, du, dup : [nvars, nlocal]
+ * flow_diag : [nlocal, nfvars, nfvars]
+ * turb_diag : [nlocal, nturbvars, nturbvars]
  */
 
 /**
  * Pack & update kernels => per-element execution
  */
 static ucfd_status_t
-rank_blusgs_pack(const UCFDInt neles, const UCFDInt nvars,
-                 const UCFDInt nfvars, const UCFDReal a0,
-                 const UCFDInt *restrict cell_ids,
-                 const UCFDReal *restrict rhs,
-                 const UCFDReal *restrict dt,
-                 UCFDReal *restrict rank_rhs,
-                 UCFDReal *restrict diag)
+_rank_blusgs_pack(const UCFDInt neles, const UCFDInt nlocal,
+                  const UCFDInt nvars, const UCFDInt nfvars, 
+                  const UCFDReal a0,
+                  const UCFDInt *restrict cell_ids,
+                  const UCFDReal *restrict rhs,
+                  const UCFDReal *restrict dt,
+                  UCFDReal *restrict rank_rhs,
+                  UCFDReal *restrict flow_diag)
 {
     UCFDInt idx, ridx, kdx, row, col;
-    const UCFDInt dim2 = nfvars*nfvars;
 
-    for (idx=0; idx<neles; ++idx)
-    {
+    for (idx=0; idx<neles; ++idx) {
         ridx = cell_ids[idx];
         for (kdx=0; kdx<nvars; ++kdx)
             // rank_rhs[ridx, kdx] = rhs[kdx, idx]
-            rank_rhs[kdx + ridx*nvars] = rhs[idx + kdx*neles];
+            rank_rhs[ridx + kdx*nlocal] = rhs[idx + kdx*neles];
         
         for (row=0; row<nfvars; ++row) {
-            const UCFDInt offset = row*nfvars + ridx*dim2;
             for (col=0; col<nfvars; ++col)
-                // diag[ridx, row, col] = 0.0
-                diag[col + offset] = 0.0;
-            diag[row + offset] = 1/dt[idx] + a0;
+                flow_diag[(size_t)(row*nfvars + col)*nlocal + ridx] = 0.0;
+            flow_diag[(size_t)(row*nfvars + row)*nlocal + ridx] = 1/dt[idx] + a0;
         }
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_Pack(FlowSys sys, UCFDInt eidx, UCFDReal a0)
+ucfd_status_t UCFDBLUSGS_Pack(UCFDSys sys, UCFDInt eidx, UCFDReal a0)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
-    FlowElem *e  = &sys->eles[eidx];
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
+    FlowEle *e  = &((FlowEle *)sys->eles)[eidx];
     
-    UCFDCall(rank_blusgs_pack(
-        e->neles, sys->nvars, sys->nfvars, a0,
-        e->cell_ids, e->rhs, e->dt, blusgs->rhs, blusgs->diag
+    UCFDCall(_rank_blusgs_pack(
+        e->neles, sys->nlocal, sys->nvars, sys->nfvars, a0,
+        e->cell_ids, e->rhs, e->dt, blusgs->rank_rhs, blusgs->flow_diag
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 
-static ucfd_status_t
-rank_tblusgs_pack(const UCFDInt neles, const UCFDInt nvars,
-                  const UCFDInt nfvars, const UCFDReal a0, const UCFDReal factor,
-                  srcjacobian dsrcf,
-                  const UCFDInt *restrict cell_ids,
-                  const UCFDReal *restrict uptsb,
-                  const UCFDReal *restrict dsrc,
-                  const UCFDReal *restrict dt,
-                  UCFDReal *restrict diag)
+ucfd_status_t
+_rank_tblusgs_pack(const UCFDInt neles, const UCFDInt nlocal,
+                   const UCFDInt nvars, const UCFDInt nfvars,
+                   const UCFDReal a0, const UCFDReal factor,
+                   srcjacobian dsrcf,
+                   const UCFDInt *restrict cell_ids,
+                   const UCFDReal *restrict uptsb,
+                   const UCFDReal *restrict dsrc,
+                   const UCFDReal *restrict dt,
+                   UCFDReal *restrict turb_diag)
 {
     UCFDInt idx, ridx, kdx, row, col;
     const UCFDInt nturbvars = nvars - nfvars;
-    const UCFDInt dim2 = nturbvars*nturbvars;
-    UCFDReal u[nvars], d[nvars];
+    UCFDReal u[nvars], ds[nvars], dmat[nturbvars*nturbvars];
 
     for (idx=0; idx<neles; ++idx)
     {
         ridx = cell_ids[idx];
         for (row=0; row<nturbvars; ++row) {
             for (col=0; col<nturbvars; ++col)
-                diag[col + row*nturbvars + ridx*dim2] = 0.0;
+                dmat[col+row*nturbvars] = 0.0;
         }
 
         // Prepare cell uf and dsrc
         for (kdx=0; kdx<nvars; ++kdx) {
             u[kdx] = uptsb[idx + kdx*neles];
-            d[kdx] = dsrc[idx + kdx*neles];
+            ds[kdx] = dsrc[idx + kdx*neles];
         }
-        dsrcf(nvars, nturbvars, u, &diag[ridx*dim2], d);
+        dsrcf(nvars, nturbvars, u, dmat, ds);
 
-        for (row=0; row<nturbvars; ++row)
-            diag[row + row*nturbvars + ridx*dim2] += 1/(dt[idx]*factor) + a0;
+        for (row=0; row<nturbvars; ++row) {
+            for (col=0; col<nturbvars; ++col)
+                turb_diag[(size_t)(row*nturbvars + col)*nlocal + ridx] = dmat[col+row*nturbvars];
+            turb_diag[(size_t)(row*nturbvars + row)*nlocal + ridx] += 1.0/(dt[idx]*factor) + a0;
+        }
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_KWSST_Pack(FlowSys sys, UCFDInt eidx, UCFDReal turb_factor, UCFDReal a0)
+ucfd_status_t UCFDBLUSGS_KWSST_Pack(UCFDSys sys, UCFDInt eidx, UCFDReal turb_factor, UCFDReal a0)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
+    FlowEle *e  = &((FlowEle *)sys->eles)[eidx];
     srcjacobian dsrcf = kwsst_src_jacobian;
-    FlowElem *e  = &sys->eles[eidx];
 
-    UCFDCall(rank_tblusgs_pack(
-        e->neles, sys->nvars, sys->nfvars, a0, turb_factor,
-        dsrcf, e->cell_ids, e->uptsb, e->dsrc, e->dt, blusgs->tdiag
+    UCFDCall(_rank_tblusgs_pack(
+        e->neles, sys->nlocal, sys->nvars, sys->nfvars, a0, turb_factor,
+        dsrcf, e->cell_ids, e->uptsb, e->dsrc, e->dt, blusgs->turb_diag
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_SA_Pack(FlowSys sys, UCFDInt eidx, UCFDReal turb_factor, UCFDReal a0)
+ucfd_status_t UCFDBLUSGS_SA_Pack(UCFDSys sys, UCFDInt eidx, UCFDReal turb_factor, UCFDReal a0)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
+    FlowEle *e  = &((FlowEle *)sys->eles)[eidx];
     srcjacobian dsrcf = sa_src_jacobian;
-    FlowElem *e  = &sys->eles[eidx];
 
-    UCFDCall(rank_tblusgs_pack(
-        e->neles, sys->nvars, sys->nfvars, a0, turb_factor,
-        dsrcf, e->cell_ids, e->uptsb, e->dsrc, e->dt, blusgs->tdiag
+    UCFDCall(_rank_tblusgs_pack(
+        e->neles, sys->nlocal, sys->nvars, sys->nfvars, a0, turb_factor,
+        dsrcf, e->cell_ids, e->uptsb, e->dsrc, e->dt, blusgs->turb_diag
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -123,11 +123,12 @@ ucfd_status_t UCFDBLUSGS_SA_Pack(FlowSys sys, UCFDInt eidx, UCFDReal turb_factor
 /**
  * Update
  */
-static ucfd_status_t
-rank_blusgs_update(const UCFDInt neles, const UCFDInt nvars,
-                   const UCFDInt *restrict cell_ids,
-                   const UCFDReal *restrict rank_du,
-                   UCFDReal *restrict upts)
+ucfd_status_t
+_rank_blusgs_update(const UCFDInt neles,
+                    const UCFDInt nvars, const UCFDInt nlocal,
+                    const UCFDInt *restrict cell_ids,
+                    const UCFDReal *restrict rank_du,
+                    UCFDReal *restrict upts)
 {
     UCFDInt idx, ridx, kdx;
 
@@ -136,20 +137,19 @@ rank_blusgs_update(const UCFDInt neles, const UCFDInt nvars,
     {
         ridx = cell_ids[idx];
         for (kdx=0; kdx<nvars; ++kdx)
-            // upts[kdx, idx] += du[ridx, kdx]
-            upts[idx + kdx*neles] += rank_du[kdx + ridx*nvars];
+            upts[idx + kdx*neles] += rank_du[ridx + kdx*nlocal];
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_Update(FlowSys sys, UCFDInt eidx)
+ucfd_status_t UCFDBLUSGS_Update(UCFDSys sys, UCFDInt eidx)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
-    FlowElem *e  = &sys->eles[eidx];
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
+    FlowEle *e = &((FlowEle *)sys->eles)[eidx];
 
-    UCFDCall(rank_blusgs_update(
-        e->neles, sys->nvars,
-        e->cell_ids, blusgs->du, e->uptsb
+    UCFDCall(_rank_blusgs_update(
+        e->neles, sys->nvars, sys->nlocal,
+        e->cell_ids, blusgs->rank_du, e->uptsb
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -158,13 +158,14 @@ ucfd_status_t UCFDBLUSGS_Update(FlowSys sys, UCFDInt eidx)
 /**
  * Inner iteration residual
  */
-static ucfd_status_t
-rank_sub_residual(const UCFDInt neles, const UCFDInt nvars,
-                  const UCFDInt *restrict cell_ids,
-                  const UCFDReal *restrict vol,
-                  const UCFDReal *restrict du,
-                  UCFDReal *restrict dup,
-                  UCFDReal *restrict res)
+ucfd_status_t
+_rank_sub_residual(const UCFDInt neles,
+                   const UCFDInt nvars, const UCFDInt nlocal,
+                   const UCFDInt *restrict cell_ids,
+                   const UCFDReal *restrict vol,
+                   const UCFDReal *restrict du,
+                   UCFDReal *restrict dup,
+                   UCFDReal *restrict res)
 {
     UCFDInt idx, ridx, kdx, offset;
     UCFDReal diff;
@@ -175,7 +176,7 @@ rank_sub_residual(const UCFDInt neles, const UCFDInt nvars,
         ridx = cell_ids[idx];
 
         for (kdx=0; kdx<nvars; ++kdx) {
-            offset = kdx + ridx*nvars;
+            offset = ridx + kdx*nlocal;
             diff = du[offset] - dup[offset];
             res[idx + kdx*neles] = diff*diff*vol[idx];
             dup[offset] = du[offset];
@@ -184,37 +185,35 @@ rank_sub_residual(const UCFDInt neles, const UCFDInt nvars,
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_SubResidual(FlowSys sys, UCFDInt eidx)
+ucfd_status_t UCFDBLUSGS_SubResidual(UCFDSys sys, UCFDInt eidx)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
-    FlowElem *e  = &sys->eles[eidx];
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
+    FlowEle *e  = &((FlowEle *)sys->eles)[eidx];
 
-    UCFDCall(rank_sub_residual(
-        e->neles, sys->nvars, e->cell_ids,
-        e->vol, blusgs->du, blusgs->dup, e->resid_out
+    UCFDCall(_rank_sub_residual(
+        e->neles, sys->nvars, sys->nlocal, e->cell_ids,
+        e->vol, blusgs->rank_du, blusgs->rank_dup, e->resid_out
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 
 static ucfd_status_t
-pre_blusgs(const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfaces,
-           const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_slots,
-           const UCFDInt8 *restrict face_sides, const UCFDReal *restrict face_area,
-           const UCFDReal *restrict rcp_vol,
-           UCFDReal *restrict diag, UCFDReal *restrict jmat)
+_pre_blusgs(const UCFDInt nlocal, const UCFDInt nv, const UCFDInt nfaces,
+            const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_slots,
+            const UCFDInt8 *restrict face_sides, const UCFDReal *restrict face_area,
+            const UCFDReal *restrict rcp_vol, UCFDReal *restrict diag, UCFDReal *restrict jmat)
 {
     UCFDInt ridx, pos, row, col, slot, st, ed;
     UCFDInt8 side;
-    const UCFDInt dim2 = nvars*nvars;
+    const UCFDInt dim2 = nv*nv;
     UCFDReal dmat[dim2], fv, val;
-
 
     for (ridx=0; ridx<nlocal; ++ridx)
     {
-        for (row=0; row<nvars; ++row) {
-            for (col=0; col<nvars; ++col)
-                dmat[col + row*nvars] = diag[col + row*nvars + ridx*dim2];
+        for (row=0; row<nv; ++row) {
+            for (col=0; col<nv; ++col)
+                dmat[col + row*nv] = diag[(size_t)(row*nv + col)*nlocal + ridx];
         }
 
         st = face_indptr[ridx];
@@ -225,59 +224,59 @@ pre_blusgs(const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfaces,
             side = face_sides[pos];
             fv = face_area[slot]*rcp_vol[ridx];
 
-            for (row=0; row<nvars; ++row) {
-                for (col=0; col<nvars; ++col) {
+            for (row=0; row<nv; ++row) {
+                for (col=0; col<nv; ++col) {
                     if (side == 1)
-                        val = jmat[slot + col*nfaces + row*nfaces*nvars];
+                        val = jmat[slot + col*nfaces + row*nfaces*nv];
                     else
-                        val = -jmat[slot + col*nfaces + row*nfaces*nvars + dim2*nfaces];
-                    dmat[col + row*nvars] += val*fv;
+                        val = -jmat[slot + col*nfaces + row*nfaces*nv + dim2*nfaces];
+                    dmat[col + row*nv] += val*fv;
                 }
             }
         }
-        ludcmp(nvars, dmat);
+        pivoted_inverse(nv, dmat, PIVOT_TOL);
 
-        for (row=0; row<nvars; ++row) {
-            for (col=0; col<nvars; ++col)
-                diag[col + row*nvars + ridx*dim2] = dmat[col + row*nvars];
+        for (row=0; row<nv; ++row) {
+            for (col=0; col<nv; ++col)
+                diag[(size_t)(row*nv + col)*nlocal + ridx] = dmat[col + row*nv];
         }
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_NSPrepare(FlowSys sys)
+ucfd_status_t UCFDBLUSGS_NSPrepare(UCFDSys sys)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
 
-    UCFDCall(pre_blusgs(
+    UCFDCall(_pre_blusgs(
         sys->nlocal, sys->nfvars, sys->nfaces,
-        sys->rowptr, sys->slots, sys->sides, sys->face_area,
-        sys->rcp_vol, blusgs->diag, blusgs->jmat
+        blusgs->face_indptr, blusgs->face_slots, blusgs->face_sides,
+        blusgs->face_area, blusgs->rcp_vol, blusgs->flow_diag, blusgs->jmat
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_RANSPrepare(FlowSys sys)
+ucfd_status_t UCFDBLUSGS_RANSPrepare(UCFDSys sys)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
 
-    UCFDCall(pre_blusgs(
+    UCFDCall(_pre_blusgs(
         sys->nlocal, sys->nturbvars, sys->nfaces,
-        sys->rowptr, sys->slots, sys->sides, sys->face_area,
-        sys->rcp_vol, blusgs->tdiag, blusgs->tjmat
+        blusgs->face_indptr, blusgs->face_slots, blusgs->face_sides,
+        blusgs->face_area, blusgs->rcp_vol, blusgs->turb_diag, blusgs->tjmat
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 
 static ucfd_status_t
-lower_sweep(const UCFDInt var0, const UCFDInt nv, const UCFDInt nlocal,
-            const UCFDInt nvars, const UCFDInt ndims, const UCFDInt nfaces,
-            const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
-            const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
-            const UCFDReal *restrict face_area, const UCFDReal *restrict rcp_vol,
-            const UCFDReal *restrict rhsb, const UCFDReal *restrict diag,
-            const UCFDReal *restrict jmat, UCFDReal *restrict dub)
+_lower_sweep(const UCFDInt var0, const UCFDInt nv,
+             const UCFDInt nlocal, const UCFDInt nfaces,
+             const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+             const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+             const UCFDReal *restrict face_area, const UCFDReal *restrict rcp_vol,
+             const UCFDReal *restrict rank_rhs, const UCFDReal *restrict diag,
+             const UCFDReal *restrict jmat, UCFDReal *restrict rank_du)
 {
     UCFDInt ridx, row, col, pos, neib, slot;
     const UCFDInt dim2 = nv*nv;
@@ -287,9 +286,9 @@ lower_sweep(const UCFDInt var0, const UCFDInt nv, const UCFDInt nlocal,
     for (ridx=0; ridx<nlocal; ++ridx)
     {
         for (row=0; row<nv; ++row) {
-            rhs[row] = rhsb[var0+row + ridx*nvars];
+            rhs[row] = rank_rhs[ridx + (var0+row)*nlocal];
             for (col=0; col<nv; ++col)
-                dmat[col + nv*row] = diag[col + nv*row + ridx*dim2];
+                dmat[col + nv*row] = diag[(size_t)(row*nv + col)*nlocal + ridx];
         }
 
         const UCFDInt pos_st = face_indptr[ridx];
@@ -297,6 +296,8 @@ lower_sweep(const UCFDInt var0, const UCFDInt nv, const UCFDInt nlocal,
         for (pos=pos_st; pos<pos_end; ++pos)
         {
             neib = face_neighbors[pos];
+            if (neib == ridx) continue;
+
             slot = face_slots[pos];
             side = face_sides[pos];
             fv = face_area[slot]*rcp_vol[ridx];
@@ -305,29 +306,29 @@ lower_sweep(const UCFDInt var0, const UCFDInt nv, const UCFDInt nlocal,
                 val = 0.0;
                 for (col=0; col<nv; ++col) {
                     if (side == 1)
-                        jval = jmat[slot + col*nfaces + row*nv*nfaces + dim2*nfaces];
+                        jval = jmat[(size_t)(dim2+row*nv+col)*nfaces + slot];
                     else
-                        jval = -jmat[slot + col*nfaces + row*nv*nfaces];
-                    val += jval * dub[var0+col + neib*nvars];
+                        jval = -jmat[(size_t)(row*nv+col)*nfaces + slot];
+                    val += jval * rank_du[neib + (var0+col)*nlocal];
                 }
                 rhs[row] -= val*fv;
             }
         }
-        lusub(nv, dmat, rhs);
+        block_matvec(nv, dmat, rhs);
         for (row=0; row<nv; ++row)
-            dub[var0+row + ridx*nvars] = rhs[row];
+            rank_du[ridx + (var0+row)*nlocal] = rhs[row];
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 static ucfd_status_t
-upper_sweep(const UCFDInt var0, const UCFDInt nv, const UCFDInt nlocal,
-            const UCFDInt nvars, const UCFDInt ndims, const UCFDInt nfaces,
-            const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
-            const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
-            const UCFDReal *restrict face_area, const UCFDReal *restrict rcp_vol,
-            const UCFDReal *restrict rhsb, UCFDReal *restrict diag,
-            const UCFDReal *restrict jmat, UCFDReal *restrict dub)
+_upper_sweep(const UCFDInt var0, const UCFDInt nv,
+             const UCFDInt nlocal, const UCFDInt nfaces,
+             const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+             const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+             const UCFDReal *restrict face_area, const UCFDReal *restrict rcp_vol,
+             const UCFDReal *restrict rank_rhs, UCFDReal *restrict diag,
+             const UCFDReal *restrict jmat, UCFDReal *restrict rank_du)
 {
     UCFDInt ridx, row, col, pos, neib, slot;
     const UCFDInt dim2 = nv*nv;
@@ -339,9 +340,9 @@ upper_sweep(const UCFDInt var0, const UCFDInt nv, const UCFDInt nlocal,
     for (ridx=i_begin; ridx>-1; --ridx)
     {
         for (row=0; row<nv; ++row) {
-            rhs[row] = rhsb[var0+row + ridx*nvars];
+            rhs[row] = rank_rhs[ridx + (var0+row)*nlocal];
             for (col=0; col<nv; ++col)
-                dmat[col + nv*row] = diag[col + nv*row + ridx*dim2];
+                dmat[col + nv*row] = diag[(size_t)(row*nv+col)*nlocal + ridx];
         }
 
         const UCFDInt pos_st = face_indptr[ridx];
@@ -349,6 +350,8 @@ upper_sweep(const UCFDInt var0, const UCFDInt nv, const UCFDInt nlocal,
         for (pos=pos_st; pos<pos_end; ++pos)
         {
             neib = face_neighbors[pos];
+            if (neib == ridx) continue;
+
             slot = face_slots[pos];
             side = face_sides[pos];
             fv = face_area[slot]*rcp_vol[ridx];
@@ -357,124 +360,127 @@ upper_sweep(const UCFDInt var0, const UCFDInt nv, const UCFDInt nlocal,
                 val = 0.0;
                 for (col=0; col<nv; ++col) {
                     if (side == 1)
-                        jval = jmat[slot + col*nfaces + row*nv*nfaces + dim2*nfaces];
+                        jval = jmat[(size_t)(dim2+row*nv+col)*nfaces + slot];
                     else
-                        jval = -jmat[slot + col*nfaces + row*nv*nfaces];
-                    val += jval * dub[var0+col + neib*nvars];
+                        jval = -jmat[(size_t)(row*nv+col)*nfaces + slot];
+                    val += jval * rank_du[neib + (var0+col)*nlocal];
                 }
                 rhs[row] -= val*fv;
             }
         }
-        lusub(nv, dmat, rhs);
+        block_matvec(nv, dmat, rhs);
         for (row=0; row<nv; ++row)
-            dub[var0+row + ridx*nvars] = rhs[row];
+            rank_du[ridx + (var0+row)*nlocal] = rhs[row];
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_NSLowerSweep(FlowSys sys)
+ucfd_status_t UCFDBLUSGS_NSLowerSweep(UCFDSys sys)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
 
-    UCFDCall(lower_sweep(
-        0, sys->nfvars, sys->nlocal, sys->nvars, sys->ndims,
-        sys->nfaces, sys->rowptr, sys->colidx, sys->sides,
-        sys->slots, sys->face_area, sys->rcp_vol, blusgs->rhs,
-        blusgs->diag, blusgs->jmat, blusgs->du
+    UCFDCall(_lower_sweep(
+        0, sys->nfvars, sys->nlocal, sys->nfaces,
+        blusgs->face_indptr, blusgs->face_neighbors, blusgs->face_sides,
+        blusgs->face_slots, blusgs->face_area, blusgs->rcp_vol, blusgs->rank_rhs,
+        blusgs->flow_diag, blusgs->jmat, blusgs->rank_du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_RANSLowerSweep(FlowSys sys)
+ucfd_status_t UCFDBLUSGS_RANSLowerSweep(UCFDSys sys)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
 #if defined(DEBUG)
     UCFDCheckNull(blusgs->tjmat, "Turbulent jacobian matrix is not set\n");
 #endif
-    UCFDCall(lower_sweep(
-        sys->nfvars, sys->nturbvars, sys->nlocal, sys->nvars, sys->ndims,
-        sys->nfaces, sys->rowptr, sys->colidx, sys->sides,
-        sys->slots, sys->face_area, sys->rcp_vol, blusgs->rhs,
-        blusgs->tdiag, blusgs->tjmat, blusgs->du
+    UCFDCall(_lower_sweep(
+        sys->nfvars, sys->nturbvars, sys->nlocal, sys->nfaces,
+        blusgs->face_indptr, blusgs->face_neighbors, blusgs->face_sides,
+        blusgs->face_slots, blusgs->face_area, blusgs->rcp_vol, blusgs->rank_rhs,
+        blusgs->turb_diag, blusgs->tjmat, blusgs->rank_du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_NSUpperSweep(FlowSys sys)
+ucfd_status_t UCFDBLUSGS_NSUpperSweep(UCFDSys sys)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
 
-    UCFDCall(upper_sweep(
-        0, sys->nfvars, sys->nlocal, sys->nvars, sys->ndims,
-        sys->nfaces, sys->rowptr, sys->colidx, sys->sides,
-        sys->slots, sys->face_area, sys->rcp_vol, blusgs->rhs,
-        blusgs->diag, blusgs->jmat, blusgs->du
+    UCFDCall(_upper_sweep(
+        0, sys->nfvars, sys->nlocal, sys->nfaces,
+        blusgs->face_indptr, blusgs->face_neighbors, blusgs->face_sides,
+        blusgs->face_slots, blusgs->face_area, blusgs->rcp_vol, blusgs->rank_rhs,
+        blusgs->flow_diag, blusgs->jmat, blusgs->rank_du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_RANSUpperSweep(FlowSys sys)
+ucfd_status_t UCFDBLUSGS_RANSUpperSweep(UCFDSys sys)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
 #if defined(DEBUG)
     UCFDCheckNull(blusgs->tjmat, "Turbulent jacobian matrix is not set\n");
 #endif
-    UCFDCall(upper_sweep(
-        sys->nfvars, sys->nturbvars, sys->nlocal, sys->nvars, sys->ndims,
-        sys->nfaces, sys->rowptr, sys->colidx, sys->sides,
-        sys->slots, sys->face_area, sys->rcp_vol, blusgs->rhs,
-        blusgs->tdiag, blusgs->tjmat, blusgs->du
+    UCFDCall(_upper_sweep(
+        sys->nfvars, sys->nturbvars, sys->nlocal, sys->nfaces,
+        blusgs->face_indptr, blusgs->face_neighbors, blusgs->face_sides,
+        blusgs->face_slots, blusgs->face_area, blusgs->rcp_vol, blusgs->rank_rhs,
+        blusgs->turb_diag, blusgs->tjmat, blusgs->rank_du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDBLUSGS_Reset(FlowSys sys)
+ucfd_status_t UCFDBLUSGS_Reset(UCFDSys sys)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
+    FlowSys *blusgs = (FlowSys *)sys->flowsys;
     const UCFDInt nlocal = sys->nlocal, nvars = sys->nvars;
 
-    memset(blusgs->du, 0, nlocal*nvars*sizeof(UCFDReal));
-    memset(blusgs->dup, 0, nlocal*nvars*sizeof(UCFDReal));
+    memset(blusgs->rank_du, 0, nlocal*nvars*sizeof(UCFDReal));
+    memset(blusgs->rank_dup, 0, nlocal*nvars*sizeof(UCFDReal));
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 
-static ucfd_status_t BLUSGSDestroy(FlowSys sys)
+ucfd_status_t UCFDSysSetBLUSGS(UCFDSys *sys,
+                               UCFDReal *rank_du, UCFDReal *rank_dup, UCFDReal *rank_rhs,
+                               UCFDReal *flow_diag, UCFDReal *jmat,
+                               UCFDReal *turb_diag, UCFDReal *tjmat)
 {
-    BLUSGSSys *blusgs = (BLUSGSSys *)sys->data;
-    free(blusgs->rhs);
-    free(blusgs->du);
-    free(blusgs->dup);
-    free(blusgs->diag);
-    free(blusgs->tdiag);
+    UCFDSys s           = *sys;
+    FlowSys *fsys       = (FlowSys *)s->flowsys;
+
+    fsys->rank_du       = rank_du;
+    fsys->rank_dup      = rank_dup;
+    fsys->rank_rhs      = rank_rhs;
+    fsys->flow_diag     = flow_diag;
+    fsys->jmat          = jmat;
+    fsys->turb_diag     = turb_diag;
+    fsys->tjmat         = tjmat;
+
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDFlowSysSetBLUSGS(FlowSys *sys, UCFDReal *jmat, UCFDReal *tjmat)
+ucfd_status_t UCFDEleSetBLUSGS(UCFDSys *sys, UCFDInt eidx,
+                              UCFDInt neles, UCFDInt nface, UCFDInt *cell_ids,
+                              UCFDReal *uptsb, UCFDReal *rhs,
+                              UCFDReal *dt, UCFDReal *dsrc,
+                              UCFDReal *vol, UCFDReal *resid_out)
 {
-    FlowSys s       = *sys;
-    BLUSGSSys *blu  = (BLUSGSSys *)calloc(1, sizeof(*blu));
-    UCFDInt nlocal  = s->nlocal;
-    UCFDInt nvars   = s->nvars;
-    UCFDInt nfvars  = s->nfvars;
-    UCFDInt ntvars  = s->nturbvars;
+    UCFDSys s           = *sys;
+    FlowEle *eles       = (FlowEle *)s->eles;
+    FlowEle *e          = &eles[eidx];
 
-    blu->rhs        = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
-    blu->du         = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
-    blu->dup        = (UCFDReal *)malloc(nlocal*nvars*sizeof(UCFDReal));
-
-    /* diag : [nlocal, nfvars, nfvars] */
-    blu->diag       = (UCFDReal *)malloc(nlocal*nfvars*nfvars*sizeof(UCFDReal));
-    if (ntvars != 0)
-        blu->tdiag  = (UCFDReal *)malloc(nlocal*ntvars*ntvars*sizeof(UCFDReal));
-    else blu->tdiag = NULL;
-
-    blu->jmat       = jmat;
-    blu->tjmat      = tjmat;
-
-    s->data         = blu;
-    s->destroy      = BLUSGSDestroy;
+    e->neles            = neles;
+    e->nface            = nface;
+    e->cell_ids         = cell_ids;
+    e->uptsb            = uptsb;
+    e->rhs              = rhs;
+    e->dt               = dt;
+    e->dsrc             = dsrc;
+    e->vol              = vol;
+    e->resid_out        = resid_out;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }

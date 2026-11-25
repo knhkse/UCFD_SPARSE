@@ -6,16 +6,16 @@
  * Pack & update kernels => per-element execution
  */
 static ucfd_status_t
-lusgs_pack(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
-           const UCFDInt nfvars, const UCFDReal turb_factor, const UCFDReal a0,
-           const UCFDInt *restrict cell_ids,
-           const UCFDReal *restrict upts,
-           const UCFDReal *restrict rhs,
-           const UCFDReal *restrict dt,
-           const UCFDReal *restrict dsrc,
-           UCFDReal *restrict rank_u,
-           UCFDReal *restrict rank_du,
-           UCFDReal *restrict rank_diag)
+_lusgs_pack(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+            const UCFDInt nfvars, const UCFDReal turb_factor, const UCFDReal a0,
+            const UCFDInt *restrict cell_ids,
+            const UCFDReal *restrict upts,
+            const UCFDReal *restrict rhs,
+            const UCFDReal *restrict dt,
+            const UCFDReal *restrict dsrc,
+            UCFDReal *restrict rank_u,
+            UCFDReal *restrict rank_du,
+            UCFDReal *restrict rank_diag)
 {
     UCFDInt idx, ridx, kdx, rank_idx, ele_idx;
     UCFDReal factor;
@@ -28,6 +28,7 @@ lusgs_pack(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
             rank_idx = ridx + kdx*nlocal;
             ele_idx = idx + kdx*neles;
             factor = kdx < nfvars ? 1.0 : turb_factor;
+
             rank_u[rank_idx] = upts[ele_idx];
             rank_du[rank_idx] = rhs[ele_idx];
             rank_diag[rank_idx] = 1.0/(dt[idx]*factor) + a0 + dsrc[ele_idx];
@@ -36,26 +37,26 @@ lusgs_pack(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDLUSGS_Pack(FlowSys sys, UCFDInt eidx,
+ucfd_status_t UCFDLUSGS_Pack(UCFDSys sys, UCFDInt eidx,
                              UCFDReal turb_factor, UCFDReal a0)
 {
-    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
-    FlowElem *e  = &(sys->eles[eidx]);
+    FlowSys *lusgs = (FlowSys *)sys->flowsys;
+    FlowEle *e = &((FlowEle *)sys->eles)[eidx];
 
-    UCFDCall(lusgs_pack(
+    UCFDCall(_lusgs_pack(
         sys->nlocal, e->neles, sys->nvars, sys->nfvars, turb_factor, a0,
         e->cell_ids, e->uptsb, e->rhs, e->dt, e->dsrc,
-        lusgs->u, lusgs->du, lusgs->diag
+        lusgs->rank_u, lusgs->rank_du, lusgs->rank_diag
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 
 static ucfd_status_t
-rank_lusgs_update(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
-                  const UCFDInt *restrict cell_ids,
-                  const UCFDReal *restrict rank_du,
-                  UCFDReal *restrict upts)
+_rank_lusgs_update(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars,
+                   const UCFDInt *restrict cell_ids,
+                   const UCFDReal *restrict rank_du,
+                   UCFDReal *restrict upts)
 {
     UCFDInt idx, ridx, kdx;
 
@@ -69,14 +70,14 @@ rank_lusgs_update(const UCFDInt nlocal, const UCFDInt neles, const UCFDInt nvars
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDLUSGS_Update(FlowSys sys, UCFDInt eidx)
+ucfd_status_t UCFDLUSGS_Update(UCFDSys sys, UCFDInt eidx)
 {
-    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
-    FlowElem *e  = &sys->eles[eidx];
+    FlowSys *lusgs = (FlowSys *)sys->flowsys;
+    FlowEle *e = &((FlowEle *)sys->eles)[eidx];
 
-    UCFDCall(rank_lusgs_update(
+    UCFDCall(_rank_lusgs_update(
         sys->nlocal, e->neles, sys->nvars,
-        e->cell_ids, lusgs->du, e->uptsb
+        e->cell_ids, lusgs->rank_du, e->uptsb
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -85,11 +86,11 @@ ucfd_status_t UCFDLUSGS_Update(FlowSys sys, UCFDInt eidx)
  * Preparation => Compute diagonal element
  */
 static ucfd_status_t
-pre_lusgs(const UCFDInt nlocal, const UCFDInt nv0, const UCFDInt nv1,
-          const UCFDReal kappa,
-          const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_slots,
-          const UCFDReal *restrict face_area, const UCFDReal *restrict rcp_vol,
-          const UCFDReal *restrict lambdaf, UCFDReal *restrict diag)
+_pre_lusgs(const UCFDInt nlocal, const UCFDInt nv0, const UCFDInt nv1,
+           const UCFDReal kappa,
+           const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_slots,
+           const UCFDReal *restrict face_area, const UCFDReal *restrict rcp_vol,
+           const UCFDReal *restrict lambdaf, UCFDReal *restrict diag)
 {
     UCFDInt ridx, pos, slot, kdx, st, ed;
     UCFDReal lamf, spectral_diag;
@@ -99,7 +100,7 @@ pre_lusgs(const UCFDInt nlocal, const UCFDInt nv0, const UCFDInt nv1,
     {
         st = face_indptr[ridx];
         ed = face_indptr[ridx+1];
-        spectral_diag = 0.0;
+        spectral_diag = 0.0; 
         for (pos=st; pos<ed; ++pos)
         {
             slot = face_slots[pos];
@@ -112,26 +113,26 @@ pre_lusgs(const UCFDInt nlocal, const UCFDInt nv0, const UCFDInt nv1,
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDLUSGS_NSPrepare(FlowSys sys, UCFDReal kappa)
+ucfd_status_t UCFDLUSGS_NSPrepare(UCFDSys sys, UCFDReal kappa)
 {
-    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    FlowSys *lusgs = (FlowSys *)sys->flowsys;
 
-    UCFDCall(pre_lusgs(
+    UCFDCall(_pre_lusgs(
         sys->nlocal, 0, sys->nfvars, kappa,
-        sys->rowptr, sys->slots, sys->face_area, sys->rcp_vol,
-        lusgs->fspr, lusgs->diag
+        lusgs->face_indptr, lusgs->face_slots, lusgs->face_area,
+        lusgs->rcp_vol, lusgs->fspr, lusgs->rank_diag
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDLUSGS_RANSPrepare(FlowSys sys, UCFDReal kappa)
+ucfd_status_t UCFDLUSGS_RANSPrepare(UCFDSys sys, UCFDReal kappa)
 {
-    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    FlowSys *lusgs = (FlowSys *)sys->flowsys;
 
-    UCFDCall(pre_lusgs(
+    UCFDCall(_pre_lusgs(
         sys->nlocal, sys->nfvars, sys->nvars, kappa,
-        sys->rowptr, sys->slots, sys->face_area, sys->rcp_vol,
-        lusgs->tfspr, lusgs->diag
+        lusgs->face_indptr, lusgs->face_slots, lusgs->face_area,
+        lusgs->rcp_vol, lusgs->tfspr, lusgs->rank_diag
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
@@ -155,15 +156,15 @@ static inline void diff_flux(UCFDInt nvars, UCFDInt nfvars, UCFDInt nturbvars,
 }
 
 static ucfd_status_t
-lower_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
-            fluxfunc fluxf, const UCFDReal *restrict lambdaf,
-            const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfvars,
-            const UCFDInt ndims, const UCFDInt nfaces,
-            const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
-            const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
-            const UCFDReal *restrict face_area, const UCFDReal *restrict face_normal,
-            const UCFDReal *restrict rcp_vol, const UCFDReal *restrict diag,
-            const UCFDReal *restrict rank_u, UCFDReal *restrict rank_du)
+_lower_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
+             fluxfunc fluxf, const UCFDReal *restrict lambdaf,
+             const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfvars,
+             const UCFDInt ndims, const UCFDInt nfaces,
+             const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+             const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+             const UCFDReal *restrict face_area, const UCFDReal *restrict face_normal,
+             const UCFDReal *restrict rcp_vol, const UCFDReal *restrict rank_diag,
+             const UCFDReal *restrict rank_u, UCFDReal *restrict rank_du)
 {
     UCFDInt ridx, kdx, pos, neib, slot;
     UCFDInt8 side;
@@ -198,22 +199,22 @@ lower_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
         }
         for (kdx=0; kdx<dnv; ++kdx) {
             const UCFDInt ldx = ridx + (kdx+nv0)*nlocal;
-            rank_du[ldx] = (rank_du[ldx] - 0.5*df[kdx])/diag[ldx];
+            rank_du[ldx] = (rank_du[ldx] - 0.5*df[kdx])/rank_diag[ldx];
         }
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 static ucfd_status_t
-upper_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
-            fluxfunc fluxf, const UCFDReal *restrict lambdaf,
-            const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfvars,
-            const UCFDInt ndims, const UCFDInt nfaces,
-            const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
-            const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
-            const UCFDReal *restrict face_area, const UCFDReal *restrict face_normal,
-            const UCFDReal *restrict rcp_vol, const UCFDReal *restrict diag,
-            const UCFDReal *restrict rank_u, UCFDReal *restrict rank_du)
+_upper_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
+             fluxfunc fluxf, const UCFDReal *restrict lambdaf,
+             const UCFDInt nlocal, const UCFDInt nvars, const UCFDInt nfvars,
+             const UCFDInt ndims, const UCFDInt nfaces,
+             const UCFDInt *restrict face_indptr, const UCFDInt *restrict face_neighbors,
+             const UCFDInt8 *restrict face_sides, const UCFDInt *restrict face_slots,
+             const UCFDReal *restrict face_area, const UCFDReal *restrict face_normal,
+             const UCFDReal *restrict rcp_vol, const UCFDReal *restrict rank_diag,
+             const UCFDReal *restrict rank_u, UCFDReal *restrict rank_du)
 {
     UCFDInt ridx, kdx, pos, neib, slot;
     UCFDInt8 side;
@@ -250,101 +251,110 @@ upper_sweep(const UCFDInt nv0, const UCFDInt nv1, const UCFDReal kappa,
         }
         for (kdx=0; kdx<dnv; ++kdx) {
             const UCFDInt ldx = ridx + (kdx+nv0)*nlocal;
-            rank_du[ldx] -= (0.5*df[kdx] / diag[ldx]);
+            rank_du[ldx] -= (0.5*df[kdx] / rank_diag[ldx]);
         }
     }
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDLUSGS_NSLowerSweep(FlowSys sys, UCFDReal kappa)
+ucfd_status_t UCFDLUSGS_NSLowerSweep(UCFDSys sys, UCFDReal kappa)
 {
-    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    FlowSys *lusgs = (FlowSys *)sys->flowsys;
     fluxfunc f = ns_flux_container;
     
-    UCFDCall(lower_sweep(
+    UCFDCall(_lower_sweep(
         0, sys->nfvars, kappa, f, lusgs->fspr,
         sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
-        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
-        sys->face_normal, sys->rcp_vol, lusgs->diag,
-        lusgs->u, lusgs->du
+        lusgs->face_indptr, lusgs->face_neighbors, lusgs->face_sides,
+        lusgs->face_slots, lusgs->face_area, lusgs->face_normal,
+        lusgs->rcp_vol, lusgs->rank_diag, lusgs->rank_u, lusgs->rank_du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDLUSGS_RANSLowerSweep(FlowSys sys, UCFDReal kappa)
+ucfd_status_t UCFDLUSGS_RANSLowerSweep(UCFDSys sys, UCFDReal kappa)
 {
-    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    FlowSys *lusgs = (FlowSys *)sys->flowsys;
     fluxfunc f = rans_flux_container;
 #if defined(DEBUG)
     UCFDCheckNull(lusgs->tfspr, "Turbulent spectral radius is not set\n");
 #endif
-    UCFDCall(lower_sweep(
+    UCFDCall(_lower_sweep(
         sys->nfvars, sys->nvars, kappa, f, lusgs->tfspr,
         sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
-        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
-        sys->face_normal, sys->rcp_vol, lusgs->diag,
-        lusgs->u, lusgs->du
+        lusgs->face_indptr, lusgs->face_neighbors, lusgs->face_sides,
+        lusgs->face_slots, lusgs->face_area, lusgs->face_normal,
+        lusgs->rcp_vol, lusgs->rank_diag, lusgs->rank_u, lusgs->rank_du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDLUSGS_NSUpperSweep(FlowSys sys, UCFDReal kappa)
+ucfd_status_t UCFDLUSGS_NSUpperSweep(UCFDSys sys, UCFDReal kappa)
 {
-    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    FlowSys *lusgs = (FlowSys *)sys->flowsys;
     fluxfunc f = ns_flux_container;
     
-    UCFDCall(upper_sweep(
+    UCFDCall(_upper_sweep(
         0, sys->nfvars, kappa, f, lusgs->fspr,
         sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
-        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
-        sys->face_normal, sys->rcp_vol, lusgs->diag,
-        lusgs->u, lusgs->du
+        lusgs->face_indptr, lusgs->face_neighbors, lusgs->face_sides,
+        lusgs->face_slots, lusgs->face_area, lusgs->face_normal,
+        lusgs->rcp_vol, lusgs->rank_diag, lusgs->rank_u, lusgs->rank_du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDLUSGS_RANSUpperSweep(FlowSys sys, UCFDReal kappa)
+ucfd_status_t UCFDLUSGS_RANSUpperSweep(UCFDSys sys, UCFDReal kappa)
 {
-    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
+    FlowSys *lusgs = (FlowSys *)sys->flowsys;
     fluxfunc f = rans_flux_container;
 #if defined(DEBUG)
     UCFDCheckNull(lusgs->tfspr, "Turbulent spectral radius is not set\n");
 #endif    
-    UCFDCall(upper_sweep(
+    UCFDCall(_upper_sweep(
         sys->nfvars, sys->nvars, kappa, f, lusgs->tfspr,
         sys->nlocal, sys->nvars, sys->nfvars, sys->ndims, sys->nfaces,
-        sys->rowptr, sys->colidx, sys->sides, sys->slots, sys->face_area,
-        sys->face_normal, sys->rcp_vol, lusgs->diag,
-        lusgs->u, lusgs->du
+        lusgs->face_indptr, lusgs->face_neighbors, lusgs->face_sides,
+        lusgs->face_slots, lusgs->face_area, lusgs->face_normal,
+        lusgs->rcp_vol, lusgs->rank_diag, lusgs->rank_u, lusgs->rank_du
     ));
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
 
-static ucfd_status_t LUSGSDestroy(FlowSys sys)
+ucfd_status_t UCFDSysSetLUSGS(UCFDSys *sys,
+                              UCFDReal *rank_u, UCFDReal *rank_du, UCFDReal *rank_diag,
+                              UCFDReal *face_normal, UCFDReal *fspr, UCFDReal *tfspr)
 {
-    LUSGSSys *lusgs = (LUSGSSys *)sys->data;
-    free(lusgs->u);
-    free(lusgs->du);
-    free(lusgs->diag);
+    UCFDSys s           = *sys;
+    FlowSys *fsys       = (FlowSys *)s->flowsys;
+
+    fsys->rank_u        = rank_u;
+    fsys->rank_du       = rank_du;
+    fsys->rank_diag     = rank_diag;
+    fsys->face_normal   = face_normal;
+    fsys->fspr          = fspr;
+    fsys->tfspr         = tfspr;
+
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
 
-ucfd_status_t UCFDFlowSysSetLUSGS(FlowSys *sys, UCFDReal *fspr, UCFDReal *tfspr)
+ucfd_status_t UCFDEleSetLUSGS(UCFDSys *sys, UCFDInt eidx,
+                              UCFDInt neles, UCFDInt nface, UCFDInt *cell_ids,
+                              UCFDReal *uptsb, UCFDReal *rhs,
+                              UCFDReal *dt, UCFDReal *dsrc)
 {
-    FlowSys s       = *sys;
-    LUSGSSys *lusgs = (LUSGSSys *)calloc(1, sizeof(*lusgs));
-    UCFDInt nlocal  = s->nlocal;
-    UCFDInt nvars   = s->nvars;
+    UCFDSys s           = *sys;
+    FlowEle *eles       = (FlowEle *)s->eles;
+    FlowEle *e          = &eles[eidx];
 
-    lusgs->u        = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
-    lusgs->du       = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
-    lusgs->diag     = (UCFDReal *)malloc(nvars*nlocal*sizeof(UCFDReal));
-    lusgs->fspr     = fspr;
-    lusgs->tfspr    = tfspr;
-
-    s->data         = lusgs;
-    s->destroy      = LUSGSDestroy;
+    e->neles            = neles;
+    e->nface            = nface;
+    e->cell_ids         = cell_ids;
+    e->uptsb            = uptsb;
+    e->rhs              = rhs;
+    e->dt               = dt;
+    e->dsrc             = dsrc;
 
     UCFDFunctionReturn(UCFD_SUCCESS);
 }
